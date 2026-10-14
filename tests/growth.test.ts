@@ -157,7 +157,7 @@ describe('choosing what to grow', () => {
     expect(app.growth).toBeNull();
   });
 
-  it('records the choice as plain state when ENTER confirms, and the pick can no longer be changed', () => {
+  it('records the choice as plain state when ENTER confirms, and the arrows and numbers leave it alone', () => {
     const { app, press } = toDay(0, 'small', ['9', '9', '9']);
     press('Enter', '2', 'Enter');
     expect(app.growth).toEqual({ kind: 'room', room: tightestRoom(app.day!.rooms).kept });
@@ -244,6 +244,60 @@ describe('choosing what to grow', () => {
     const again = toDay();
     expect(again.app.growth).toBeNull();
     expect(again.app.growthOpen).toBe(false);
+  });
+});
+
+describe('changing the choice before the next morning', () => {
+  it.each(['u', 'U', 'Backspace'])('%s takes a confirmed choice back to the three options with nothing chosen', (key) => {
+    const { app, press } = toDay();
+    press('Enter', '2', 'Enter');
+    expect(app.growth).not.toBeNull();
+    press(key);
+    expect(app.growth).toBeNull();
+    expect(app.growthOpen).toBe(true);
+    expect(app.screen).toBe('day');
+    expect(screen(app).join('\n')).toContain('WHAT TO GROW');
+  });
+
+  it('lets a different option, or the same one, be confirmed after taking it back', () => {
+    const { app, press } = toDay();
+    press('Enter', '1', 'Enter', 'u', '3', 'Enter');
+    expect(app.growth?.kind).toBe('client');
+    press('Backspace', 'Enter');
+    expect(app.growth?.kind).toBe('client');
+    press('u', '1', 'Enter');
+    expect(app.growth).toEqual({ kind: 'truck' });
+  });
+
+  it('does nothing when nothing is chosen yet, and the key bar offers it only once chosen', () => {
+    const cues: string[] = [];
+    const { app, press } = toDay(0, 'small', ['a'], cues);
+    press('Enter');
+    cues.length = 0;
+    press('u', 'Backspace');
+    expect(cues).toEqual([]);
+    expect(screen(app).join('\n')).not.toContain('change choice');
+    press('Enter');
+    expect(screen(app).join('\n')).toContain('U change choice');
+    press('u');
+    expect(cues).toEqual(['finish', 'confirm']);
+  });
+
+  it('puts the last choice to work when the next morning starts', () => {
+    const { app, press } = toDay();
+    const trucks = app.morning.trucks.length;
+    press('Enter', '2', 'Enter', 'u', '1', 'Enter', 'Enter');
+    expect(app.screen).toBe('messages');
+    expect(app.run.day).toBe(2);
+    expect(app.morning.trucks.length).toBe(trucks + 1);
+  });
+
+  it('keeps the same new client across taking back and choosing again', () => {
+    const { app, press } = toDay(0, 'small', ['a'], [], sequence(0.3, 0.9));
+    const before = (app.growthOptions[2]!.growth as { client: NewClient }).client;
+    press('Enter', '3', 'Enter', 'u', '1', 'Enter', 'u', '3', 'Enter');
+    expect(app.growth).toEqual({ kind: 'client', client: before });
+    expect(app.growthOptions[2]!.growth).toEqual({ kind: 'client', client: before });
   });
 });
 
