@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import { ROAD_STEP_MINUTES, ROAD_TICK_MS } from '../src/game/road';
 import { App, type Effects } from '../src/ui/app';
 import { allowCue, REPEAT_GAP, type CueArg, type Moment } from '../src/ui/cues';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 
 function fakeEffects() {
-  const log = { cues: [] as { moment: Moment; arg?: CueArg }[], printed: 0, sound: true };
+  const log = { cues: [] as { moment: Moment; arg?: CueArg }[], printed: 0, sound: true, ticks: [] as (() => void)[] };
   const effects: Effects = {
     cue: (moment, arg) => void log.cues.push({ moment, arg }),
     print: (lines) => {
       log.printed = lines;
       return 100;
     },
-    later: (fn) => fn(),
+    // The road clock waits for the test to run its ticks; the printer runs at once.
+    later: (fn, ms) => (ms === ROAD_TICK_MS ? void log.ticks.push(fn) : fn()),
     toggleSound: () => (log.sound = !log.sound),
   };
   return { effects, log };
@@ -234,6 +236,8 @@ describe('sounds', () => {
     const { app, press, heard } = newApp();
     press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
     expect(heard('F9')).toEqual([['confirm']]);
+    expect(app.screen).toBe('road');
+    expect(heard(' ', 'Enter')).toEqual([['confirm'], ['confirm']]);
     expect(app.screen).toBe('result');
     expect(heard('ArrowUp', 'ArrowDown', 'q', 'r')).toEqual([[], ['move'], [], ['confirm']]);
   });
@@ -425,6 +429,9 @@ describe('a whole small morning', () => {
     expect(app.screen).toBe('sheets');
     expect(header()).toContain(' PROMITHEFTIS · ');
     press('F9');
+    expect(app.screen).toBe('road');
+    expect(header()).toContain(' PROMITHEFTIS · ');
+    press(' ', 'Enter');
     expect(app.screen).toBe('result');
     expect(header()).toContain(' PROMITHEFTIS · ');
     press('r');
@@ -467,12 +474,61 @@ describe('a whole small morning', () => {
     expect(log.printed).toBe(4);
     expect(app.printed).toBe(true);
     expect(expectFullScreen(app).join('\n')).toContain('Truck sheets printed.');
-    press('F9');
+    press('F9', ' ', 'Enter');
     expect(app.screen).toBe('result');
     const text = expectFullScreen(app).join('\n');
     expect(text).toContain('THE TRUCKS HAVE GONE');
     expect(text).toContain('WHO GOT LESS');
     expect(text).toContain('last truck back at');
+  });
+
+  it('runs the road clock a few minutes per tick, filling the log, until every truck is back', () => {
+    const { app, press, log } = play();
+    press('F10', 'F9');
+    expect(app.screen).toBe('road');
+    const start = app.roadClock;
+    expect(start).toBe(7 * 60);
+    expect(log.ticks).toHaveLength(1);
+    expect(expectFullScreen(app).join('\n')).toContain('leaves the depot');
+    log.ticks.shift()!();
+    expect(app.roadClock).toBe(start + ROAD_STEP_MINUTES);
+    expect(app.roadOver).toBe(false);
+    press('Enter');
+    expect(app.roadOver).toBe(true);
+    // A tick left over from before the skip changes nothing.
+    log.ticks.splice(0).forEach((fn) => fn());
+    expect(app.roadClock).toBe(app.road?.end);
+  });
+
+  it('logs each delivery in the screen text, and each truck back', () => {
+    const { app, press } = play();
+    press('F10', 'F9', ' ');
+    const text = expectFullScreen(app).join('\n');
+    expect(text).toMatch(/\d\d:\d\d Truck 2 · The Plough, Fenwick · \d+ items/);
+    expect(text).toContain('a little short');
+    expect(text).toContain('back at the depot');
+    expect(text).toContain('Every truck is back at the depot.');
+  });
+
+  it('skips with SPACE or ENTER, then ENTER goes to the result and SPACE does not', () => {
+    const { app, press } = play();
+    press('F10', 'F9', ' ');
+    expect(app.screen).toBe('road');
+    expect(app.roadOver).toBe(true);
+    press(' ');
+    expect(app.screen).toBe('road');
+    press('Enter');
+    expect(app.screen).toBe('result');
+  });
+
+  it('stops the ticks once the road is left', () => {
+    const { app, press, log } = play();
+    press('F10', 'F9', 'Enter', 'Enter');
+    expect(app.screen).toBe('result');
+    const before = app.roadClock;
+    log.ticks.splice(0).forEach((fn) => fn());
+    expect(app.roadClock).toBe(before);
+    expect(app.screen).toBe('result');
   });
 
   it('reports who got less when the stock ran short', () => {
@@ -488,7 +544,7 @@ describe('a whole small morning', () => {
     const { app, press } = play();
     press('F10', 'Escape');
     expect(app.screen).toBe('desk');
-    press('F10', 'F9', 'r');
+    press('F10', 'F9', ' ', 'Enter', 'r');
     expect(app.screen).toBe('messages');
     expect(app.desk.unfinishedCount()).toBe(7);
   });
@@ -520,6 +576,11 @@ describe('the big morning', () => {
       expectFullScreen(app);
     }
     press('F9');
+    expect(app.screen).toBe('road');
+    expectFullScreen(app);
+    press(' ');
+    expectFullScreen(app);
+    press('Enter');
     expect(app.screen).toBe('result');
     for (let i = 0; i < 40; i++) {
       press('ArrowDown');

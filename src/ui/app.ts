@@ -2,11 +2,12 @@ import { DEPART_MINUTE } from '../game/clock';
 import { Desk } from '../game/desk';
 import { loadMorning } from '../game/morning';
 import { buildResult, type MorningResult } from '../game/results';
+import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
 import type { Morning } from '../game/types';
 import type { CueArg, Moment } from './cues';
 import { plural } from './format';
 
-export type Screen = 'messages' | 'desk' | 'sheets' | 'result';
+export type Screen = 'messages' | 'desk' | 'sheets' | 'road' | 'result';
 export type Pane = 'orders' | 'lines' | 'trucks';
 export type Tone = 'info' | 'warn';
 
@@ -59,6 +60,10 @@ export class App {
   printing: { done: number; total: number } | null = null;
   private printJob = 0;
   printed = false;
+
+  road: Road | null = null;
+  roadClock = 0;
+  private roadJob = 0;
 
   result: MorningResult | null = null;
   resultSel = 0;
@@ -118,6 +123,8 @@ export class App {
         return this.deskKey(key, shift, wasConfirming);
       case 'sheets':
         return this.sheetsKey(key);
+      case 'road':
+        return this.roadKey(key);
       case 'result':
         return this.resultKey(key);
     }
@@ -181,6 +188,8 @@ export class App {
     this.sheetOpen = new Set();
     this.printing = null;
     this.printed = false;
+    this.road = null;
+    this.roadJob++;
     this.result = null;
     this.resultSel = 0;
   }
@@ -464,8 +473,42 @@ export class App {
     const departAt = Math.max(DEPART_MINUTE, this.desk.clock);
     this.result = buildResult(this.desk, departAt);
     this.resultSel = 0;
-    this.screen = 'result';
+    this.road = buildRoad(this.desk, this.result);
+    this.roadClock = this.road.departAt;
+    this.screen = 'road';
     this.sound('confirm');
+    this.scheduleTick(++this.roadJob);
+  }
+
+  // ------------------------------------------------------------ on the road
+  /** True once every truck is back and the whole log is shown. */
+  get roadOver(): boolean {
+    return !!this.road && this.roadClock >= this.road.end;
+  }
+
+  private scheduleTick(job: number): void {
+    this.effects.later(() => {
+      if (job !== this.roadJob || this.screen !== 'road' || !this.road || this.roadOver) return;
+      this.roadClock = Math.min(this.road.end, this.roadClock + ROAD_STEP_MINUTES);
+      // The ticks are not key presses, so they make their own soft click; the last one is the finishing knock.
+      this.effects.cue(this.roadOver ? 'finish' : 'move');
+      if (!this.roadOver) this.scheduleTick(job);
+      this.changed();
+    }, ROAD_TICK_MS);
+  }
+
+  private roadKey(key: string): boolean {
+    if (key === ' ' || key === 'Enter') {
+      if (!this.roadOver) {
+        this.roadClock = this.road?.end ?? this.roadClock;
+        this.sound('confirm');
+      } else if (key === 'Enter') {
+        this.screen = 'result';
+        this.sound('confirm');
+      }
+      return true;
+    }
+    return false;
   }
 
   // ------------------------------------------------------------ result
