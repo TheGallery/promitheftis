@@ -2,6 +2,8 @@
 
 A calm, keyboard-only browser game about running a small restaurant-supply business.
 
+**[Play it in your browser](https://thegallery.github.io/promitheftis/)**, no download needed.
+
 You own a small wholesaler that supplies restaurants. Each morning you hand out the overnight orders against the stock on hand and put each order on a truck before the trucks leave at 07:00. There is no failure screen: if stock runs short, some clients simply get less, and if a truck is sent to places that are far apart, it gets back later.
 
 This is a one-morning prototype. It plays one fixed morning in two sizes:
