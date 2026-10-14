@@ -313,6 +313,91 @@ describe('the supplier ordering screen', () => {
     expect(app.blue).toBe(true);
   });
 
+  describe('the room bars', () => {
+    const heading = (lines: string[], room: string) => lines.find((l) => l.trimStart().startsWith(room)) ?? '';
+    const shades = (line: string) => ({ ...Object.fromEntries(['█', '▓', '▒', '░'].map((g) => [g, [...line].filter((c) => c === g).length])) });
+
+    it('sit on each room\'s heading with its per cent, and a legend explains the four shades', () => {
+      const { app, press } = toResult();
+      press('Enter');
+      const lines = screen(app);
+      const text = lines.join('\n');
+      for (const word of ['█ in store', '▓ ordered', '▒ this row', '░ free']) expect(text).toContain(word);
+      for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) {
+        const line = heading(lines, room);
+        const space = app.supply!.roomSpace(room === 'FREEZER' ? 'freezer' : room === 'FRIDGE' ? 'fridge' : 'dry', 0);
+        expect(line).toMatch(/[█▓▒░]{36} +\d+%/);
+        expect(line).toContain(`${space.pct}%`);
+        expect(line).not.toContain('over by');
+      }
+    });
+
+    it('update as an amount is typed, nudged or filled', () => {
+      const { app, press } = toResult();
+      press('Enter');
+      const freezer = () => heading(screen(app), 'FREEZER');
+      const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
+      const before = shades(freezer());
+      expect(before['▒']).toBe(0);
+      press(...Array(chips).fill('ArrowDown'), '4');
+      const typed = shades(freezer());
+      expect(typed['▒']).toBeGreaterThan(0);
+      expect(typed['░']).toBeLessThan(before['░']!);
+      press('0');
+      const more = shades(freezer())['▒']!;
+      expect(more).toBeGreaterThan(typed['▒']!);
+      press('ArrowLeft');
+      expect(shades(freezer())['▒']).toBeLessThanOrEqual(more);
+      // Leaving the row turns its share into ordered space.
+      press('Enter');
+      const after = shades(freezer());
+      expect(after['▒']).toBe(0);
+      expect(after['▓']).toBeGreaterThan(0);
+      // A fill with A adds the rest of the usual amounts.
+      press('a');
+      const filled = shades(freezer());
+      expect(filled['▓']! + filled['▒']!).toBeGreaterThan(after['▓']!);
+      expect(heading(screen(app), 'FREEZER')).toContain(`${app.supply!.roomSpace('freezer', app.supplySel).pct}%`);
+    });
+
+    it('cap at full and warn in amber when the order is more than a room holds, and F9 still places it', () => {
+      const { app, press } = toResult(0, 'big');
+      press('Enter');
+      const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
+      press(...Array(chips).fill('ArrowDown'), '9', '9', '9');
+      const space = app.supply!.roomSpace('freezer', chips);
+      expect(space.overPct).toBeGreaterThan(0);
+      const lines = screen(app);
+      const line = heading(lines, 'FREEZER');
+      expect(line).toContain(`FREEZER over by ${space.overPct}%`);
+      expect(line).toContain(`${space.pct}%`);
+      expect(shades(line)['░']).toBe(0);
+      expect([...line].filter((c) => '█▓▒'.includes(c))).toHaveLength(36);
+      const amber = screenLines(app).find((l) => l.some(([t]) => t.includes('FREEZER over by')));
+      expect(amber!.filter(([t]) => t.includes('over by') || /^ +\d+%$/.test(t)).every(([, cls]) => cls === 'w')).toBe(true);
+      // The other rooms are not over, so say nothing about them.
+      expect(lines.join('\n').match(/over by/g)).toHaveLength(1);
+      press('F9');
+      expect(app.supply!.placed).toBe(true);
+      expect(screen(app).join('\n')).toContain('ORDER PLACED FOR TOMORROW');
+      // Once placed, nothing is being edited: all of it is ordered.
+      expect(shades(heading(screen(app), 'FREEZER'))['▒']).toBe(0);
+    });
+
+    it('draw all four shades with their own colour in both colour schemes', () => {
+      const { app, press } = toResult(0, 'big');
+      press('Enter', 'a');
+      for (const theme of [false, true]) {
+        expect(app.blue).toBe(theme);
+        const classes = new Map<string, string>();
+        for (const line of screenLines(app)) for (const [t, cls] of line) for (const g of '█▓▒░') if (t.includes(g)) classes.set(g, cls);
+        expect(new Set(classes.keys())).toEqual(new Set(['█', '▓', '▒', '░']));
+        expect(new Set(classes.values()).size).toBe(4);
+        press('F2');
+      }
+    });
+  });
+
   it('makes only the sounds the other screens use', () => {
     const cues: string[] = [];
     const fx = fakeEffects();

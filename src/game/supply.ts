@@ -1,5 +1,6 @@
 import type { Call } from './calls';
 import type { Desk } from './desk';
+import { ROOM_CAPACITY, roomSpace, spaceOf, type RoomSpace } from './rooms';
 import type { Item, Kept, Morning } from './types';
 
 /** The rooms in the order the screen lists them. */
@@ -109,6 +110,21 @@ export class Supply {
 
   fillAll(): void {
     for (let r = 0; r < this.count; r++) this.fillRow(r);
+  }
+
+  /** How full a room will be tomorrow; `editing` is the row being edited, shown apart from the rest of the order. */
+  roomSpace(kept: Kept, editing: number | null = null): RoomSpace {
+    let inStore = 0;
+    let ordered = 0;
+    let current = 0;
+    this.rows.forEach((row, r) => {
+      if (row.kept !== kept) return;
+      const space = spaceOf(row.item.id);
+      inStore += row.onHand * space;
+      if (r === editing) current += this.amount(r) * space;
+      else ordered += this.amount(r) * space;
+    });
+    return roomSpace(ROOM_CAPACITY[kept], inStore, ordered, current);
   }
 
   /** The items with something to order, in the order listed. */

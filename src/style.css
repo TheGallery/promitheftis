@@ -96,6 +96,10 @@ body {
 #screen .acc { color: var(--accent); }
 #screen .bf { color: var(--accent); }
 #screen .be { color: var(--dim); }
+#screen .rs { color: var(--fg); }
+#screen .ro { color: var(--accent); }
+#screen .re { color: var(--head); }
+#screen .rf { color: var(--dim); }
 #screen .w { color: var(--warn); }
 #screen .hl { background: var(--row); }
 body[data-theme='blue'] #screen .hl { color: #000000; }
