@@ -297,13 +297,13 @@ describe('on the screens', () => {
     expect(JSON.stringify(app.morning.orders)).toBe(orders);
     expect(screen(app).join('\n')).toMatch(/!/);
 
-    press('b');
+    press('b', 'b');
     expect(app.run.history).toEqual({});
     expect(app.morning.day).toBe(1);
     expect(screen(app).join('\n')).not.toMatch(/ ! | !! /);
 
     const again = dayTwo();
-    again.press('s');
+    again.press('s', 's');
     expect(again.app.run.history).toEqual({});
     press('r');
     expect(app.run.history).toEqual({});

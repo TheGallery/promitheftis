@@ -86,6 +86,8 @@ export class App {
   truckSel = 0;
   typed = '';
   private confirmEnd = false;
+  /** The fixed morning whose B or S asked to start a new run over a later day's save; the same key again starts it. */
+  private confirmNew: 'small' | 'big' | null = null;
   /** The sound this key press makes: the last one asked for wins. Null is silence. */
   private heard: { moment: Moment; arg?: CueArg } | null = null;
 
@@ -187,12 +189,14 @@ export class App {
   /** Handles one key. Returns false for a key the game does not use. */
   press({ key, shift = false, repeat = false }: KeyPress): boolean {
     const wasConfirming = this.confirmEnd;
+    const askedNew = repeat ? null : this.confirmNew;
     this.confirmEnd = false;
+    this.confirmNew = null;
     this.status = '';
     this.tone = 'info';
     this.heard = null;
 
-    const handled = this.route(key, shift, repeat, wasConfirming);
+    const handled = this.route(key, shift, repeat, wasConfirming, askedNew);
     if (handled) {
       // One sound per key press: a warning replaces the ordinary sound, a key that only shows a message warns,
       // and a key that changed nothing is silent.
@@ -211,7 +215,7 @@ export class App {
     this.heard = { moment, arg };
   }
 
-  private route(key: string, shift: boolean, repeat: boolean, wasConfirming: boolean): boolean {
+  private route(key: string, shift: boolean, repeat: boolean, wasConfirming: boolean, askedNew: 'small' | 'big' | null): boolean {
     if (key === 'F2') {
       this.blue = !this.blue;
       this.saveSettings();
@@ -229,7 +233,7 @@ export class App {
       case 'start':
         return this.startKey(key);
       case 'messages':
-        return this.messagesKey(key);
+        return this.messagesKey(key, askedNew);
       case 'desk':
         return this.deskKey(key, shift, wasConfirming);
       case 'sheets':
@@ -237,11 +241,11 @@ export class App {
       case 'road':
         return this.roadKey(key, repeat);
       case 'result':
-        return this.resultKey(key);
+        return this.resultKey(key, askedNew);
       case 'supply':
         return this.supplyKey(key);
       case 'day':
-        return this.dayKey(key);
+        return this.dayKey(key, askedNew);
     }
   }
 
@@ -292,7 +296,7 @@ export class App {
   }
 
   // ------------------------------------------------------------ messages
-  private messagesKey(key: string): boolean {
+  private messagesKey(key: string, askedNew: 'small' | 'big' | null): boolean {
     const last = this.morning.messages.length - 1;
     const before = this.msgSel;
     switch (key) {
@@ -314,18 +318,31 @@ export class App {
         return true;
       case 'b':
       case 'B':
-        this.loadMorning('big');
-        this.sound('confirm');
-        return true;
+        return this.newRun('big', askedNew);
       case 's':
       case 'S':
-        this.loadMorning('small');
-        this.sound('confirm');
-        return true;
+        return this.newRun('small', askedNew);
       default:
         return false;
     }
     if (this.msgSel !== before) this.sound('move');
+    return true;
+  }
+
+  /**
+   * B or S during play. From day 2 on the first press only asks, since the new run replaces the saved one;
+   * the same key pressed again straight after starts it. On day 1 there is little to lose, so it starts at once.
+   */
+  private newRun(id: 'small' | 'big', askedNew: 'small' | 'big' | null): boolean {
+    if (this.run.day > 1 && askedNew !== id) {
+      const key = id === 'big' ? 'B' : 'S';
+      this.confirmNew = id;
+      this.say(`Start a new run? This replaces your saved day ${this.run.day}. Press ${key} again to confirm, any other key to keep playing.`);
+      this.sound('warn');
+      return true;
+    }
+    this.loadMorning(id);
+    this.sound('confirm');
     return true;
   }
 
@@ -763,7 +780,7 @@ export class App {
   }
 
   // ------------------------------------------------------------ result
-  private resultKey(key: string): boolean {
+  private resultKey(key: string, askedNew: 'small' | 'big' | null): boolean {
     const last = this.morning.orders.length - 1;
     const before = this.resultSel;
     switch (key) {
@@ -789,14 +806,10 @@ export class App {
         return true;
       case 'b':
       case 'B':
-        this.loadMorning('big');
-        this.sound('confirm');
-        return true;
+        return this.newRun('big', askedNew);
       case 's':
       case 'S':
-        this.loadMorning('small');
-        this.sound('confirm');
-        return true;
+        return this.newRun('small', askedNew);
       default:
         return false;
     }
@@ -909,30 +922,26 @@ export class App {
     return this.day && this.newClient ? growthOptions(this.day, this.newClient) : [];
   }
 
-  /** R plays this day again, B and S start a new run from a fixed morning: all of them start over and drop the growth choice. */
-  private restartKey(key: string): boolean {
+  /** R plays this day again, B and S start a new run from a fixed morning (from day 2 on, once asked): all of them start over and drop the growth choice. */
+  private restartKey(key: string, askedNew: 'small' | 'big' | null): boolean {
     switch (key) {
       case 'r':
       case 'R':
         this.restartDay();
-        break;
+        this.sound('confirm');
+        return true;
       case 'b':
       case 'B':
-        this.loadMorning('big');
-        break;
+        return this.newRun('big', askedNew);
       case 's':
       case 'S':
-        this.loadMorning('small');
-        break;
-      default:
-        return false;
+        return this.newRun('small', askedNew);
     }
-    this.sound('confirm');
-    return true;
+    return false;
   }
 
-  private dayKey(key: string): boolean {
-    if (this.restartKey(key)) return true;
+  private dayKey(key: string, askedNew: 'small' | 'big' | null): boolean {
+    if (this.restartKey(key, askedNew)) return true;
     if (this.growthOpen) return this.growthKey(key);
     const last = (this.day?.orders.length ?? 1) - 1;
     const before = this.daySel;

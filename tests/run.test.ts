@@ -576,7 +576,7 @@ describe('the next morning in the game', () => {
     const { app, press } = toNextMorning('1');
     expect(app.morning.day).toBe(2);
     playToSupply(app, press);
-    press('Escape', key);
+    press('Escape', key, key);
     expect(app.morning.day).toBe(1);
     expect(app.run.day).toBe(1);
     expect(app.morning.id).toBe(id);

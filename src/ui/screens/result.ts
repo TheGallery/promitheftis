@@ -111,14 +111,16 @@ export function resultScreen(app: App): Line[] {
   const body: Line[] = [];
   for (let i = 0; i < n; i++) body.push(cols([left[i] ?? [], right[i] ?? []], [LEFT_W, RIGHT_W]));
   const total = app.morning.orders.length;
-  const summary = r
-    ? cat(
-        s(' '),
-        s(`${r.inFull} of ${plural(total, 'order')} in full`, 'b'),
-        s(` · ${plural(r.gotLess.length, 'client')} got less`),
-        s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
-      )
-    : [];
+  const summary = app.status
+    ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
+    : r
+      ? cat(
+          s(' '),
+          s(`${r.inFull} of ${plural(total, 'order')} in full`, 'b'),
+          s(` · ${plural(r.gotLess.length, 'client')} got less`),
+          s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
+        )
+      : [];
   const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

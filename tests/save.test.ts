@@ -304,7 +304,7 @@ describe('B and S replace the save', () => {
     const store = memoryStore();
     toNextMorning('1', 'small', 0, RANDOM, store);
     const { app, press } = appOn(store);
-    press('Enter', 'b');
+    press('Enter', 'b', 'b');
     expect(app.run.day).toBe(1);
     expect(savedRun(store)?.run.kind).toBe('big');
     press(' ', 'F10', 'F10');
@@ -337,6 +337,93 @@ describe('B and S replace the save', () => {
     const { app } = appOn(store);
     expect(app.screen).toBe('start');
     expect(screen(app).join('\n')).toContain('Day 1, TUE 14 MAR');
+  });
+});
+
+describe('B and S ask first from day 2 on', () => {
+  it.each([['b', 'B', 'big'], ['s', 'S', 'small']] as const)(
+    '%s on a later day only asks, and leaves the save untouched until it is pressed again',
+    (key, name, kind) => {
+      const store = memoryStore();
+      const { app, press } = toNextMorning('1', 'small', 0, RANDOM, store);
+      const text = store.data.get(RUN_KEY);
+      press(key);
+      expect(app.run.day).toBe(2);
+      expect(app.screen).toBe('messages');
+      expect(store.data.get(RUN_KEY)).toBe(text);
+      expect(app.status).toBe(`Start a new run? This replaces your saved day 2. Press ${name} again to confirm, any other key to keep playing.`);
+      expect(screen(app).join('\n')).toContain(`Press ${name} again to confirm`);
+      press(key.toUpperCase());
+      expect(app.run.day).toBe(1);
+      expect(app.run.kind).toBe(kind);
+      expect(savedRun(store)).toEqual({ run: runFromMorning(app.morning), daySeed: 0 });
+    },
+  );
+
+  it('any other key cancels the question and does what it always does', () => {
+    const store = memoryStore();
+    const { app, press } = toNextMorning('1', 'small', 0, RANDOM, store);
+    const text = store.data.get(RUN_KEY);
+    press('b', 'ArrowDown');
+    expect(app.status).toBe('');
+    expect(app.msgSel).toBe(1);
+    press('b');
+    expect(app.run.day).toBe(2);
+    press('s');
+    expect(app.run.day).toBe(2);
+    expect(app.status).toContain('Press S again');
+    press(' ');
+    expect(app.screen).toBe('desk');
+    expect(app.run.day).toBe(2);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+  });
+
+  it('a held key repeating does not confirm', () => {
+    const store = memoryStore();
+    const { app } = toNextMorning('1', 'small', 0, RANDOM, store);
+    const text = store.data.get(RUN_KEY);
+    app.press({ key: 'b' });
+    app.press({ key: 'b', repeat: true });
+    expect(app.run.day).toBe(2);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+    expect(app.status).toContain('Press B again');
+  });
+
+  it('asks on the result, the end of the day and the growth choice, with the question on the screen in 120 columns', () => {
+    const store = memoryStore();
+    const { app, press } = toNextMorning('1', 'small', 0, RANDOM, store);
+    const text = store.data.get(RUN_KEY);
+    playToSupply(app, press);
+    press('Escape');
+    expect(app.screen).toBe('result');
+    for (const where of ['result', 'day', 'growth'] as const) {
+      if (where === 'day') press('Enter', 'a', 'F9');
+      if (where === 'growth') press('Enter');
+      press('s');
+      expect(app.screen).toBe(where === 'growth' ? 'day' : where);
+      expect(app.growthOpen).toBe(where === 'growth');
+      expect(app.run.day).toBe(2);
+      expect(store.data.get(RUN_KEY)).toBe(text);
+      const lines = screen(app);
+      expect(lines.join('\n')).toContain('This replaces your saved day 2. Press S again to confirm');
+    }
+    press('s');
+    expect(app.run.day).toBe(1);
+    expect(app.screen).toBe('messages');
+    expect(savedRun(store)).toEqual({ run: runFromMorning(smallMorning()), daySeed: 0 });
+  });
+
+  it('on day 1 there is nothing to ask: one press starts the new run', () => {
+    const store = memoryStore();
+    const { app, press } = appOn(store);
+    press('b');
+    expect(app.run.kind).toBe('big');
+    expect(app.status).toBe('');
+    expect(savedRun(store)?.run.kind).toBe('big');
+    const day = toDay(0, 'small', ['a'], [], RANDOM, memoryStore());
+    day.press('b');
+    expect(day.app.run.kind).toBe('big');
+    expect(day.app.screen).toBe('messages');
   });
 });
 
