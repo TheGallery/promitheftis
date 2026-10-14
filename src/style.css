@@ -1,0 +1,106 @@
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./assets/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: block;
+}
+
+/* Soft green, the default look. */
+:root,
+body[data-theme='green'] {
+  --bg: #0e1512;
+  --fg: #cfe6d6;
+  --head: #e9f8ee;
+  --accent: #6fd69a;
+  --warn: #f0b46c;
+  --dim: #6e8a79;
+  --row: #1b2c24;
+  --cursor-bg: #6fd69a;
+  --cursor-fg: #0e1512;
+  --pane-bg: #1b2c24;
+  --pane-fg: #6fd69a;
+  --focus-bg: #6fd69a;
+  --focus-fg: #0e1512;
+  --bar-bg: #1b2c24;
+  --key-bg: #6fd69a;
+  --key-fg: #0e1512;
+}
+
+/* Office blue, the colours of the old keyboard programs. */
+body[data-theme='blue'] {
+  --bg: #1b2a9a;
+  --fg: #ffffff;
+  --head: #ffff66;
+  --accent: #66e0e0;
+  --warn: #ffc266;
+  --dim: #a3aef0;
+  --row: #00a3a3;
+  --cursor-bg: #ffff66;
+  --cursor-fg: #1b2a9a;
+  --pane-bg: #162280;
+  --pane-fg: #66e0e0;
+  --focus-bg: #00a3a3;
+  --focus-fg: #000000;
+  --bar-bg: #162280;
+  --key-bg: #00a3a3;
+  --key-fg: #000000;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+/*
+ * 120 columns fill the width of the page, as long as 30 rows still fit in the
+ * height. JetBrains Mono is 0.6 em wide and 1.32 em tall per character cell.
+ */
+#screen {
+  margin: 0;
+  width: 120ch;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: min(calc(100vw / 72), calc(100vh / 39.6));
+  line-height: 1.32;
+  white-space: pre;
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0, 'calt' 0;
+  color: var(--fg);
+}
+
+#screen i {
+  display: inline-block;
+  width: 1ch;
+  font-style: normal;
+  text-align: center;
+}
+
+#screen .d { color: var(--dim); }
+#screen .b { color: var(--head); font-weight: 700; }
+#screen .acc { color: var(--accent); }
+#screen .bf { color: var(--accent); }
+#screen .be { color: var(--dim); }
+#screen .w { color: var(--warn); }
+#screen .hl { background: var(--row); }
+body[data-theme='blue'] #screen .hl { color: #000000; }
+#screen .cur { background: var(--cursor-bg); color: var(--cursor-fg); }
+#screen .pane { background: var(--pane-bg); color: var(--pane-fg); }
+#screen .focus { background: var(--focus-bg); color: var(--focus-fg); font-weight: 700; }
+#screen .k { background: var(--key-bg); color: var(--key-fg); }
+#screen .kbar { background: var(--bar-bg); color: var(--fg); }
