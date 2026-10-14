@@ -9,7 +9,8 @@ export type Moment =
   | 'finish'
   | 'warn'
   | 'sheetOpen'
-  | 'sheetClose';
+  | 'sheetClose'
+  | 'ring';
 
 export interface CueArg {
   /** For `nudge`: 1 for more, -1 for less. */

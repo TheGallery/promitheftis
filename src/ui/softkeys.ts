@@ -118,6 +118,14 @@ const SOFT_KEYS: Record<Moment, (v: Voice, t: number, arg: CueArg) => void> = {
     burst(v, t, { f: 1500, q: 0.8, dur: 0.035, gain: 0.22 });
     burst(v, t + 0.05, { f: 2200, f2: 700, q: 0.6, dur: 0.12, gain: 0.14, attack: 0.025 });
   },
+  // An incoming call: a soft two-note burble, twice, like a telephone heard from the next room.
+  ring(v, t) {
+    for (const dt of [0, 0.5]) {
+      tone(v, t + dt, { f: 740, dur: 0.14, gain: 0.07, attack: 0.012 });
+      tone(v, t + dt + 0.17, { f: 622, dur: 0.14, gain: 0.07, attack: 0.012 });
+      tone(v, t + dt + 0.01, { f: 1480, dur: 0.1, gain: 0.015, attack: 0.012 });
+    }
+  },
 };
 
 /** Schedules one moment of the Soft keys set to start at time `t`. */

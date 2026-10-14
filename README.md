@@ -11,9 +11,9 @@ This is a one-morning prototype. It plays one fixed morning in two sizes:
 - **the small morning**: 2 trucks and 7 clients (the default);
 - **the big morning**: 9 trucks and 38 orders.
 
-It has five screens: the overnight messages, the order desk, the truck sheets, the road, and a short result screen (when each truck is back, what share of each order was delivered, who got less). On the road the clock runs on from 07:00 and a log fills in as each truck leaves, delivers (with a gentle note when a client got less) and comes back, until every truck is home.
+It has five screens: the overnight messages, the order desk, the truck sheets, the road, and a short result screen (when each truck is back, what share of each order was delivered, who got less). On the road the clock runs on from 07:00 and a log fills in as each truck leaves, delivers (with a gentle note when a client got less) and comes back, until every truck is home. Now and then a client rings while the trucks are out (two or three calls in the small morning, a few more in the big one): the log waits, a call box shows who it is and what they say, and you pick a friendly answer with **↑ ↓** and **ENTER**: add it to tomorrow's order, sorry not today, or the time the truck really reaches them. The answers are listed on the result screen; they do not change the deliveries.
 
-Left out on purpose: phone calls and new clients on the road, supplier ordering, end of day, customer moods over time, money, growth, more than one day, saving.
+Left out on purpose: new clients ringing, answers that change anything yet, supplier ordering, end of day, customer moods over time, money, growth, more than one day, saving.
 
 ## What it looks like
 
@@ -67,7 +67,7 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 | Overnight messages | **↑ ↓** read through the messages · **SPACE** start the morning · **B** load the big morning · **S** load the small morning |
 | Order desk | **TAB** next pane (**Shift+TAB** back) · **↑ ↓** move within a pane · type a number or **← →** (one less / one more) for the amount on a line · **ENTER** accept the line and go to the next · **ENTER** on the highlighted truck in the TRUCKS pane puts the order on it · **F10** truck sheets |
 | Truck sheets | **↑ ↓** pick a truck · **ENTER** open or close it · **+** / **−** open or close all · **P** print the sheets (with the printer sound) · **ESC** back to the desk · **F9** send the trucks |
-| On the road | **SPACE** or **ENTER** skip to the end of the log · once every truck is back, **ENTER** goes to the result |
+| On the road | **SPACE** or **ENTER** skip ahead (it stops at each call) · when the phone rings, **↑ ↓** pick an answer and **ENTER** gives it · once every truck is back and the calls are answered, **ENTER** goes to the result |
 | Result | **↑ ↓** look through the orders · **R** play this morning again · **B** / **S** load the other morning |
 
 ### How the desk plays
@@ -94,13 +94,13 @@ Orders for the same place should go on the same truck. Places next to each other
 
 Plain TypeScript with Vite and no UI framework; Vitest for tests.
 
-- `src/game/` holds the rules and has no screen code: the map (`places.ts`), the two mornings (`morning.ts`), the order desk with stock, truck fullness and the clock (`desk.ts`), return times (`routes.ts`), the log of the drive (`road.ts`), shortages (`headsup.ts`) and the result (`results.ts`).
+- `src/game/` holds the rules and has no screen code: the map (`places.ts`), the two mornings (`morning.ts`), the order desk with stock, truck fullness and the clock (`desk.ts`), return times (`routes.ts`), the log of the drive (`road.ts`), the phone calls (`calls.ts`), shortages (`headsup.ts`) and the result (`results.ts`).
 - `src/ui/` holds the screens. Each screen builds lines of text of exactly 120 columns (`grid.ts`, `screens/`); `app.ts` holds the state and what each key does; `view.ts` and `main.ts` put the text on the page; `audio.ts` plays the sounds, with the Soft keys set in `softkeys.ts`.
 - `tests/` has the unit tests, including a full play-through of both mornings that checks that every screen is exactly 120 columns by 30 rows.
 
 ## Sounds and fonts
 
-The sounds are made in code with the Web Audio API, so there are no sound files: gentle "soft key" keyboard clicks, a little deeper for ENTER, with a low double knock when an order is finished and a soft double thud for a warning, and the dot-matrix printer on the truck sheets. On the road each step of the clock makes a soft click, and the last one, when every truck is back, is the finishing knock. Each key press makes one sound at most: a key that only shows a message at the bottom plays the warning, and a key that changes nothing at all is silent. The font is [JetBrains Mono](https://www.jetbrains.com/lp/mono/), used under the SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+The sounds are made in code with the Web Audio API, so there are no sound files: gentle "soft key" keyboard clicks, a little deeper for ENTER, with a low double knock when an order is finished and a soft double thud for a warning, and the dot-matrix printer on the truck sheets. On the road each step of the clock makes a soft click, and the last one, when every truck is back, is the finishing knock; an incoming call has a soft two-note ring. Each key press makes one sound at most: a key that only shows a message at the bottom plays the warning, and a key that changes nothing at all is silent. The font is [JetBrains Mono](https://www.jetbrains.com/lp/mono/), used under the SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 
 ## License
 
