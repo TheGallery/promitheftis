@@ -309,35 +309,30 @@ describe('the supplier ordering screen', () => {
     expect(callNotes(app.calls, app.answers).size).toBe(0);
   });
 
-  it('warns about an empty order, then F9 places it and confirms what was ordered', () => {
+  it('warns about an empty order, then F9 places it and opens the end of the day', () => {
     const { app, press } = toResult();
     press('Enter', 'F9');
     expect(app.supply!.placed).toBe(false);
+    expect(app.screen).toBe('supply');
     expect(screen(app).join('\n')).toContain('Nothing is on the order yet');
     press('3', 'ArrowDown', '4', 'F9');
     expect(app.supply!.placed).toBe(true);
+    expect(app.screen).toBe('day');
     const text = screen(app).join('\n');
-    expect(text).toContain('ORDER PLACED FOR TOMORROW');
-    expect(text).toContain(`3 × ${app.supply!.rows[0]!.item.name.split(',')[0]!.toLowerCase()}`);
     expect(text).toContain('Order placed for tomorrow: 2 items, 7 units in all.');
-    // Nothing else changes: the amounts are locked and F9 again only says so.
-    press('9');
-    expect(app.supply!.amount(1)).toBe(4);
-    press('F9');
-    expect(screen(app).join('\n')).toContain('already placed');
+    expect(text).toContain(`3 ${app.supply!.rows[0]!.item.name.split(',')[0]!.toLowerCase()}`);
   });
 
-  it('goes back to the result with ESC and keeps the order; R plays the morning again once placed', () => {
+  it('goes back to the result with ESC and keeps the order', () => {
     const { app, press } = toResult();
     press('Enter', '6', 'Escape');
     expect(app.screen).toBe('result');
     press('Enter');
     expect(app.supply!.amount(0)).toBe(6);
-    press('r');
-    expect(app.screen).toBe('supply');
     press('F9', 'r');
     expect(app.screen).toBe('messages');
     expect(app.supply).toBeNull();
+    expect(app.day).toBeNull();
   });
 
   it('fits 120 columns in both colour schemes and in the big morning', () => {
@@ -425,7 +420,7 @@ describe('the supplier ordering screen', () => {
       expect(lines.join('\n').match(/over by/g)).toHaveLength(1);
       press('F9');
       expect(app.supply!.placed).toBe(true);
-      expect(screen(app).join('\n')).toContain('ORDER PLACED FOR TOMORROW');
+      expect(app.screen).toBe('day');
     });
 
     it('draw the three shades with their own colour in both colour schemes', () => {
