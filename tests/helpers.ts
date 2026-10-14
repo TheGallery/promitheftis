@@ -92,6 +92,13 @@ export function toDay(
   return { app, press };
 }
 
+/** Holds B or S down for a new run until the button is full, then lets go: what the player does to start over from a later day. */
+export function holdNewRun(app: App, key: string) {
+  app.press({ key });
+  for (let n = 0; n < 5 && app.holding; n++) app.tick();
+  app.release(key);
+}
+
 export function screen(app: App): string[] {
   const lines = plain(screenLines(app));
   expect(lines).toHaveLength(ROWS);

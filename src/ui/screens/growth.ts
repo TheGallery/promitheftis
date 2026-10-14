@@ -3,7 +3,7 @@ import { tightestRoom, type GrowthOption } from '../../game/growth';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, header, keyBar, layout, rule, s, wrapText, type Line } from '../grid';
-import { clockLine, otherMornings } from './common';
+import { clockLine, newRunPrompt, otherMornings } from './common';
 import { roomLine } from './day';
 
 /** Room for text after the 7-column indent of an option's details. */
@@ -57,10 +57,12 @@ export function growthScreen(app: App): Line[] {
   const keys = chosen
     ? ([['ENTER', 'next morning'], ['U', 'change choice'], ['ESC', 'back to the day']] as const)
     : ([['↑↓ 1-3', 'pick one'], ['ENTER', 'choose it'], ['ESC', 'back to the day']] as const);
-  const status = app.status
-    ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
-    : chosen
-      ? s(` Chosen: ${chosen.title}. It takes effect tomorrow. ENTER starts the next morning, U changes the choice.`, 'acc')
-      : [];
+  const status =
+    newRunPrompt(app) ??
+    (app.status
+      ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
+      : chosen
+        ? s(` Chosen: ${chosen.title}. It takes effect tomorrow. ENTER starts the next morning, U changes the choice.`, 'acc')
+        : []);
   return layout(top, body, [rule(), status, keyBar([...keys, ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])]);
 }

@@ -9,7 +9,7 @@ import { NEW_CLIENTS } from '../src/game/growth';
 import { stockAfterDeliveries } from '../src/game/supply';
 import type { Morning } from '../src/game/types';
 import { App } from '../src/ui/app';
-import { fakeEffects, playToSupply, screen, toDay, toNextMorning } from './helpers';
+import { fakeEffects, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
 const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, ...over });
 const smallRun = (): RunState => runFromMorning(smallMorning());
@@ -576,7 +576,8 @@ describe('the next morning in the game', () => {
     const { app, press } = toNextMorning('1');
     expect(app.morning.day).toBe(2);
     playToSupply(app, press);
-    press('Escape', key, key);
+    press('Escape');
+    holdNewRun(app, key);
     expect(app.morning.day).toBe(1);
     expect(app.run.day).toBe(1);
     expect(app.morning.id).toBe(id);

@@ -8,7 +8,7 @@ import type { OrderResult } from '../src/game/results';
 import { buildDay } from '../src/game/day';
 import { moodPoints } from '../src/game/moods';
 import { App } from '../src/ui/app';
-import { fakeEffects, playToSupply, screen, summary, toNextMorning } from './helpers';
+import { fakeEffects, holdNewRun, playToSupply, screen, summary, toNextMorning } from './helpers';
 
 const full: ClientDay = { percent: 100, late: false, lacked: [] };
 const short = (percent: number, ...lacked: Array<[string, number, number]>): ClientDay => ({
@@ -297,13 +297,13 @@ describe('on the screens', () => {
     expect(JSON.stringify(app.morning.orders)).toBe(orders);
     expect(screen(app).join('\n')).toMatch(/!/);
 
-    press('b', 'b');
+    holdNewRun(app, 'b');
     expect(app.run.history).toEqual({});
     expect(app.morning.day).toBe(1);
     expect(screen(app).join('\n')).not.toMatch(/ ! | !! /);
 
     const again = dayTwo();
-    again.press('s', 's');
+    holdNewRun(again.app, 's');
     expect(again.app.run.history).toEqual({});
     press('r');
     expect(app.run.history).toEqual({});

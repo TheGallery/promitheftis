@@ -4,7 +4,7 @@ import { place } from '../../game/places';
 import { placesLabel, plural } from '../format';
 import type { App } from '../app';
 import { bar, cat, clip, cols, header, keyBar, layout, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine, otherMornings } from './common';
+import { clockLine, newRunPrompt, otherMornings } from './common';
 
 const LEFT_W = 58;
 const RIGHT_W = 61;
@@ -111,16 +111,18 @@ export function resultScreen(app: App): Line[] {
   const body: Line[] = [];
   for (let i = 0; i < n; i++) body.push(cols([left[i] ?? [], right[i] ?? []], [LEFT_W, RIGHT_W]));
   const total = app.morning.orders.length;
-  const summary = app.status
-    ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
-    : r
-      ? cat(
-          s(' '),
-          s(`${r.inFull} of ${plural(total, 'order')} in full`, 'b'),
-          s(` · ${plural(r.gotLess.length, 'client')} got less`),
-          s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
-        )
-      : [];
+  const summary =
+    newRunPrompt(app) ??
+    (app.status
+      ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
+      : r
+        ? cat(
+            s(' '),
+            s(`${r.inFull} of ${plural(total, 'order')} in full`, 'b'),
+            s(` · ${plural(r.gotLess.length, 'client')} got less`),
+            s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
+          )
+        : []);
   const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

@@ -22,9 +22,21 @@ const app: App = new App(
   () => draw(),
 );
 
+/** While the key for a new run is held down, the button fills a little more on every frame. */
+let filling = false;
+
+function frame(): void {
+  filling = false;
+  app.tick();
+}
+
 function draw(): void {
   document.body.dataset.theme = app.blue ? 'blue' : 'green';
   screen!.innerHTML = screenHtml(app);
+  if (app.holding && !filling) {
+    filling = true;
+    window.requestAnimationFrame(frame);
+  }
 }
 
 window.addEventListener('keydown', (e) => {
@@ -35,5 +47,8 @@ window.addEventListener('keydown', (e) => {
   const used = app.press({ key: e.key, shift: e.shiftKey, repeat: e.repeat });
   if (used || e.key === 'Tab' || /^F\d+$/.test(e.key)) e.preventDefault();
 });
+
+window.addEventListener('keyup', (e) => app.release(e.key));
+window.addEventListener('blur', () => app.releaseAll());
 
 draw();

@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bigMorning, smallMorning } from '../src/game/morning';
 import { nextDay, runFromMorning, type RunState } from '../src/game/run';
 import { decodeRun, decodeSettings, encodeRun, encodeSettings, SAVE_VERSION } from '../src/game/save';
-import { App, RUN_KEY, SETTINGS_KEY, type Effects } from '../src/ui/app';
+import { App, HOLD_MS, RUN_KEY, SETTINGS_KEY, type Effects } from '../src/ui/app';
+import { screenLines } from '../src/ui/view';
 import { browserStore, memoryStore, type Store } from '../src/ui/store';
-import { fakeEffects, playToSupply, screen, toDay, toNextMorning } from './helpers';
+import { fakeEffects, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
 const RANDOM = () => 0.37;
 const SEED = Math.floor(0.37 * 4294967296);
@@ -304,7 +305,8 @@ describe('B and S replace the save', () => {
     const store = memoryStore();
     toNextMorning('1', 'small', 0, RANDOM, store);
     const { app, press } = appOn(store);
-    press('Enter', 'b', 'b');
+    press('Enter');
+    holdNewRun(app, 'b');
     expect(app.run.day).toBe(1);
     expect(savedRun(store)?.run.kind).toBe('big');
     press(' ', 'F10', 'F10');
@@ -340,85 +342,235 @@ describe('B and S replace the save', () => {
   });
 });
 
-describe('B and S ask first from day 2 on', () => {
+/** A later day on a store, with a clock the test moves and a log of the sounds made. */
+function laterDay() {
+  const store = memoryStore();
+  toNextMorning('1', 'small', 0, RANDOM, store);
+  const clock = { t: 0 };
+  const cues: string[] = [];
+  const effects: Effects = { ...fakeEffects(cues, () => 0.9, store), now: () => clock.t };
+  const app = new App(effects);
+  // Each key comes a second after the one before, as a player reading the screen would press it.
+  const press = (...keys: string[]) =>
+    keys.forEach((key) => {
+      clock.t += 1000;
+      app.press({ key });
+    });
+  press('Enter');
+  const wait = (ms: number) => {
+    clock.t += ms;
+    app.tick();
+  };
+  const text = store.data.get(RUN_KEY);
+  cues.length = 0;
+  return { app, press, store, text, wait, cues };
+}
+
+/** How many cells of the hold-to-start bar are filled on the screen. */
+function filled(app: App): number {
+  return [...barOf(app).filter(([, cls]) => cls === 'bf').map(([text]) => text).join('')].length;
+}
+
+/** The segments of the bar on the line with the button: █ in the accent colour, ░ dimmed. */
+function barOf(app: App) {
+  const line = screenLines(app).find((l) => l.map(([text]) => text).join('').includes('HOLD'));
+  return (line ?? []).filter(([text]) => /^[█░]+$/.test(text));
+}
+
+describe('B and S have to be held down from day 2 on', () => {
   it.each([['b', 'B', 'big'], ['s', 'S', 'small']] as const)(
-    '%s on a later day only asks, and leaves the save untouched until it is pressed again',
+    '%s on a later day shows the button and starts nothing until it has been held for the whole time',
     (key, name, kind) => {
-      const store = memoryStore();
-      const { app, press } = toNextMorning('1', 'small', 0, RANDOM, store);
-      const text = store.data.get(RUN_KEY);
-      press(key);
+      const { app, store, text, wait, cues } = laterDay();
+      app.press({ key });
+      expect(app.newRunAsk).toBe(kind);
+      expect(app.holding).toBe(true);
+      expect(cues).toEqual([]);
+      const lines = screen(app).join('\n');
+      expect(lines).toContain(`Start a new run? It replaces your saved day 2. [ HOLD ${name} TO START A NEW RUN ]`);
+      expect(lines).toContain('ESC keeps playing');
+      wait(HOLD_MS - 1);
       expect(app.run.day).toBe(2);
-      expect(app.screen).toBe('messages');
       expect(store.data.get(RUN_KEY)).toBe(text);
-      expect(app.status).toBe(`Start a new run? This replaces your saved day 2. Press ${name} again to confirm, any other key to keep playing.`);
-      expect(screen(app).join('\n')).toContain(`Press ${name} again to confirm`);
-      press(key.toUpperCase());
+      wait(1);
       expect(app.run.day).toBe(1);
       expect(app.run.kind).toBe(kind);
+      expect(app.screen).toBe('messages');
+      expect(app.newRunAsk).toBeNull();
+      expect(app.holding).toBe(false);
       expect(savedRun(store)).toEqual({ run: runFromMorning(app.morning), daySeed: 0 });
+      expect(cues).toEqual(['confirm']);
+      expect(screen(app).join('\n')).not.toContain('HOLD');
     },
   );
 
-  it('any other key cancels the question and does what it always does', () => {
-    const store = memoryStore();
-    const { app, press } = toNextMorning('1', 'small', 0, RANDOM, store);
-    const text = store.data.get(RUN_KEY);
-    press('b', 'ArrowDown');
-    expect(app.status).toBe('');
-    expect(app.msgSel).toBe(1);
-    press('b');
-    expect(app.run.day).toBe(2);
-    press('s');
-    expect(app.run.day).toBe(2);
-    expect(app.status).toContain('Press S again');
-    press(' ');
-    expect(app.screen).toBe('desk');
-    expect(app.run.day).toBe(2);
-    expect(store.data.get(RUN_KEY)).toBe(text);
-  });
-
-  it('a held key repeating does not confirm', () => {
-    const store = memoryStore();
-    const { app } = toNextMorning('1', 'small', 0, RANDOM, store);
-    const text = store.data.get(RUN_KEY);
+  it('fills the bar from left to right, in the accent colour, as the key stays down', () => {
+    const { app, wait } = laterDay();
     app.press({ key: 'b' });
-    app.press({ key: 'b', repeat: true });
-    expect(app.run.day).toBe(2);
-    expect(store.data.get(RUN_KEY)).toBe(text);
-    expect(app.status).toContain('Press B again');
+    expect(filled(app)).toBe(0);
+    wait(HOLD_MS / 2);
+    expect(filled(app)).toBe(8);
+    wait(HOLD_MS / 4);
+    expect(filled(app)).toBe(12);
+    expect(barOf(app).map(([text]) => text[0])).toEqual(['█', '░']);
+    expect(barOf(app).map(([, cls]) => cls)).toEqual(['bf', 'be']);
   });
 
-  it('asks on the result, the end of the day and the growth choice, with the question on the screen in 120 columns', () => {
-    const store = memoryStore();
-    const { app, press } = toNextMorning('1', 'small', 0, RANDOM, store);
-    const text = store.data.get(RUN_KEY);
+  it('letting go early empties the bar, starts nothing and leaves the save alone', () => {
+    const { app, store, text, wait } = laterDay();
+    app.press({ key: 'b' });
+    wait(HOLD_MS - 200);
+    expect(filled(app)).toBeGreaterThan(10);
+    app.release('b');
+    expect(app.holding).toBe(false);
+    expect(app.holdProgress).toBe(0);
+    expect(filled(app)).toBe(0);
+    wait(HOLD_MS * 3);
+    expect(app.run.day).toBe(2);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+    expect(screen(app).join('\n')).toContain('HOLD B TO START A NEW RUN');
+  });
+
+  it('after letting go early the key can be held again, and the fill starts over', () => {
+    const { app, wait } = laterDay();
+    app.press({ key: 'b' });
+    wait(HOLD_MS - 100);
+    app.release('b');
+    app.press({ key: 'b' });
+    wait(HOLD_MS - 100);
+    expect(app.run.day).toBe(2);
+    wait(100);
+    expect(app.run.day).toBe(1);
+  });
+
+  it('keys other than the one asked for cancel the question and do what they always do', () => {
+    const { app, press, store, text, wait } = laterDay();
+    press('b', 'ArrowDown');
+    expect(app.newRunAsk).toBeNull();
+    expect(app.msgSel).toBe(1);
+    wait(HOLD_MS * 2);
+    expect(app.run.day).toBe(2);
+    app.press({ key: 's' });
+    press(' ');
+    expect(app.newRunAsk).toBeNull();
+    expect(app.screen).toBe('desk');
+    wait(HOLD_MS * 2);
+    expect(app.run.day).toBe(2);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+  });
+
+  it('ESC cancels the question and does nothing else', () => {
+    const { app, press, store, text, wait } = laterDay();
+    press('b', 'Escape');
+    expect(app.newRunAsk).toBeNull();
+    expect(app.screen).toBe('messages');
+    expect(screen(app).join('\n')).not.toContain('HOLD');
+    wait(HOLD_MS * 2);
+    expect(app.run.day).toBe(2);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+  });
+
+  it('the other new-run key replaces the question with its own, and a hold of the first key no longer counts', () => {
+    const { app, wait } = laterDay();
+    app.press({ key: 'b' });
+    wait(HOLD_MS / 2);
+    app.press({ key: 's' });
+    expect(app.newRunAsk).toBe('small');
+    expect(filled(app)).toBe(0);
+    wait(HOLD_MS - 1);
+    expect(app.run.day).toBe(2);
+    wait(1);
+    expect(app.run.kind).toBe('small');
+    expect(app.run.day).toBe(1);
+  });
+
+  it('the keyboard repeating the key neither starts the fill again nor cancels it', () => {
+    const { app, wait } = laterDay();
+    app.press({ key: 'b' });
+    wait(HOLD_MS / 2);
+    app.press({ key: 'b', repeat: true });
+    app.press({ key: 'B', repeat: true });
+    expect(app.holding).toBe(true);
+    expect(filled(app)).toBe(8);
+    wait(HOLD_MS / 2);
+    expect(app.run.day).toBe(1);
+  });
+
+  it('a repeat of the key alone, with no press before it, starts no fill', () => {
+    const { app, wait } = laterDay();
+    app.press({ key: 'b' });
+    app.release('b');
+    app.press({ key: 'b', repeat: true });
+    expect(app.holding).toBe(false);
+    wait(HOLD_MS * 2);
+    expect(app.run.day).toBe(2);
+  });
+
+  it('once it has started, the key still held down does not start another new run', () => {
+    const { app, wait, cues } = laterDay();
+    app.press({ key: 'b' });
+    wait(HOLD_MS);
+    expect(app.run.day).toBe(1);
+    const heard = cues.length;
+    app.press({ key: 'b', repeat: true });
+    app.press({ key: 'b', repeat: true });
+    expect(cues).toHaveLength(heard);
+    app.release('b');
+    app.press({ key: 's' });
+    expect(app.run.kind).toBe('small');
+    expect(cues).toHaveLength(heard + 1);
+  });
+
+  it('the page losing the keyboard lets go of the key', () => {
+    const { app, wait } = laterDay();
+    app.press({ key: 'b' });
+    wait(HOLD_MS / 2);
+    app.releaseAll();
+    expect(app.holding).toBe(false);
+    wait(HOLD_MS * 2);
+    expect(app.run.day).toBe(2);
+  });
+
+  it('works on the result, the end of the day and the growth choice, in 120 columns, over the status line', () => {
+    const { app, press, store, text, wait } = laterDay();
     playToSupply(app, press);
     press('Escape');
     expect(app.screen).toBe('result');
     for (const where of ['result', 'day', 'growth'] as const) {
       if (where === 'day') press('Enter', 'a', 'F9');
       if (where === 'growth') press('Enter');
-      press('s');
+      app.press({ key: 's' });
+      wait(HOLD_MS / 2);
       expect(app.screen).toBe(where === 'growth' ? 'day' : where);
       expect(app.growthOpen).toBe(where === 'growth');
       expect(app.run.day).toBe(2);
       expect(store.data.get(RUN_KEY)).toBe(text);
-      const lines = screen(app);
-      expect(lines.join('\n')).toContain('This replaces your saved day 2. Press S again to confirm');
+      expect(screen(app).join('\n')).toContain('Start a new run? It replaces your saved day 2. [ HOLD S TO START A NEW RUN ]');
+      expect(filled(app)).toBe(8);
+      app.release('s');
+      press('x');
     }
-    press('s');
+    app.press({ key: 's' });
+    wait(HOLD_MS);
     expect(app.run.day).toBe(1);
     expect(app.screen).toBe('messages');
     expect(savedRun(store)).toEqual({ run: runFromMorning(smallMorning()), daySeed: 0 });
   });
 
-  it('on day 1 there is nothing to ask: one press starts the new run', () => {
+  it('ESC on the growth choice only cancels the question, and the choice stays open', () => {
+    const { app, press } = laterDay();
+    playToSupply(app, press);
+    press('a', 'F9', 'Enter', 's', 'Escape');
+    expect(app.newRunAsk).toBeNull();
+    expect(app.growthOpen).toBe(true);
+  });
+
+  it('on day 1 there is nothing to hold: one press starts the new run', () => {
     const store = memoryStore();
     const { app, press } = appOn(store);
     press('b');
+    expect(app.newRunAsk).toBeNull();
     expect(app.run.kind).toBe('big');
-    expect(app.status).toBe('');
     expect(savedRun(store)?.run.kind).toBe('big');
     const day = toDay(0, 'small', ['a'], [], RANDOM, memoryStore());
     day.press('b');

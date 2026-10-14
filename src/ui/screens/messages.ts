@@ -4,7 +4,7 @@ import { place } from '../../game/places';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, clip, header, keyBar, layout, pad, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine, shortfallLines } from './common';
+import { clockLine, newRunPrompt, shortfallLines } from './common';
 
 const LIST_ROWS = 16;
 
@@ -69,7 +69,7 @@ export function messagesScreen(app: App): Line[] {
     app.morning.day > 1
       ? [['B S', 'big / small morning']]
       : app.morning.id === 'small' ? [['B', 'big morning (9 trucks, 38 orders)']] : [['S', 'small morning (2 trucks, 7 orders)']];
-  const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : [];
+  const status = newRunPrompt(app) ?? (app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : []);
   const footer = [rule(), status, keyBar([['↑↓', 'message'], ['SPACE', 'start the morning'], ...other, ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }
