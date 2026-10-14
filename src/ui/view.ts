@@ -2,6 +2,7 @@ import type { App } from './app';
 import { toHtml, type Line } from './grid';
 import { dayScreen } from './screens/day';
 import { deskScreen } from './screens/desk';
+import { growthScreen } from './screens/growth';
 import { messagesScreen } from './screens/messages';
 import { roadScreen } from './screens/road';
 import { resultScreen } from './screens/result';
@@ -24,7 +25,7 @@ export function screenLines(app: App): Line[] {
     case 'supply':
       return supplyScreen(app);
     case 'day':
-      return dayScreen(app);
+      return app.growthOpen ? growthScreen(app) : dayScreen(app);
   }
 }
 

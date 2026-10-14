@@ -14,6 +14,7 @@ const app: App = new App(
     later: (fn, ms) => void window.setTimeout(fn, ms),
     toggleSound: () => sounds.toggle(),
     now: () => performance.now(),
+    random: () => Math.random(),
   },
   () => draw(),
 );

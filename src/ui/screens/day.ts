@@ -88,7 +88,7 @@ function callsBlock(day: DaySummary): Line[] {
   return out;
 }
 
-function roomLine({ kept, space }: DayRoom): Line {
+export function roomLine({ kept, space }: DayRoom): Line {
   const over = space.overBy > 0;
   return cat(
     s(` ${KEPT_LABEL[kept].padEnd(11)}`),
@@ -150,8 +150,8 @@ export function dayScreen(app: App): Line[] {
   const status = app.status
     ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
     : day
-      ? s(` ${pleased} of ${plural(day.orders.length, 'client')} pleased. The day is done: goodnight.`, 'd')
+      ? s(` ${pleased} of ${plural(day.orders.length, 'client')} pleased. ENTER to choose what to grow.`, 'd')
       : [];
   const other = app.morning.id === 'small' ? ([['B', 'big morning']] as const) : ([['S', 'small morning']] as const);
-  return layout(top, body, [rule(), status, keyBar([['↑↓', 'look through the clients'], ['R', 'play again'], ...other, ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([['↑↓', 'look through the clients'], ['ENTER', 'what to grow'], ['R', 'play again'], ...other, ['F2', 'colours'], ['F4', 'sound']])]);
 }
