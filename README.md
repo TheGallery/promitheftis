@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/brand/logo-plate.svg" alt="Promitheftis" width="436" />
+</p>
+
 # Promitheftis
 
 A calm, keyboard-only browser game about running a small restaurant-supply business.
