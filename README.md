@@ -19,7 +19,7 @@ Left out on purpose: the road, supplier ordering, end of day, customer moods ove
 
 *The Nine Squares: our depot sits in Town, and every client lives somewhere on this little island.*
 
-Promitheftis is an imaginary town on a small island, with eight neighbouring places around it: woods and a lake to the north, fields in the south, a harbour on the east side and a railway line through Southgate. Every restaurant, café and inn in the game has a spot on this map.
+Promitheftis is an imaginary town on a small island, with eight neighbouring places around it: woods and a lake to the north, fields in the south, a harbour on the east side and a railway line through Southgate. Some of the places and clients you will meet are on this map.
 
 ## Run it
 
