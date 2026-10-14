@@ -1,9 +1,10 @@
 import { place, PLACES, type PlaceId } from '../../game/places';
 import { plainName, shortItems } from '../../game/headsup';
+import { shortMarker } from '../../game/history';
 import { placesLabel } from '../format';
 import type { App } from '../app';
 import { bar, cat, clip, cols, header, keyBar, layout, pad, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine } from './common';
+import { clockLine, shortfallLines } from './common';
 
 const ORDERS_W = 34;
 const LINES_W = 43;
@@ -14,6 +15,8 @@ function paneTitle(name: string, lit: boolean, rest: Line): Line {
   return cat(s(` ${name} `, lit ? 'focus' : 'pane'), rest);
 }
 
+const LEGEND = ['! went short lately', '!! short two days running'];
+
 function ordersPane(app: App): Line[] {
   const d = app.desk;
   const lit = app.pane === 'orders';
@@ -21,14 +24,23 @@ function ordersPane(app: App): Line[] {
     paneTitle('ORDERS', lit, s(`  ${app.orderSel + 1} of ${d.orderCount}`, 'd')),
     s(`   ${''.padEnd(17)}${'PLACE'.padEnd(11)}TRK`, 'd'),
   ];
+  const markers = d.morning.orders.map((o) => shortMarker(app.run.history[o.client]));
   const rows: Line[] = d.morning.orders.map((o, i) => {
     const current = i === app.orderSel;
     const mark = current ? '▶' : d.isFinished(i) ? '✓' : ' ';
     const truck = d.truckFor(i);
-    const text = ` ${mark} ${clip(o.client, 16).padEnd(17)}${clip(place(o.place).name, 10).padEnd(11)}${truck ?? ''}`;
-    return s(text, current ? 'hl' : d.isFinished(i) ? 'd' : '');
+    const base = current ? 'hl' : d.isFinished(i) ? 'd' : '';
+    const warn = current ? 'w hl' : 'w';
+    const marker = markers[i] ?? '';
+    // A marked client gives up the last three columns of its name's room to the marker.
+    return cat(
+      s(` ${mark} ${marker ? clip(o.client, 13).padEnd(14) : clip(o.client, 16).padEnd(17)}`, base),
+      marker ? s(marker.padEnd(3), warn) : [],
+      s(`${clip(place(o.place).name, 10).padEnd(11)}${truck ?? ''}`, base),
+    );
   });
-  out.push(...scrollRows(rows, app.orderSel, BODY_ROWS - out.length));
+  const legend = markers.some(Boolean) ? LEGEND.map((text) => s(` ${text}`, 'w')) : [];
+  out.push(...scrollRows(rows, app.orderSel, BODY_ROWS - out.length - legend.length), ...legend);
   return out;
 }
 
@@ -90,7 +102,7 @@ function linesPane(app: App): Line[] {
   });
   out.push([], s(' type a number, or ←→ for one more / less', 'd'), [], s(' NOTES', 'd'));
   if (order.before != null) out.push(s(` Wanted there before ${String(Math.floor(order.before / 60)).padStart(2, '0')}:${String(order.before % 60).padStart(2, '0')}.`, 'w'));
-  out.push(...lineNotes(app));
+  out.push(...shortfallLines(app, order.client, LINES_W, 2), ...lineNotes(app));
   return out;
 }
 

@@ -11,7 +11,7 @@ import type { Morning } from '../src/game/types';
 import { App } from '../src/ui/app';
 import { fakeEffects, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
-const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, promises: [], growth: null, ...over });
+const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, ...over });
 const smallRun = (): RunState => runFromMorning(smallMorning());
 const bigRun = (): RunState => runFromMorning(bigMorning());
 const total = (m: Morning, client: string) => m.orders.find((o) => o.client === client)!.lines.reduce((sum, l) => sum + l.asked, 0);

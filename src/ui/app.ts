@@ -778,7 +778,7 @@ export class App {
     }
     supply.placed = true;
     this.supplyTyped = '';
-    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply);
+    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply, this.run.history);
     this.daySel = 0;
     this.growthOpen = false;
     this.growthSel = 0;

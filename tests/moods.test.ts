@@ -26,6 +26,28 @@ describe('the mood rule', () => {
     expect(moodOf(facts({ percent: 80, late: true }))).toBe('let down');
   });
 
+  it('is one point more let down by being short again after being short yesterday', () => {
+    expect(moodPoints(facts({ percent: 80, shortBefore: true }))).toBe(moodPoints(facts({ percent: 80 })) + 1);
+    expect(moodOf(facts({ percent: 80 }))).toBe('a bit let down');
+    expect(moodOf(facts({ percent: 80, shortBefore: true }))).toBe('let down');
+    expect(moodOf(facts({ percent: 40, shortBefore: true }))).toBe('let down');
+  });
+
+  it('is pleased by a full delivery on time even after a short day, and not worse for a late one', () => {
+    expect(moodOf(facts({ shortBefore: true }))).toBe('pleased');
+    expect(moodPoints(facts({ late: true, shortBefore: true }))).toBe(moodPoints(facts({ late: true })));
+  });
+
+  it('lets a promise of the rest tomorrow soften a repeated shortfall by a point', () => {
+    expect(moodOf(facts({ percent: 80, shortBefore: true, shortCall: 'promised' }))).toBe('a bit let down');
+  });
+
+  it('says in plain words that the client was short yesterday as well, only when short again', () => {
+    expect(moodReasons(facts({ percent: 80, shortBefore: true }))).toContain('was short yesterday as well');
+    expect(moodReasons(facts({ shortBefore: true }))).not.toContain('was short yesterday as well');
+    expect(moodReasons(facts({ percent: 80 }))).not.toContain('was short yesterday as well');
+  });
+
   it('is let down by being told nothing more today after a short delivery', () => {
     expect(moodOf(facts({ percent: 80, shortCall: 'refused' }))).toBe('let down');
   });
@@ -65,13 +87,20 @@ describe('the facts for an order', () => {
   });
 
   it('takes the percent and lateness from the delivery', () => {
-    expect(moodFacts(order, [], new Map())).toEqual({ percent: 70, late: true, shortCall: null });
+    expect(moodFacts(order, [], new Map())).toEqual({ percent: 70, late: true, shortCall: null, shortBefore: false });
   });
 
   it('reads the answer to the short call about this order only', () => {
     const calls = [call(0, 'short', 1), call(1, 'short', 3), call(2, 'forgot', 3)];
     expect(moodFacts(order, calls, new Map([[0, 1], [1, 0], [2, 1]])).shortCall).toBe('promised');
     expect(moodFacts(order, calls, new Map([[0, 0], [1, 1], [2, 0]])).shortCall).toBe('refused');
+  });
+
+  it('reads yesterday from the client\'s remembered days', () => {
+    const recent = (percent: number) => [{ percent, late: false, lacked: [] }];
+    expect(moodFacts(order, [], new Map(), recent(60)).shortBefore).toBe(true);
+    expect(moodFacts(order, [], new Map(), recent(100)).shortBefore).toBe(false);
+    expect(moodFacts(order, [], new Map(), []).shortBefore).toBe(false);
   });
 
   it('ignores a short call that was not answered', () => {

@@ -1,4 +1,5 @@
 import type { Call } from './calls';
+import { shortYesterday, type ClientDay } from './history';
 import type { OrderResult } from './results';
 
 export type Mood = 'pleased' | 'a bit let down' | 'let down';
@@ -11,6 +12,8 @@ export interface MoodFacts {
   late: boolean;
   /** How the client's call about a short delivery was answered, if they rang. */
   shortCall: 'promised' | 'refused' | null;
+  /** True when the client was also short the day before. */
+  shortBefore?: boolean;
 }
 
 /** Below this share delivered, a client is let down by the delivery alone; at 100 they are not. */
@@ -18,13 +21,16 @@ const HALF = 50;
 
 /**
  * Points of disappointment, never below zero: 1 for less than everything, 2 for less than half, 1 for
- * coming after the time asked, 1 more for being told "nothing more today" about a short delivery, and
- * 1 less for being promised the rest tomorrow. No points is pleased, one a bit let down, more let down.
+ * coming after the time asked, 1 more for being told "nothing more today" about a short delivery,
+ * 1 less for being promised the rest tomorrow, and 1 more for being short again after being short the
+ * day before. No points is pleased, one a bit let down, more let down. A full delivery on time is
+ * pleased whatever came before.
  */
-export function moodPoints({ percent, late, shortCall }: MoodFacts): number {
+export function moodPoints({ percent, late, shortCall, shortBefore }: MoodFacts): number {
   const delivery = percent >= 100 ? 0 : percent >= HALF ? 1 : 2;
   const call = shortCall === 'refused' ? 1 : shortCall === 'promised' ? -1 : 0;
-  return Math.max(0, delivery + (late ? 1 : 0) + call);
+  const again = shortBefore && percent < 100 ? 1 : 0;
+  return Math.max(0, delivery + (late ? 1 : 0) + call + again);
 }
 
 export function moodOf(facts: MoodFacts): Mood {
@@ -42,15 +48,21 @@ export function moodReasons(facts: MoodFacts, noTruck = false): string[] {
   if (facts.late) out.push('came after the time asked');
   if (facts.shortCall === 'promised') out.push('was promised the rest tomorrow');
   if (facts.shortCall === 'refused') out.push('was told nothing more today');
+  if (facts.shortBefore && facts.percent < 100) out.push('was short yesterday as well');
   return out;
 }
 
-/** The facts for one order: its delivery, and the answer to the call about it going short, if any. */
-export function moodFacts(order: OrderResult, calls: readonly Call[], answers: ReadonlyMap<number, number>): MoodFacts {
+/** The facts for one order: its delivery, the answer to the call about it going short, if any, and the client's recent days. */
+export function moodFacts(
+  order: OrderResult,
+  calls: readonly Call[],
+  answers: ReadonlyMap<number, number>,
+  recent?: readonly ClientDay[],
+): MoodFacts {
   const call = calls.find((c) => c.kind === 'short' && c.orderIndex === order.orderIndex && answers.has(c.id));
   const choice = call ? answers.get(call.id) : undefined;
   const shortCall = call == null || choice == null ? null : call.options[choice]?.addsToOrder ? 'promised' : 'refused';
-  return { percent: order.percent, late: order.lateForAsk, shortCall };
+  return { percent: order.percent, late: order.lateForAsk, shortCall, shortBefore: shortYesterday(recent) };
 }
 
 /** How a client's mood the day before changes today's order: the share of the usual quantities it asks for, and a note. */

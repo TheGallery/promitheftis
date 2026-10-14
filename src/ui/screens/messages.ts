@@ -1,9 +1,10 @@
 import { formatTime } from '../../game/clock';
+import { shortMarker } from '../../game/history';
 import { place } from '../../game/places';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, clip, header, keyBar, layout, pad, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine } from './common';
+import { clockLine, shortfallLines } from './common';
 
 const LIST_ROWS = 17;
 
@@ -16,19 +17,22 @@ function messageRow(app: App, i: number): Line {
   let where: string;
   let what: string;
   let extra = '';
+  let marker = '';
   if (m.kind === 'order') {
     const o = app.desk.order(m.orderId - 1);
     from = o.client;
     where = place(o.place).name;
     what = `order · ${plural(o.lines.length, 'line')}`;
     if (o.note) extra = '+ note';
+    marker = shortMarker(app.run.history[o.client]);
   } else {
     from = m.from;
     where = m.kind;
     what = m.text;
   }
-  const text = ` ${mark}${number}  ${clip(from, 25).padEnd(26)}${clip(where, 11).padEnd(12)}${clip(what, 56).padEnd(57)}${extra}`;
-  return s(text, i === app.msgSel ? 'hl' : '');
+  const text = ` ${mark}${number}  ${clip(from, 25).padEnd(26)}${clip(where, 11).padEnd(12)}${clip(what, 56).padEnd(57)}${extra.padEnd(7)}`;
+  const hl = i === app.msgSel;
+  return cat(s(text, hl ? 'hl' : ''), marker ? s(marker, hl ? 'w hl' : 'w') : []);
 }
 
 function detail(app: App): Line[] {
@@ -43,6 +47,7 @@ function detail(app: App): Line[] {
       .map((l) => `${l.asked} × ${app.desk.item(l.item).name}`)
       .join(' · ');
     for (const row of wrapText(items, 116).slice(0, 2)) out.push(s(` ${row}`, 'd'));
+    out.push(...shortfallLines(app, o.client, 118, 3));
     return out;
   }
   const out: Line[] = [cat(s(` ${m.from.toUpperCase()}`, 'b'), s(` · ${m.kind} · ${left(m.at)}`, 'd'))];

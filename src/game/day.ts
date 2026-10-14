@@ -1,4 +1,5 @@
 import { callLine, type Call } from './calls';
+import type { History } from './history';
 import { moodFacts, moodOf, moodReasons, type Mood } from './moods';
 import type { MorningResult, OrderResult } from './results';
 import { KEPT_ORDER, type Supply } from './supply';
@@ -49,9 +50,10 @@ export function buildDay(
   calls: readonly Call[],
   answers: ReadonlyMap<number, number>,
   supply: Supply,
+  history: History = {},
 ): DaySummary {
   const orders = result.orders.map((o): DayOrder => {
-    const facts = moodFacts(o, calls, answers);
+    const facts = moodFacts(o, calls, answers, history[o.client]);
     return { ...o, mood: moodOf(facts), reasons: moodReasons(facts, o.truckId == null) };
   });
   const trucks = result.trucks.map((t): DayTruck => ({
