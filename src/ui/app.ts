@@ -55,6 +55,7 @@ export class App {
   sheetSel = 0;
   sheetOpen = new Set<number>();
   printing: { done: number; total: number } | null = null;
+  private printJob = 0;
   printed = false;
 
   result: MorningResult | null = null;
@@ -338,7 +339,7 @@ export class App {
     const left = this.desk.unfinishedCount();
     if (left > 0 && !confirmed) {
       this.confirmEnd = true;
-      this.say(`${plural(left, 'order')} not handed out yet. They will not be delivered. F10 again to carry on.`, 'warn');
+      this.say(`${plural(left, 'order')} not handed out. On a truck: go with the lines decided so far. No truck: not delivered. F10 again.`, 'warn');
       return;
     }
     this.screen = 'sheets';
@@ -393,10 +394,11 @@ export class App {
     }
     const total = this.morning.trucks.length + 2;
     const ms = this.effects.print(total);
+    const job = ++this.printJob;
     this.printing = { done: 0, total };
     for (let i = 1; i <= total; i++) {
       this.effects.later(() => {
-        if (!this.printing) return;
+        if (job !== this.printJob || !this.printing) return;
         this.printing = { done: i, total };
         if (i === total) {
           this.printing = null;
