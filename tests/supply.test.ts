@@ -224,20 +224,50 @@ describe('the supplier ordering screen', () => {
     expect(screen(app).join('\n')).toContain('A fill all');
   });
 
-  it('puts a note on the rows whose calls were answered with "add it to tomorrow\'s order"', () => {
+  it('shows a call note below the room bars only while its item is the highlighted row', () => {
     const { app, press } = toResult(0);
     press('Enter');
-    const lines = screen(app);
     const noted = app.calls.filter((c) => c.item && c.options[0]?.addsToOrder);
     expect(noted.length).toBeGreaterThan(0);
-    for (const call of noted) {
-      const name = app.morning.items.find((i) => i.id === call.item)!.name;
-      const row = rowOf(lines, name);
-      expect(row).toContain(call.client);
-      expect(row).toContain("add it to tomorrow's order");
+    const supply = app.supply!;
+    const bars = (lines: string[]) => lines.findIndex((l) => l.includes('DRY STORE') && l.includes('░'));
+    for (let r = 0; r < supply.count; r++) {
+      const row = supply.rows[r]!;
+      const lines = screen(app);
+      const here = noted.filter((c) => c.item === row.item.id);
+      const noteLines = lines.filter((l) => l.includes('rang:') || l.includes("tomorrow's order") && l.includes('←'));
+      if (here.length > 0) {
+        expect(noteLines).toHaveLength(1);
+        expect(noteLines[0]).toContain(here[0]!.client);
+        // Below the last bar, in the panel on the right, never on the item's own line.
+        expect(lines.indexOf(noteLines[0]!)).toBeGreaterThan(bars(lines));
+        expect(noteLines[0]!.indexOf('←')).toBeGreaterThanOrEqual(56);
+        expect(rowOf(lines, row.item.name)).not.toContain('rang');
+      } else {
+        expect(noteLines).toHaveLength(0);
+      }
+      press('ArrowDown');
     }
-    const withNote = lines.filter((l) => l.includes("add it to tomorrow's order"));
-    expect(withNote).toHaveLength(new Set(noted.map((c) => c.item)).size);
+  });
+
+  it('marks every row with a note in amber, whether or not it is highlighted, and no other row', () => {
+    const { app, press } = toResult(0);
+    press('Enter', 'a');
+    const supply = app.supply!;
+    const noted = new Set(supply.rows.flatMap((row) => (supply.notes.get(row.item.id)?.length ? [row.item.id] : [])));
+    expect(noted.size).toBeGreaterThan(0);
+    for (const blue of [false, true]) {
+      expect(app.blue).toBe(blue);
+      for (let r = 0; r < supply.count; r++) {
+        const row = supply.rows[r]!;
+        const name = screenLines(app).flat().find(([t]) => t.trim() === row.item.name)!;
+        const classes = name[1].split(' ');
+        expect(classes.includes('w')).toBe(noted.has(row.item.id));
+        expect(classes.includes('hl')).toBe(r === app.supplySel);
+        press('ArrowDown');
+      }
+      press('F2');
+    }
   });
 
   it('leaves the supplier screen without amounts, and the result screen shows them', () => {
@@ -314,22 +344,29 @@ describe('the supplier ordering screen', () => {
   });
 
   describe('the room bars', () => {
-    const heading = (lines: string[], room: string) => lines.find((l) => l.trimStart().startsWith(room)) ?? '';
-    const shades = (line: string) => ({ ...Object.fromEntries(['█', '▓', '▒', '░'].map((g) => [g, [...line].filter((c) => c === g).length])) });
+    const heading = (lines: string[], room: string) => lines.find((l) => l.includes(room) && l.includes('%')) ?? '';
+    const shades = (line: string) => ({ ...Object.fromEntries(['█', '▓', '░'].map((g) => [g, [...line].filter((c) => c === g).length])) });
 
-    it('sit on each room\'s heading with its per cent, and a legend explains the four shades', () => {
+    it('sit in a panel on the right under the legend, one per room with its per cent', () => {
       const { app, press } = toResult();
       press('Enter');
       const lines = screen(app);
       const text = lines.join('\n');
-      for (const word of ['█ in store', '▓ ordered', '▒ this row', '░ free']) expect(text).toContain(word);
+      for (const word of ['█ in store', '▓ ordered', '░ free']) expect(text).toContain(word);
+      expect(text).not.toContain('this row');
+      expect(text).not.toContain('▒');
+      const legend = lines.findIndex((l) => l.includes('█ in store'));
       for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) {
         const line = heading(lines, room);
-        const space = app.supply!.roomSpace(room === 'FREEZER' ? 'freezer' : room === 'FRIDGE' ? 'fridge' : 'dry', 0);
-        expect(line).toMatch(/[█▓▒░]{36} +\d+%/);
+        const space = app.supply!.roomSpace(room === 'FREEZER' ? 'freezer' : room === 'FRIDGE' ? 'fridge' : 'dry');
+        expect(line).toMatch(/[█▓░]{32} +\d+%/);
         expect(line).toContain(`${space.pct}%`);
         expect(line).not.toContain('over by');
+        // To the right of the item columns, and at least one empty line below the legend.
+        expect(line.indexOf('█') === -1 ? line.indexOf('░') : line.indexOf('█')).toBeGreaterThanOrEqual(56);
+        expect(lines.indexOf(line)).toBeGreaterThan(legend + 1);
       }
+      expect(lines[legend + 1]!.slice(50).trim()).toBe('');
     });
 
     it('update as an amount is typed, nudged or filled', () => {
@@ -338,26 +375,23 @@ describe('the supplier ordering screen', () => {
       const freezer = () => heading(screen(app), 'FREEZER');
       const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
       const before = shades(freezer());
-      expect(before['▒']).toBe(0);
+      expect(before['▓']).toBe(0);
       press(...Array(chips).fill('ArrowDown'), '4');
       const typed = shades(freezer());
-      expect(typed['▒']).toBeGreaterThan(0);
+      expect(typed['▓']).toBeGreaterThan(0);
       expect(typed['░']).toBeLessThan(before['░']!);
       press('0');
-      const more = shades(freezer())['▒']!;
-      expect(more).toBeGreaterThan(typed['▒']!);
+      const more = shades(freezer())['▓']!;
+      expect(more).toBeGreaterThan(typed['▓']!);
       press('ArrowLeft');
-      expect(shades(freezer())['▒']).toBeLessThanOrEqual(more);
-      // Leaving the row turns its share into ordered space.
+      expect(shades(freezer())['▓']).toBeLessThanOrEqual(more);
       press('Enter');
       const after = shades(freezer());
-      expect(after['▒']).toBe(0);
       expect(after['▓']).toBeGreaterThan(0);
       // A fill with A adds the rest of the usual amounts.
       press('a');
-      const filled = shades(freezer());
-      expect(filled['▓']! + filled['▒']!).toBeGreaterThan(after['▓']!);
-      expect(heading(screen(app), 'FREEZER')).toContain(`${app.supply!.roomSpace('freezer', app.supplySel).pct}%`);
+      expect(shades(freezer())['▓']).toBeGreaterThan(after['▓']!);
+      expect(freezer()).toContain(`${app.supply!.roomSpace('freezer').pct}%`);
     });
 
     it('cap at full and warn in amber when the order is more than a room holds, and F9 still places it', () => {
@@ -365,34 +399,32 @@ describe('the supplier ordering screen', () => {
       press('Enter');
       const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
       press(...Array(chips).fill('ArrowDown'), '9', '9', '9');
-      const space = app.supply!.roomSpace('freezer', chips);
+      const space = app.supply!.roomSpace('freezer');
       expect(space.overPct).toBeGreaterThan(0);
       const lines = screen(app);
       const line = heading(lines, 'FREEZER');
-      expect(line).toContain(`FREEZER over by ${space.overPct}%`);
+      expect(line).toContain(`over by ${space.overPct}%`);
       expect(line).toContain(`${space.pct}%`);
       expect(shades(line)['░']).toBe(0);
-      expect([...line].filter((c) => '█▓▒'.includes(c))).toHaveLength(36);
-      const amber = screenLines(app).find((l) => l.some(([t]) => t.includes('FREEZER over by')));
+      expect([...line].filter((c) => '█▓'.includes(c))).toHaveLength(32);
+      const amber = screenLines(app).find((l) => l.some(([t]) => t.includes('over by')));
       expect(amber!.filter(([t]) => t.includes('over by') || /^ +\d+%$/.test(t)).every(([, cls]) => cls === 'w')).toBe(true);
       // The other rooms are not over, so say nothing about them.
       expect(lines.join('\n').match(/over by/g)).toHaveLength(1);
       press('F9');
       expect(app.supply!.placed).toBe(true);
       expect(screen(app).join('\n')).toContain('ORDER PLACED FOR TOMORROW');
-      // Once placed, nothing is being edited: all of it is ordered.
-      expect(shades(heading(screen(app), 'FREEZER'))['▒']).toBe(0);
     });
 
-    it('draw all four shades with their own colour in both colour schemes', () => {
+    it('draw the three shades with their own colour in both colour schemes', () => {
       const { app, press } = toResult(0, 'big');
       press('Enter', 'a');
       for (const theme of [false, true]) {
         expect(app.blue).toBe(theme);
         const classes = new Map<string, string>();
-        for (const line of screenLines(app)) for (const [t, cls] of line) for (const g of '█▓▒░') if (t.includes(g)) classes.set(g, cls);
-        expect(new Set(classes.keys())).toEqual(new Set(['█', '▓', '▒', '░']));
-        expect(new Set(classes.values()).size).toBe(4);
+        for (const line of screenLines(app)) for (const [t, cls] of line) for (const g of '█▓░') if (t.includes(g)) classes.set(g, cls);
+        expect(new Set(classes.keys())).toEqual(new Set(['█', '▓', '░']));
+        expect(new Set(classes.values()).size).toBe(3);
         press('F2');
       }
     });
