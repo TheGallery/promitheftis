@@ -2,7 +2,7 @@ import { buildCalls, callLine, type Call } from '../game/calls';
 import { DEPART_MINUTE } from '../game/clock';
 import { buildDay, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
-import { growthOptions, type Growth, type GrowthOption } from '../game/growth';
+import { growthOptions, newClientFor, type Growth, type GrowthOption, type NewClient } from '../game/growth';
 import { loadMorning } from '../game/morning';
 import { buildResult, type MorningResult } from '../game/results';
 import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
@@ -32,6 +32,8 @@ export interface Effects {
   toggleSound(): boolean;
   /** A real-time clock, in ms. */
   now(): number;
+  /** A random number from 0 up to but not including 1, for the few things that differ from game to game. */
+  random(): number;
 }
 
 export interface KeyPress {
@@ -97,6 +99,8 @@ export class App {
   growthSel = 0;
   /** What was chosen to grow, or null until it is confirmed. Day part 7 reads it. */
   growth: Growth | null = null;
+  /** The restaurant that asks to join, picked at random when the order is placed so it stays the same while the day is on show. */
+  private newClient: NewClient | null = null;
 
   constructor(
     private readonly effects: Effects,
@@ -237,6 +241,7 @@ export class App {
     this.growthOpen = false;
     this.growthSel = 0;
     this.growth = null;
+    this.newClient = null;
   }
 
   // ------------------------------------------------------------ order desk
@@ -750,6 +755,7 @@ export class App {
     this.growthOpen = false;
     this.growthSel = 0;
     this.growth = null;
+    this.newClient = newClientFor(this.morning.orders.map((o) => o.client), () => this.effects.random());
     this.screen = 'day';
     this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');
@@ -758,7 +764,7 @@ export class App {
   // ------------------------------------------------------------ end of the day
   /** The three things the day can end by growing; empty before the day is built. */
   get growthOptions(): GrowthOption[] {
-    return this.day ? growthOptions(this.day, this.morning.orders.map((o) => o.client)) : [];
+    return this.day && this.newClient ? growthOptions(this.day, this.newClient) : [];
   }
 
   /** R plays this morning again, B and S load a morning: all of them start over and drop the growth choice. */

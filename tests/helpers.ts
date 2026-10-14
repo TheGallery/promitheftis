@@ -39,7 +39,7 @@ export function summary(answer: number, leaveOut: string[] = [], amounts: Record
   return { d, result, calls, answers, supply, day: buildDay(result, calls, answers, supply) };
 }
 
-export function fakeEffects(cues: string[] = []): Effects {
+export function fakeEffects(cues: string[] = [], random: () => number = () => 0): Effects {
   return {
     cue: (moment) => void cues.push(moment),
     print: () => 100,
@@ -49,12 +49,19 @@ export function fakeEffects(cues: string[] = []): Effects {
       let t = 0;
       return () => (t += 1000);
     })(),
+    random,
   };
 }
 
 /** Plays a morning to the end-of-day screen, answering every call with the given option. */
-export function toDay(answer = 0, morning: 'small' | 'big' = 'small', typed = ['a'], cues: string[] = []) {
-  const app = new App(fakeEffects(cues), () => {}, morning);
+export function toDay(
+  answer = 0,
+  morning: 'small' | 'big' = 'small',
+  typed = ['a'],
+  cues: string[] = [],
+  random: () => number = () => 0,
+) {
+  const app = new App(fakeEffects(cues, random), () => {}, morning);
   const press = (...keys: string[]) => keys.forEach((key) => app.press({ key }));
   press(' ');
   if (morning === 'small') {

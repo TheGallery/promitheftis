@@ -17,6 +17,7 @@ function fakeEffects() {
     later: (fn, ms) => (ms === ROAD_TICK_MS ? void log.ticks.push(fn) : fn()),
     toggleSound: () => (log.sound = !log.sound),
     now: () => log.time,
+    random: () => 0,
   };
   return { effects, log };
 }

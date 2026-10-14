@@ -127,6 +127,7 @@ function fakeEffects(): Effects {
       let t = 0;
       return () => (t += 1000);
     })(),
+    random: () => 0,
   };
 }
 

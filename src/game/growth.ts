@@ -48,20 +48,20 @@ export function tightestRoom(rooms: readonly DayRoom[]): DayRoom {
 }
 
 /**
- * The restaurant that asks to join. It is worked out from the day, so the same
- * day always names the same one, and never one that is a client already.
+ * The restaurant that asks to join: one of the pool picked with `random` (a number
+ * from 0 up to but not including 1), never one that is a client already.
  */
-export function newClientFor(taken: readonly string[]): NewClient {
+export function newClientFor(taken: readonly string[], random: () => number): NewClient {
   const free = NEW_CLIENTS.filter((c) => !taken.includes(c.name));
   const pool = free.length > 0 ? free : NEW_CLIENTS;
-  return pool[taken.length % pool.length] as NewClient;
+  const at = Math.min(pool.length - 1, Math.max(0, Math.floor(random() * pool.length)));
+  return pool[at] as NewClient;
 }
 
-/** The three things the day can end by growing, in the order they are listed. `clients` are the names of today's clients. */
-export function growthOptions(day: DaySummary, clients: readonly string[]): GrowthOption[] {
+/** The three things the day can end by growing, in the order they are listed; `client` is the restaurant that asks to join. */
+export function growthOptions(day: DaySummary, client: NewClient): GrowthOption[] {
   const tight = tightestRoom(day.rooms);
   const room = ROOM_NAME[tight.kept];
-  const client = newClientFor(clients);
   return [
     {
       growth: { kind: 'truck' },

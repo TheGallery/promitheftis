@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { bigMorning, smallMorning } from '../src/game/morning';
-import { growthOptions, NEW_CLIENTS, newClientFor, tightestRoom } from '../src/game/growth';
+import { growthOptions, NEW_CLIENTS, newClientFor, tightestRoom, type NewClient } from '../src/game/growth';
 import { PLACES } from '../src/game/places';
 import { plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 import { screen, summary, toDay } from './helpers';
 
 const clientsOf = (m: { orders: Array<{ client: string }> }) => m.orders.map((o) => o.client);
+const CLIENT: NewClient = { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' };
+/** A random source that gives these numbers in turn, then the last one again. */
+const sequence = (...values: number[]) => {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)] as number;
+};
 
 describe('the tightest room', () => {
   it('is the freezer when the order fills it most', () => {
@@ -35,8 +41,8 @@ describe('the tightest room', () => {
 
 describe('the three growth options', () => {
   it('lists another truck, a bigger room and a new client, in that order', () => {
-    const { day, d } = summary(0, [], { chips: 40 });
-    const options = growthOptions(day, clientsOf(d.morning));
+    const { day } = summary(0, [], { chips: 40 });
+    const options = growthOptions(day, CLIENT);
     expect(options.map((o) => o.growth.kind)).toEqual(['truck', 'room', 'client']);
     expect(options[0]!.title).toBe('Another truck');
     for (const o of options) {
@@ -53,42 +59,65 @@ describe('the three growth options', () => {
       [{ flour: 100 }, 'dry', 'A bigger dry store'],
     ] as const;
     for (const [amounts, room, title] of cases) {
-      const { day, d } = summary(0, [], amounts);
-      const option = growthOptions(day, clientsOf(d.morning))[1]!;
+      const { day } = summary(0, [], amounts);
+      const option = growthOptions(day, CLIENT)[1]!;
       expect(option.title).toBe(title);
       expect(option.growth).toEqual({ kind: 'room', room });
       expect(option.gain).toContain(`${tightestRoom(day.rooms).space.pct}% full tomorrow`);
     }
   });
 
-  it('names a plausible new client on a square of the map, who is not a client already', () => {
-    const { day, d } = summary(0);
-    const taken = clientsOf(d.morning);
-    const option = growthOptions(day, taken)[2]!;
-    expect(option.growth.kind).toBe('client');
-    if (option.growth.kind !== 'client') return;
-    const { client } = option.growth;
-    expect(taken).not.toContain(client.name);
-    expect(PLACES.map((p) => p.id)).toContain(client.place);
-    expect(client.contact.length).toBeGreaterThan(0);
-    expect(option.title).toBe(`A new client: ${client.name}`);
-    expect(option.gain).toContain(client.name);
-    expect(option.gain).toMatch(/in [A-Z][a-z]+/);
+  it('offers the restaurant it is given, with its square and contact', () => {
+    const { day } = summary(0);
+    const option = growthOptions(day, CLIENT)[2]!;
+    expect(option.growth).toEqual({ kind: 'client', client: CLIENT });
+    expect(option.title).toBe('A new client: The Salt Cellar');
+    expect(option.gain).toContain('The Salt Cellar in Saltmarket');
+    expect(option.gain).toContain('contact Ines');
   });
+});
 
-  it('names the same client for the same day, and never one of either morning\'s clients', () => {
-    const small = clientsOf(smallMorning());
-    const big = clientsOf(bigMorning());
-    expect(newClientFor(small)).toEqual(newClientFor(small));
-    for (const name of [...small, ...big]) expect(NEW_CLIENTS.map((c) => c.name)).not.toContain(name);
+describe('the new client', () => {
+  const pool = (taken: readonly string[]) => NEW_CLIENTS.filter((c) => !taken.includes(c.name));
+
+  it('has a pool of restaurants on the nine squares, none of them a client of either morning', () => {
+    const clients = [...clientsOf(smallMorning()), ...clientsOf(bigMorning())];
+    for (const c of NEW_CLIENTS) {
+      expect(clients).not.toContain(c.name);
+      expect(PLACES.map((p) => p.id)).toContain(c.place);
+      expect(c.contact.length).toBeGreaterThan(0);
+    }
     expect(new Set(NEW_CLIENTS.map((c) => c.name)).size).toBe(NEW_CLIENTS.length);
-    expect(newClientFor(big).name).not.toBe('');
   });
 
-  it('skips a candidate that is a client already', () => {
-    const first = NEW_CLIENTS[0]!.name;
-    expect(newClientFor([first]).name).not.toBe(first);
-    expect(newClientFor(NEW_CLIENTS.map((c) => c.name)).name).not.toBe('');
+  it('is picked with the random number it is given: the first at 0, the last just under 1', () => {
+    const taken = clientsOf(smallMorning());
+    expect(newClientFor(taken, () => 0)).toEqual(NEW_CLIENTS[0]);
+    expect(newClientFor(taken, () => 0.999999)).toEqual(NEW_CLIENTS.at(-1));
+    expect(newClientFor(taken, () => 0.5)).toEqual(NEW_CLIENTS[Math.floor(NEW_CLIENTS.length / 2)]);
+  });
+
+  it('can be any of the pool, so it differs from game to game', () => {
+    const seen = new Set(NEW_CLIENTS.map((_, i) => newClientFor([], () => (i + 0.5) / NEW_CLIENTS.length).name));
+    expect(seen.size).toBe(NEW_CLIENTS.length);
+  });
+
+  it('is never one that is a client already, whatever the random number', () => {
+    const taken = [NEW_CLIENTS[0]!.name, NEW_CLIENTS[3]!.name];
+    for (let i = 0; i < 20; i++) {
+      const c = newClientFor(taken, () => i / 20);
+      expect(taken).not.toContain(c.name);
+      expect(pool(taken)).toContain(c);
+    }
+  });
+
+  it('keeps to the pool when a random source gives a number outside 0 to 1', () => {
+    expect(NEW_CLIENTS).toContain(newClientFor([], () => 1));
+    expect(NEW_CLIENTS).toContain(newClientFor([], () => -0.5));
+  });
+
+  it('still names someone when every candidate is a client already', () => {
+    expect(newClientFor(NEW_CLIENTS.map((c) => c.name), () => 0.3).name).not.toBe('');
   });
 });
 
@@ -204,6 +233,44 @@ describe('choosing what to grow', () => {
     const again = toDay();
     expect(again.app.growth).toBeNull();
     expect(again.app.growthOpen).toBe(false);
+  });
+});
+
+describe('the new client in the game', () => {
+  const offered = (app: { growthOptions: Array<{ growth: { kind: string } }> }) => app.growthOptions[2]!.growth as { kind: 'client'; client: NewClient };
+
+  it('is picked with the random source the app was given, and is not one of the morning\'s clients', () => {
+    const first = toDay(0, 'small', ['a'], [], () => 0).app;
+    const last = toDay(0, 'small', ['a'], [], () => 0.999).app;
+    expect(offered(first).client).toEqual(NEW_CLIENTS[0]);
+    expect(offered(last).client).toEqual(NEW_CLIENTS.at(-1));
+    for (const app of [first, last]) expect(clientsOf(app.morning)).not.toContain(offered(app).client.name);
+  });
+
+  it('stays the same while the day is on show, and is what a choice of it records', () => {
+    const random = sequence(0.3, 0.9);
+    const { app, press } = toDay(0, 'small', ['a'], [], random);
+    const before = offered(app).client;
+    press('Enter', 'Escape', 'Enter', 'ArrowDown', 'ArrowUp', 'ArrowDown', 'ArrowDown');
+    expect(offered(app).client).toEqual(before);
+    expect(screen(app).join('\n')).toContain(`A new client: ${before.name}`);
+    press('Enter');
+    expect(app.growth).toEqual({ kind: 'client', client: before });
+  });
+
+  it('is forgotten by R, and the next game picks its own', () => {
+    const { app, press } = toDay(0, 'small', ['a'], [], () => 0);
+    expect(offered(app).client).toEqual(NEW_CLIENTS[0]);
+    press('r');
+    expect(app.growthOptions).toEqual([]);
+    const again = toDay(0, 'small', ['a'], [], sequence(0.999)).app;
+    expect(offered(again).client).toEqual(NEW_CLIENTS.at(-1));
+  });
+
+  it('draws no random number for anything else in the game', () => {
+    let draws = 0;
+    toDay(0, 'big', ['a'], [], () => (draws++, 0));
+    expect(draws).toBe(1);
   });
 });
 
