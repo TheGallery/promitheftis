@@ -273,7 +273,8 @@ describe('a run saved in the browser', () => {
     const store = memoryStore();
     toNextMorning('1', 'small', 0, RANDOM, store);
     const { app, press } = appOn(store);
-    press('ArrowDown', 'ArrowDown', 'Enter');
+    press('ArrowDown', 'ArrowDown');
+    holdNewRun(app, 'Enter');
     expect(app.screen).toBe('messages');
     expect(app.morning.id).toBe('big');
     expect(app.morning.day).toBe(1);
@@ -294,8 +295,8 @@ describe('B and S replace the save', () => {
     const store = memoryStore();
     toNextMorning('1', kind === 'big' ? 'small' : 'big', 0, RANDOM, store);
     expect(savedRun(store)?.run.day).toBe(2);
-    const { app, press } = appOn(store);
-    press(key.toUpperCase());
+    const { app } = appOn(store);
+    holdNewRun(app, key.toUpperCase());
     expect(app.run.kind).toBe(kind);
     expect(app.morning.day).toBe(1);
     expect(savedRun(store)).toEqual({ run: runFromMorning(app.morning), daySeed: 0 });
@@ -335,10 +336,10 @@ describe('B and S replace the save', () => {
   it('a new run chosen on the opening screen is what the next visit finds', () => {
     const store = memoryStore();
     toNextMorning('1', 'small', 0, RANDOM, store);
-    appOn(store).press('s');
+    holdNewRun(appOn(store).app, 's');
     const { app } = appOn(store);
-    expect(app.screen).toBe('start');
-    expect(screen(app).join('\n')).toContain('Day 1, TUE 14 MAR');
+    expect(app.screen).toBe('messages');
+    expect(app.run.day).toBe(1);
   });
 });
 
@@ -579,6 +580,121 @@ describe('B and S have to be held down from day 2 on', () => {
   });
 });
 
+/** The opening screen over a saved later day, with a clock the test moves and a log of the sounds made. */
+function welcome() {
+  const store = memoryStore();
+  toNextMorning('1', 'small', 0, RANDOM, store);
+  const clock = { t: 0 };
+  const cues: string[] = [];
+  const effects: Effects = { ...fakeEffects(cues, () => 0.9, store), now: () => clock.t };
+  const app = new App(effects);
+  const wait = (ms: number) => {
+    clock.t += ms;
+    app.tick();
+  };
+  return { app, store, text: store.data.get(RUN_KEY), wait, cues };
+}
+
+describe('a new run on the opening screen has to be held down', () => {
+  it.each([['s', 'S', 'small'], ['b', 'B', 'big']] as const)(
+    '%s shows the button and starts the %s morning only once the whole hold is done',
+    (key, name, kind) => {
+      const { app, store, text, wait, cues } = welcome();
+      app.press({ key });
+      expect(app.screen).toBe('start');
+      expect(app.holding).toBe(true);
+      expect(screen(app).join('\n')).toContain(`It replaces your saved day 2. [ HOLD ${name} TO START A NEW RUN ]`);
+      wait(HOLD_MS - 1);
+      expect(app.screen).toBe('start');
+      expect(store.data.get(RUN_KEY)).toBe(text);
+      wait(1);
+      expect(app.screen).toBe('messages');
+      expect(app.run.kind).toBe(kind);
+      expect(app.run.day).toBe(1);
+      expect(cues).toEqual(['confirm']);
+      expect(savedRun(store)).toEqual({ run: runFromMorning(app.morning), daySeed: 0 });
+    },
+  );
+
+  it('ENTER on a new run is held the same way, and the button names ENTER', () => {
+    const { app, wait } = welcome();
+    app.press({ key: 'ArrowDown' });
+    app.press({ key: 'Enter' });
+    expect(screen(app).join('\n')).toContain('[ HOLD ENTER TO START A NEW RUN ]');
+    wait(HOLD_MS);
+    expect(app.run.kind).toBe('small');
+    expect(app.screen).toBe('messages');
+  });
+
+  it('letting go early empties the bar and leaves the save alone', () => {
+    const { app, store, text, wait, cues } = welcome();
+    app.press({ key: 's' });
+    wait(HOLD_MS - 1);
+    app.release('s');
+    wait(HOLD_MS * 2);
+    expect(app.holding).toBe(false);
+    expect(app.screen).toBe('start');
+    expect(filled(app)).toBe(0);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+    expect(cues).toEqual([]);
+  });
+
+  it('ESC or another key cancels the question', () => {
+    const { app, store, text } = welcome();
+    app.press({ key: 's' });
+    app.press({ key: 'Escape' });
+    expect(app.newRunAsk).toBeNull();
+    expect(app.screen).toBe('start');
+    app.press({ key: 'b' });
+    app.press({ key: 'ArrowDown' });
+    expect(app.newRunAsk).toBeNull();
+    expect(app.startSel).toBe(1);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+  });
+
+  it('continue is a single press, by ENTER or by C', () => {
+    for (const [keys, sel] of [[['Enter'], 0], [['c'], 1]] as const) {
+      const { app } = welcome();
+      app.startSel = sel;
+      keys.forEach((key) => app.press({ key }));
+      expect(app.screen).toBe('messages');
+      expect(app.run.day).toBe(2);
+      expect(app.holding).toBe(false);
+    }
+  });
+
+  it('the screen stays 120 columns wide with the button on show', () => {
+    const { app } = welcome();
+    app.press({ key: 'b' });
+    screen(app);
+  });
+});
+
+describe('a saved first day opens without the opening screen', () => {
+  it.each([['small'], ['big']] as const)('a saved %s first day opens at its overnight messages, keeping the settings', (kind) => {
+    const store = memoryStore();
+    const first = appOn(store, () => 0.9, kind);
+    first.press('F2', 'F4');
+    expect(first.app.run.day).toBe(1);
+    const { app, sound } = appOn(store, () => 0.9, kind === 'big' ? 'small' : 'big');
+    expect(app.screen).toBe('messages');
+    expect(app.saved).toBeNull();
+    expect(app.run.kind).toBe(kind);
+    expect(app.blue).toBe(true);
+    expect(app.soundOn).toBe(first.app.soundOn);
+    expect(sound).toEqual([first.app.soundOn]);
+    expect(screen(app).join('\n')).not.toContain('WELCOME BACK');
+  });
+
+  it('does not rewrite the save', () => {
+    const store = memoryStore();
+    appOn(store);
+    const text = store.data.get(RUN_KEY);
+    appOn(store);
+    expect(store.data.get(RUN_KEY)).toBe(text);
+  });
+});
+
 describe('the settings saved in the browser', () => {
   it('saves the colours when F2 is pressed, and the next visit has them', () => {
     const store = memoryStore();
@@ -610,7 +726,7 @@ describe('the settings saved in the browser', () => {
     const { app, press } = appOn(store);
     press('F2');
     expect(app.screen).toBe('start');
-    press('s');
+    holdNewRun(app, 's');
     expect(app.blue).toBe(true);
     expect(appOn(store).app.blue).toBe(true);
   });

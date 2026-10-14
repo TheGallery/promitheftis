@@ -1,6 +1,7 @@
 import { dateLabel } from '../../game/clock';
 import { plural } from '../format';
 import type { App, StartChoice } from '../app';
+import { newRunPrompt } from './common';
 import { header, keyBar, layout, rule, s, cat, type Line } from '../grid';
 
 const CHOICES: ReadonlyArray<{ choice: StartChoice; title: string; text: string }> = [
@@ -27,7 +28,7 @@ export function startScreen(app: App): Line[] {
     [],
     ...rows,
   ];
-  const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : [];
-  const keys = keyBar([['↑↓', 'pick one'], ['ENTER', 'go'], ['C', 'continue'], ['S', 'small morning'], ['B', 'big morning'], ['F2', 'colours'], ['F4', 'sound']]);
+  const status = newRunPrompt(app) ?? (app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : []);
+  const keys = keyBar([['↑↓', 'pick one'], ['ENTER', 'go (hold for a new run)'], ['C', 'continue'], ['S', 'small morning'], ['B', 'big morning'], ['F2', 'colours'], ['F4', 'sound']]);
   return layout(top, body, [rule(), status, keys]);
 }

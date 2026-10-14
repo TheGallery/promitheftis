@@ -39,15 +39,15 @@ export function shortfallLines(app: App, client: string, wide: number, named: nu
 const HOLD_CELLS = 16;
 
 /**
- * The question shown from day 2 on after B or S: a button to hold down while its bar fills from left to right,
+ * The question shown from day 2 on after B or S (and on the opening screen after choosing a new run): a button to hold down while its bar fills from left to right,
  * in the accent colour; null when there is no question.
  */
 export function newRunPrompt(app: App): Line | null {
   const id = app.newRunAsk;
   if (!id) return null;
-  const key = id === 'big' ? 'B' : 'S';
+  const key = app.holdKeyName;
   return cat(
-    s(` Start a new run? It replaces your saved day ${app.run.day}. `),
+    s(` Start a new run? It replaces your saved day ${app.saved?.run.day ?? app.run.day}. `),
     s(`[ HOLD ${key} TO START A NEW RUN ]`, 'b'),
     s(' '),
     bar(app.holdProgress * 100, HOLD_CELLS),
