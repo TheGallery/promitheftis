@@ -146,12 +146,18 @@ describe('sounds', () => {
     expect(log.cues.map((c) => c.moment)).toEqual([]);
   });
 
-  it('makes the confirm sound for ENTER on a line and on an order, and no sound for a digit in another pane', () => {
-    const { heard } = newApp();
+  it('makes the confirm sound for ENTER on a line and on an order, and the warning sound for a digit in another pane', () => {
+    const { app, heard } = newApp();
     heard(' ');
     expect(heard('Enter')).toEqual([['confirm']]);
-    heard('Tab', 'Tab');
-    expect(heard('5')).toEqual([[]]);
+    heard('Tab');
+    expect(app.pane).toBe('trucks');
+    expect(heard('5')).toEqual([['warn']]);
+    expect(app.status).toContain('press T');
+    heard('Tab');
+    expect(app.pane).toBe('orders');
+    expect(heard('5')).toEqual([['warn']]);
+    expect(app.status).toContain('press T');
     expect(heard('Enter')).toEqual([['confirm']]);
   });
 

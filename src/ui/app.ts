@@ -83,7 +83,8 @@ export class App {
 
     const handled = this.route(key, shift, wasConfirming);
     if (handled) {
-      // One sound per key press: a warning replaces the ordinary sound, and a key that changed nothing is silent.
+      // One sound per key press: a warning replaces the ordinary sound, a key that only shows a message warns,
+      // and a key that changed nothing is silent.
       const heard = this.heardNow();
       if (heard) this.effects.cue(heard.moment, heard.arg);
     }
@@ -240,7 +241,10 @@ export class App {
     }
     if (/^\d$/.test(key)) {
       if (this.pane === 'lines') this.typeDigit(key);
-      else this.say('To put this order on a truck, press T and then 1 to 9.');
+      else {
+        this.say('To put this order on a truck, press T and then 1 to 9.');
+        this.sound('warn');
+      }
       return true;
     }
     return false;
