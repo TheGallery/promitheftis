@@ -103,7 +103,7 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 | Result | **↑ ↓** look through the orders · **ENTER** supplier order · **R** play this day again · **B** / **S** load a morning |
 | Supplier order | **↑ ↓** pick an item · type a number or **← →** (one less / one more) · **ENTER** confirm the row and go to the next · **U** fill the row up to the usual amount · **A** fill every row (both leave a row that already has an amount alone) · the room bars update as you go · **F9** place the order and go to the end of the day · **ESC** back to the result |
 | End of the day | **↑ ↓** look through the clients (**PgUp** / **PgDn** ten at a time) · **ENTER** choose what to grow · **R** play this day again · **B** / **S** load a morning |
-| What to grow | **↑ ↓** or **1**–**3** pick one of the three · **ENTER** choose it (final), then **ENTER** again for the next morning · **ESC** back to the day · **R** play this day again · **B** / **S** load a morning |
+| What to grow | **↑ ↓** or **1**–**3** pick one of the three · **ENTER** choose it, then **ENTER** again for the next morning (the choice is final from then on) · **U** or **BACKSPACE** take the choice back · **ESC** back to the day · **R** play this day again · **B** / **S** load a morning |
 
 ### How the desk plays
 
