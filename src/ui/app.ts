@@ -2,6 +2,7 @@ import { buildCalls, callLine, type Call } from '../game/calls';
 import { DEPART_MINUTE } from '../game/clock';
 import { buildDay, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
+import { growthOptions, type Growth, type GrowthOption } from '../game/growth';
 import { loadMorning } from '../game/morning';
 import { buildResult, type MorningResult } from '../game/results';
 import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
@@ -90,6 +91,12 @@ export class App {
 
   day: DaySummary | null = null;
   daySel = 0;
+  /** True while the growth choice is on show instead of the look back at the day. */
+  growthOpen = false;
+  /** The highlighted choice; once one is confirmed, that one. */
+  growthSel = 0;
+  /** What was chosen to grow, or null until it is confirmed. Day part 7 reads it. */
+  growth: Growth | null = null;
 
   constructor(
     private readonly effects: Effects,
@@ -227,6 +234,9 @@ export class App {
     this.supplyTyped = '';
     this.day = null;
     this.daySel = 0;
+    this.growthOpen = false;
+    this.growthSel = 0;
+    this.growth = null;
   }
 
   // ------------------------------------------------------------ order desk
@@ -737,13 +747,45 @@ export class App {
     this.supplyTyped = '';
     if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply);
     this.daySel = 0;
+    this.growthOpen = false;
+    this.growthSel = 0;
+    this.growth = null;
     this.screen = 'day';
     this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');
   }
 
   // ------------------------------------------------------------ end of the day
+  /** The three things the day can end by growing; empty before the day is built. */
+  get growthOptions(): GrowthOption[] {
+    return this.day ? growthOptions(this.day, this.morning.orders.map((o) => o.client)) : [];
+  }
+
+  /** R plays this morning again, B and S load a morning: all of them start over and drop the growth choice. */
+  private restartKey(key: string): boolean {
+    switch (key) {
+      case 'r':
+      case 'R':
+        this.loadMorning(this.morning.id);
+        break;
+      case 'b':
+      case 'B':
+        this.loadMorning('big');
+        break;
+      case 's':
+      case 'S':
+        this.loadMorning('small');
+        break;
+      default:
+        return false;
+    }
+    this.sound('confirm');
+    return true;
+  }
+
   private dayKey(key: string): boolean {
+    if (this.restartKey(key)) return true;
+    if (this.growthOpen) return this.growthKey(key);
     const last = (this.day?.orders.length ?? 1) - 1;
     const before = this.daySel;
     switch (key) {
@@ -759,19 +801,8 @@ export class App {
       case 'PageDown':
         this.daySel = Math.min(last, this.daySel + 10);
         break;
-      case 'r':
-      case 'R':
-        this.loadMorning(this.morning.id);
-        this.sound('confirm');
-        return true;
-      case 'b':
-      case 'B':
-        this.loadMorning('big');
-        this.sound('confirm');
-        return true;
-      case 's':
-      case 'S':
-        this.loadMorning('small');
+      case 'Enter':
+        this.growthOpen = true;
         this.sound('confirm');
         return true;
       default:
@@ -779,5 +810,35 @@ export class App {
     }
     if (this.daySel !== before) this.sound('move');
     return true;
+  }
+
+  /** The growth choice: pick with ↑↓ or 1-3, ENTER confirms. Once confirmed it cannot be changed. */
+  private growthKey(key: string): boolean {
+    const options = this.growthOptions;
+    const before = this.growthSel;
+    if (key === 'Escape') {
+      this.growthOpen = false;
+      this.sound('confirm');
+      return true;
+    }
+    if (key === 'Enter') {
+      const picked = options[this.growthSel];
+      if (this.growth) this.say('Already chosen: it takes effect tomorrow.');
+      else if (picked) {
+        this.growth = picked.growth;
+        this.say(`Chosen: ${picked.title}. It takes effect tomorrow.`);
+        this.sound('finish');
+      }
+      return true;
+    }
+    const number = /^[1-9]$/.test(key) ? Number(key) - 1 : -1;
+    if (key === 'ArrowUp' || key === 'ArrowDown' || number >= 0) {
+      if (this.growth) return true;
+      const to = number >= 0 ? number : this.growthSel + (key === 'ArrowUp' ? -1 : 1);
+      this.growthSel = Math.max(0, Math.min(options.length - 1, to));
+      if (this.growthSel !== before) this.sound('move');
+      return true;
+    }
+    return false;
   }
 }

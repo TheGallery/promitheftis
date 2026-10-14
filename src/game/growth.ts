@@ -1,0 +1,85 @@
+import type { DayRoom, DaySummary } from './day';
+import { place, type PlaceId } from './places';
+import type { Kept } from './types';
+
+/** A restaurant that asks to join: where it is on the nine squares and who to speak to. */
+export interface NewClient {
+  name: string;
+  place: PlaceId;
+  contact: string;
+}
+
+/**
+ * What the player chose to grow at the end of the day. It is only recorded here:
+ * the next morning reads it, today is not changed by it.
+ */
+export type Growth =
+  | { kind: 'truck' }
+  | { kind: 'room'; room: Kept }
+  | { kind: 'client'; client: NewClient };
+
+export interface GrowthOption {
+  growth: Growth;
+  /** Short name of the choice, as listed. */
+  title: string;
+  /** What it gives. */
+  gain: string;
+  /** The extra work it brings, since nothing is paid for; a clause that follows "The extra work:". */
+  work: string;
+}
+
+const ROOM_NAME: Record<Kept, string> = { freezer: 'freezer', fridge: 'fridge', dry: 'dry store' };
+
+/** Restaurants that could ask to join, none of them among the clients of either morning. */
+export const NEW_CLIENTS: readonly NewClient[] = [
+  { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' },
+  { name: 'Quayside Kitchen', place: 'docks', contact: 'Bram' },
+  { name: 'Hollin Bistro', place: 'hollin', contact: 'Maud' },
+  { name: 'Fenwick Pie Shop', place: 'fenwick', contact: 'Alf' },
+  { name: 'Station Road Grill', place: 'southgate', contact: 'Nuala' },
+  { name: 'The Lantern Room', place: 'saltmarket', contact: 'Yusuf' },
+  { name: 'Ashby Orchard Café', place: 'ashby', contact: 'Fern' },
+  { name: 'Millford Chippy', place: 'millford', contact: 'Gordon' },
+];
+
+/** The room that will be fullest tomorrow; the first listed wins a tie. */
+export function tightestRoom(rooms: readonly DayRoom[]): DayRoom {
+  return rooms.reduce((best, r) => (r.space.pct > best.space.pct ? r : best));
+}
+
+/**
+ * The restaurant that asks to join. It is worked out from the day, so the same
+ * day always names the same one, and never one that is a client already.
+ */
+export function newClientFor(taken: readonly string[]): NewClient {
+  const free = NEW_CLIENTS.filter((c) => !taken.includes(c.name));
+  const pool = free.length > 0 ? free : NEW_CLIENTS;
+  return pool[taken.length % pool.length] as NewClient;
+}
+
+/** The three things the day can end by growing, in the order they are listed. `clients` are the names of today's clients. */
+export function growthOptions(day: DaySummary, clients: readonly string[]): GrowthOption[] {
+  const tight = tightestRoom(day.rooms);
+  const room = ROOM_NAME[tight.kept];
+  const client = newClientFor(clients);
+  return [
+    {
+      growth: { kind: 'truck' },
+      title: 'Another truck',
+      gain: 'More deliveries can go out on time.',
+      work: 'one more truck to load and send out every morning.',
+    },
+    {
+      growth: { kind: 'room', room: tight.kept },
+      title: `A bigger ${room}`,
+      gain: `Extra space in the ${room}, the tightest room: ${tight.space.pct}% full tomorrow.`,
+      work: 'more stock to order and keep track of.',
+    },
+    {
+      growth: { kind: 'client', client },
+      title: `A new client: ${client.name}`,
+      gain: `One more restaurant asks to join: ${client.name} in ${place(client.place).name}, contact ${client.contact}.`,
+      work: 'more orders to hand out, and more to juggle between the trucks.',
+    },
+  ];
+}
