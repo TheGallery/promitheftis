@@ -63,12 +63,12 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 
 ### The map
 
-Nine squares, with Town in the middle:
+Nine squares, with Saltmarket in the middle:
 
 ```
-Oakley    Hollin   Rushmere
-Fenwick   TOWN     Docks
-Millford  Southgate Ashby
+Oakley    Hollin     Rushmere
+Fenwick   SALTMARKET Docks
+Millford  Southgate  Ashby
 ```
 
 Orders for the same place should go on the same truck. Places next to each other (squares that touch, corners included) can share a truck. A truck sent to places far apart gets back late; that is the only penalty. Each square shows the numbers of the trucks going there, and the current order's square is lit.
