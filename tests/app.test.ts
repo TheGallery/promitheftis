@@ -42,11 +42,16 @@ function expectFullScreen(app: App) {
   return lines;
 }
 
+/** The keys that move the highlight in the TRUCKS pane to the given truck and choose it. */
+function chooseTruck(truck: number): string[] {
+  return [...Array(9).fill('ArrowUp'), ...Array(truck - 1).fill('ArrowDown'), 'Enter'];
+}
+
 /** Gives every line what is asked, as far as possible, and puts the order on a truck. */
 function handOutNext(press: (...k: string[]) => void, app: App, truck: number) {
   const lines = app.desk.order(app.orderSel).lines.length;
   for (let l = 0; l < lines; l++) press('Enter');
-  press('t', String(truck));
+  press(...chooseTruck(truck));
 }
 
 /** Like handOutNext, but tries the following trucks when one is too full. */
@@ -55,7 +60,7 @@ function handOutSomewhere(press: (...k: string[]) => void, app: App, first: numb
   const lines = app.desk.order(o).lines.length;
   for (let l = 0; l < lines; l++) press('Enter');
   const count = app.morning.trucks.length;
-  for (let i = 0; i < count && !app.desk.isFinished(o); i++) press('t', String(1 + ((first - 1 + i) % count)));
+  for (let i = 0; i < count && !app.desk.isFinished(o); i++) press(...chooseTruck(1 + ((first - 1 + i) % count)));
 }
 
 describe('overnight messages', () => {
@@ -119,13 +124,12 @@ describe('sounds', () => {
     expect(heard('b', 's', ' ', 'F2', 'F4')).toEqual([['confirm'], ['confirm'], ['confirm'], ['confirm'], ['confirm']]);
   });
 
-  it('makes the move, tab and truck key sounds on the desk, and none when a move changes nothing', () => {
+  it('makes the move and tab sounds on the desk, and none when a move changes nothing', () => {
     const { heard } = newApp();
     heard(' ');
     expect(heard('ArrowUp')).toEqual([[]]);
     expect(heard('ArrowDown')).toEqual([['move']]);
     expect(heard('Tab', 'Tab', 'ArrowDown', 'ArrowDown')).toEqual([['tab'], ['tab'], ['move'], ['move']]);
-    expect(heard('t')).toEqual([['truckKey']]);
   });
 
   it('tells a digit, a nudge either way and a backspace apart, and keeps still when the line cannot change', () => {
@@ -153,18 +157,18 @@ describe('sounds', () => {
     heard('Tab');
     expect(app.pane).toBe('trucks');
     expect(heard('5')).toEqual([['warn']]);
-    expect(app.status).toContain('press T');
+    expect(app.status).toContain('typed in the LINES pane');
     heard('Tab');
     expect(app.pane).toBe('orders');
     expect(heard('5')).toEqual([['warn']]);
-    expect(app.status).toContain('press T');
+    expect(app.status).toContain('typed in the LINES pane');
     expect(heard('Enter')).toEqual([['confirm']]);
   });
 
   it('makes the truck sound when an order goes on a truck with lines still to do', () => {
     const { heard } = newApp();
     heard(' ');
-    expect(heard('t', '1')).toEqual([['truckKey'], ['truck']]);
+    expect(heard('Tab', 'Enter')).toEqual([['tab'], ['truck']]);
   });
 
   it('makes the finish sound, not the confirm or truck sound, when an order is finished', () => {
@@ -173,10 +177,10 @@ describe('sounds', () => {
     const lines = app.desk.order(0).lines.length;
     const confirms = Array.from({ length: lines }, () => 'Enter');
     expect(heard(...confirms)).toEqual(confirms.map(() => ['confirm']));
-    expect(heard('t', '2')).toEqual([['truckKey'], ['finish']]);
+    expect(heard(...chooseTruck(2)).filter((s) => s.length)).toEqual([['move'], ['finish']]);
 
     // The same, when ENTER on the last line is what finishes an order that already has a truck.
-    press('t', '2');
+    press('Tab', 'Enter');
     const next = app.desk.order(app.orderSel).lines.length;
     const keys = Array.from({ length: next }, () => 'Enter');
     const sounds = heard(...keys);
@@ -187,7 +191,6 @@ describe('sounds', () => {
   it('makes the warning sound instead of the ordinary one', () => {
     const { heard, press } = newApp();
     press(' ');
-    expect(heard('t', '7')).toEqual([['truckKey'], ['warn']]);
     // Ending the morning with orders left asks to be pressed again: a warning, then the ordinary sound.
     expect(heard('F10', 'F10')).toEqual([['warn'], ['confirm']]);
   });
@@ -198,12 +201,11 @@ describe('sounds', () => {
     for (let i = 0; i < app.desk.orderCount && app.tone !== 'warn'; i++) handOutNext(press, app, 1);
     expect(app.status).toContain('too full');
     expect(log.cues.at(-1)).toEqual({ moment: 'warn', arg: undefined });
-    expect(log.cues.at(-2)?.moment).toBe('truckKey');
   });
 
   it('makes the sheet open and close sounds on the truck sheets, and keeps the printer to itself', () => {
     const { app, press, heard, log } = newApp();
-    press(' ', 'Enter', 't', '1', 'F10', 'F10');
+    press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
     expect(app.screen).toBe('sheets');
     expect(heard('ArrowUp')).toEqual([[]]);
     expect(heard('ArrowDown')).toEqual([['move']]);
@@ -215,16 +217,9 @@ describe('sounds', () => {
     expect(app.screen).toBe('desk');
   });
 
-  it('makes the move sound when ESC drops a pending T', () => {
-    const { app, press, heard } = newApp();
-    press(' ');
-    expect(heard('t', 'Escape')).toEqual([['truckKey'], ['move']]);
-    expect(app.truckPending).toBe(false);
-  });
-
   it('makes the warning sound, not the printer, for P while the printer is still going', () => {
     const { app, press, heard, effects, log } = newApp();
-    press(' ', 'Enter', 't', '1', 'F10', 'F10');
+    press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
     effects.later = () => {};
     expect(heard('p')).toEqual([[]]);
     const printed = log.printed;
@@ -237,7 +232,7 @@ describe('sounds', () => {
 
   it('makes the confirm sound when the trucks are sent and the move sound on the result', () => {
     const { app, press, heard } = newApp();
-    press(' ', 'Enter', 't', '1', 'F10', 'F10');
+    press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
     expect(heard('F9')).toEqual([['confirm']]);
     expect(app.screen).toBe('result');
     expect(heard('ArrowUp', 'ArrowDown', 'q', 'r')).toEqual([[], ['move'], [], ['confirm']]);
@@ -340,9 +335,9 @@ describe('order desk', () => {
     const lines = app.desk.order(0).lines.length;
     for (let l = 0; l < lines; l++) press('Enter');
     expect(app.pane).toBe('trucks');
-    expect(app.status).toContain('pick a truck');
+    expect(app.status).toContain('Choose a truck');
     expect(app.desk.isFinished(0)).toBe(false);
-    press('t', '2');
+    press(...chooseTruck(2));
     expect(app.desk.truckFor(0)).toBe(2);
     expect(app.desk.isFinished(0)).toBe(true);
     expect(app.orderSel).toBe(1);
@@ -350,9 +345,9 @@ describe('order desk', () => {
     expect(app.lineSel).toBe(0);
   });
 
-  it('picks a truck with T then 1-9 from any pane, and goes back to the lines still to do', () => {
+  it('picks a truck in the trucks pane, and goes back to the lines still to do', () => {
     const { app, press } = newApp();
-    press(' ', 'Tab', 'Tab', 't', '1');
+    press(' ', 'Tab', 'Enter');
     expect(app.desk.truckFor(0)).toBe(1);
     expect(app.desk.isFinished(0)).toBe(false);
     expect(app.pane).toBe('lines');
@@ -365,14 +360,16 @@ describe('order desk', () => {
     expect(app.desk.truckFor(0)).toBe(2);
   });
 
-  it('says so when there is no such truck, and lets ESC drop the T', () => {
+  it('does nothing with the keys T and 1-9 on trucks, and a digit outside the lines pane only warns', () => {
     const { app, press } = newApp();
     press(' ', 't', '7');
     expect(app.desk.truckFor(0)).toBeNull();
-    expect(app.status).toContain('no truck 7');
-    press('t', 'Escape');
-    expect(app.truckPending).toBe(false);
-    press('5');
+    press('Tab', '3');
+    expect(app.status).toContain('typed in the LINES pane');
+    press('t');
+    expect(app.desk.truckFor(0)).toBeNull();
+    expect(app.truckSel).toBe(0);
+    press('Tab', 'Tab', '5');
     expect(app.desk.given(0, 0)).toBe(5);
   });
 
@@ -400,7 +397,7 @@ describe('order desk', () => {
     const { app, press } = newApp();
     press(' ');
     expect(expectFullScreen(app).join('\n')).toContain('▶ no truck');
-    press('t', '1');
+    press('Tab', 'Enter');
     expect(expectFullScreen(app).join('\n')).toContain('▶ 1');
   });
 });

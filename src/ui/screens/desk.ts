@@ -128,7 +128,7 @@ function trucksPane(app: App): Line[] {
   const lit = app.pane === 'trucks';
   const current = d.truckFor(app.orderSel);
   const out: Line[] = [
-    paneTitle('TRUCKS', lit, app.truckPending ? s('  T: press 1-9 now', 'w') : s('  T then 1-9 to pick', 'd')),
+    paneTitle('TRUCKS', lit, s('  ↑↓ ENTER to pick', 'd')),
   ];
   d.morning.trucks.forEach((t, i) => {
     const pct = Math.round(d.fullness(t.id) * 100);
@@ -181,8 +181,7 @@ export function deskScreen(app: App): Line[] {
     pad(headsUp(app), 120),
     status,
     keyBar([
-      ['TAB', 'next pane'], ['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next'],
-      ['T 1-9', 'put on truck'], ['F2', 'colours'], ['F4', 'sound'], ['F10', 'truck sheets'],
+      ['TAB', 'next pane'], ['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next / pick truck'], ['F2', 'colours'], ['F4', 'sound'], ['F10', 'truck sheets'],
     ]),
   ];
   return layout(top, body, footer);

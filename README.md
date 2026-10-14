@@ -49,7 +49,7 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 | Screen | Keys |
 | --- | --- |
 | Overnight messages | **↑ ↓** read through the messages · **SPACE** start the morning · **B** load the big morning · **S** load the small morning |
-| Order desk | **TAB** next pane (**Shift+TAB** back) · **↑ ↓** move within a pane · type a number or **← →** (one less / one more) for the amount on a line · **ENTER** accept the line and go to the next · **T** then **1–9** put the order on that truck, from any pane · **F10** truck sheets |
+| Order desk | **TAB** next pane (**Shift+TAB** back) · **↑ ↓** move within a pane · type a number or **← →** (one less / one more) for the amount on a line · **ENTER** accept the line and go to the next · **ENTER** on the highlighted truck in the TRUCKS pane puts the order on it · **F10** truck sheets |
 | Truck sheets | **↑ ↓** pick a truck · **ENTER** open or close it · **+** / **−** open or close all · **P** print the sheets (with the printer sound) · **ESC** back to the desk · **F9** send the trucks |
 | Result | **↑ ↓** look through the orders · **R** play this morning again · **B** / **S** load the other morning |
 
@@ -57,7 +57,7 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 
 - The **ORDERS** pane lists the orders with each one's place and truck. **LINES** shows the current order: each item, what was asked, what is on hand, and what you give. **TRUCKS** shows each truck's fullness and the places it already goes to, with the nine squares under it.
 - On a line, **ENTER** gives as much as was asked, or as much as there is. Type a number or use **← →** to give a different amount. A truck that is full takes no more.
-- After the last line, pick a truck with **T** then **1–9** (or **ENTER** on the highlighted truck in the TRUCKS pane). The order is finished and the desk moves to the next one.
+- After the last line, choose a truck: **↑ ↓** to highlight it in the TRUCKS pane, then **ENTER**. The order is finished and the desk moves to the next one.
 - The **HEADS UP** line lists items that today's orders ask for more of than there is on hand, so you can hold some back for later clients.
 - The clock moves a minute for each truck you pick and each order you finish, not in real time. The trucks leave at 07:00.
 
