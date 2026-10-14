@@ -1,3 +1,4 @@
+import { buildCalls, callLine, type Call } from '../game/calls';
 import { DEPART_MINUTE } from '../game/clock';
 import { Desk } from '../game/desk';
 import { loadMorning } from '../game/morning';
@@ -64,6 +65,11 @@ export class App {
   road: Road | null = null;
   roadClock = 0;
   private roadJob = 0;
+  calls: Call[] = [];
+  /** The option picked for each answered call, by call id. */
+  answers = new Map<number, number>();
+  /** The highlighted answer of the call that is ringing. */
+  callSel = 0;
 
   result: MorningResult | null = null;
   resultSel = 0;
@@ -189,6 +195,9 @@ export class App {
     this.printing = null;
     this.printed = false;
     this.road = null;
+    this.calls = [];
+    this.answers = new Map();
+    this.callSel = 0;
     this.roadJob++;
     this.result = null;
     this.resultSel = 0;
@@ -474,6 +483,9 @@ export class App {
     this.result = buildResult(this.desk, departAt);
     this.resultSel = 0;
     this.road = buildRoad(this.desk, this.result);
+    this.calls = buildCalls(this.desk, this.result, this.road);
+    this.answers = new Map();
+    this.callSel = 0;
     this.roadClock = this.road.departAt;
     this.screen = 'road';
     this.sound('confirm');
@@ -481,27 +493,67 @@ export class App {
   }
 
   // ------------------------------------------------------------ on the road
-  /** True once every truck is back and the whole log is shown. */
+  /** The call that is ringing: the first one whose time has come and that is not answered yet. */
+  get roadCall(): Call | null {
+    return this.calls.find((c) => c.at <= this.roadClock && !this.answers.has(c.id)) ?? null;
+  }
+
+  /** True once every truck is back, every call is answered and the whole log is shown. */
   get roadOver(): boolean {
-    return !!this.road && this.roadClock >= this.road.end;
+    return !!this.road && this.roadClock >= this.road.end && !this.roadCall;
+  }
+
+  /** The answered calls as result-screen lines, in the order they rang. */
+  get callLines(): string[] {
+    return this.calls.filter((c) => this.answers.has(c.id)).map((c) => callLine(c, this.answers.get(c.id) as number));
+  }
+
+  /** The first call still to come after the clock, if any. */
+  private nextCall(): Call | undefined {
+    return this.calls.find((c) => c.at > this.roadClock && !this.answers.has(c.id));
   }
 
   private scheduleTick(job: number): void {
     this.effects.later(() => {
-      if (job !== this.roadJob || this.screen !== 'road' || !this.road || this.roadOver) return;
-      this.roadClock = Math.min(this.road.end, this.roadClock + ROAD_STEP_MINUTES);
-      // The ticks are not key presses, so they make their own soft click; the last one is the finishing knock.
-      this.effects.cue(this.roadOver ? 'finish' : 'move');
-      if (!this.roadOver) this.scheduleTick(job);
+      if (job !== this.roadJob || this.screen !== 'road' || !this.road || this.roadOver || this.roadCall) return;
+      this.roadClock = Math.min(this.road.end, this.nextCall()?.at ?? this.road.end, this.roadClock + ROAD_STEP_MINUTES);
+      // The ticks are not key presses, so they make their own sound: a soft click, the ring of a call, the finishing knock.
+      this.effects.cue(this.roadCall ? 'ring' : this.roadOver ? 'finish' : 'move');
+      // The clock waits while a phone rings; answering it starts the ticks again.
+      if (!this.roadOver && !this.roadCall) this.scheduleTick(job);
       this.changed();
     }, ROAD_TICK_MS);
   }
 
   private roadKey(key: string): boolean {
+    const call = this.roadCall;
+    if (call) {
+      const last = call.options.length - 1;
+      const before = this.callSel;
+      if (key === 'ArrowUp' || key === 'ArrowDown') {
+        this.callSel = Math.max(0, Math.min(last, this.callSel + (key === 'ArrowUp' ? -1 : 1)));
+        if (this.callSel !== before) this.sound('move');
+        return true;
+      }
+      if (key === 'Enter') {
+        this.answers.set(call.id, this.callSel);
+        this.callSel = 0;
+        this.sound('confirm');
+        if (this.road && this.roadClock < this.road.end) this.scheduleTick(++this.roadJob);
+        return true;
+      }
+      if (key === ' ') {
+        this.say('Answer the call first: ↑↓ then ENTER.');
+        this.sound('warn');
+        return true;
+      }
+      return false;
+    }
     if (key === ' ' || key === 'Enter') {
       if (!this.roadOver) {
-        this.roadClock = this.road?.end ?? this.roadClock;
-        this.sound('confirm');
+        // Skipping runs on to the next call that is still to come, or to the end.
+        this.roadClock = this.nextCall()?.at ?? this.road?.end ?? this.roadClock;
+        this.sound(this.roadCall ? 'ring' : 'confirm');
       } else if (key === 'Enter') {
         this.screen = 'result';
         this.sound('confirm');

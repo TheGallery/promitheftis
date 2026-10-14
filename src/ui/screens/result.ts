@@ -34,18 +34,27 @@ function leftColumn(app: App): Line[] {
       ),
     );
   }
+  const calls = callsBlock(app);
   out.push([], s(' WHO GOT LESS', 'b'));
   if (r.gotLess.length === 0) {
     out.push(s(' Everybody got everything they asked for.', 'acc'));
-    return out;
+    return [...out, ...calls];
   }
-  const room = 24 - out.length;
+  // The calls keep their room at the bottom; the list of who got less takes what is left.
+  const room = Math.max(2, 24 - out.length - calls.length);
   const shown = r.gotLess.length > room ? room - 1 : r.gotLess.length;
   for (const g of r.gotLess.slice(0, shown)) {
     out.push(s(` ${clip(g.client, 21).padEnd(22)}${`${g.percent}%`.padStart(4)}  ${clip(shortSummary(app, g.orderIndex), 29)}`, g.percent === 0 ? 'w' : ''));
   }
   if (shown < r.gotLess.length) out.push(s(` + ${r.gotLess.length - shown} more in the list`, 'd'));
-  return out;
+  return [...out, ...calls];
+}
+
+/** One short line for each call that was answered on the road. */
+function callsBlock(app: App): Line[] {
+  const lines = app.callLines;
+  if (lines.length === 0) return [];
+  return [[], s(' CALLS', 'b'), ...lines.map((l) => s(` ${clip(l, LEFT_W - 2)}`))];
 }
 
 function rightColumn(app: App): Line[] {
