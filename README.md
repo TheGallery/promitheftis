@@ -13,6 +13,14 @@ It has four screens: the overnight messages, the order desk, the truck sheets, a
 
 Left out on purpose: the road, supplier ordering, end of day, customer moods over time, money, growth, more than one day, saving.
 
+## Where it happens
+
+![A storybook map of the island: the walled Town in the middle, with Hollin, Rushmere, Oakley, Fenwick, Docks, Millford, Southgate and Ashby around it](docs/world-map.png)
+
+*The Nine Squares: our depot sits in Town, and every client lives somewhere on this little island.*
+
+Promitheftis is an imaginary town on a small island, with eight neighbouring places around it: woods and a lake to the north, fields in the south, a harbour on the east side and a railway line through Southgate. Every restaurant, café and inn in the game has a spot on this map.
+
 ## Run it
 
 You need Node.js 24 (see `.nvmrc`).
