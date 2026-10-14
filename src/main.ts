@@ -13,6 +13,7 @@ const app: App = new App(
     print: (lines) => sounds.print(lines),
     later: (fn, ms) => void window.setTimeout(fn, ms),
     toggleSound: () => sounds.toggle(),
+    now: () => performance.now(),
   },
   () => draw(),
 );
@@ -27,7 +28,7 @@ window.addEventListener('keydown', (e) => {
   if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
   // Reloading and developer tools stay available; every other key belongs to the game.
   if (e.key === 'F5' || e.key === 'F11' || e.key === 'F12') return;
-  const used = app.press({ key: e.key, shift: e.shiftKey });
+  const used = app.press({ key: e.key, shift: e.shiftKey, repeat: e.repeat });
   if (used || e.key === 'Tab' || /^F\d+$/.test(e.key)) e.preventDefault();
 });
 

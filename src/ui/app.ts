@@ -14,6 +14,8 @@ export type Tone = 'info' | 'warn';
 
 const PANES: readonly Pane[] = ['orders', 'lines', 'trucks'];
 const MAX_DIGITS = 3;
+/** How long ENTER and SPACE are ignored after a call starts ringing, in ms, so a skip does not answer it too. */
+export const RING_GUARD_MS = 600;
 
 /** What the app needs from the browser, so the game can run without one. */
 export interface Effects {
@@ -25,11 +27,15 @@ export interface Effects {
   later(fn: () => void, ms: number): void;
   /** Turns the sounds on or off; returns whether they are on now. */
   toggleSound(): boolean;
+  /** A real-time clock, in ms. */
+  now(): number;
 }
 
 export interface KeyPress {
   key: string;
   shift?: boolean;
+  /** True when the key is held down and this press is the keyboard repeating it. */
+  repeat?: boolean;
 }
 
 /**
@@ -70,6 +76,8 @@ export class App {
   answers = new Map<number, number>();
   /** The highlighted answer of the call that is ringing. */
   callSel = 0;
+  private ringId: number | null = null;
+  private ringAt = 0;
 
   result: MorningResult | null = null;
   resultSel = 0;
@@ -84,14 +92,14 @@ export class App {
   }
 
   /** Handles one key. Returns false for a key the game does not use. */
-  press({ key, shift = false }: KeyPress): boolean {
+  press({ key, shift = false, repeat = false }: KeyPress): boolean {
     const wasConfirming = this.confirmEnd;
     this.confirmEnd = false;
     this.status = '';
     this.tone = 'info';
     this.heard = null;
 
-    const handled = this.route(key, shift, wasConfirming);
+    const handled = this.route(key, shift, repeat, wasConfirming);
     if (handled) {
       // One sound per key press: a warning replaces the ordinary sound, a key that only shows a message warns,
       // and a key that changed nothing is silent.
@@ -110,7 +118,7 @@ export class App {
     this.heard = { moment, arg };
   }
 
-  private route(key: string, shift: boolean, wasConfirming: boolean): boolean {
+  private route(key: string, shift: boolean, repeat: boolean, wasConfirming: boolean): boolean {
     if (key === 'F2') {
       this.blue = !this.blue;
       this.sound('confirm');
@@ -130,7 +138,7 @@ export class App {
       case 'sheets':
         return this.sheetsKey(key);
       case 'road':
-        return this.roadKey(key);
+        return this.roadKey(key, repeat);
       case 'result':
         return this.resultKey(key);
     }
@@ -487,6 +495,8 @@ export class App {
     this.answers = new Map();
     this.callSel = 0;
     this.roadClock = this.road.departAt;
+    this.ringId = null;
+    this.noteRing();
     this.screen = 'road';
     this.sound('confirm');
     this.scheduleTick(++this.roadJob);
@@ -513,10 +523,19 @@ export class App {
     return this.calls.find((c) => c.at > this.roadClock && !this.answers.has(c.id));
   }
 
+  /** Notes the real time a call starts ringing, once per call. */
+  private noteRing(): void {
+    const call = this.roadCall;
+    if (!call || call.id === this.ringId) return;
+    this.ringId = call.id;
+    this.ringAt = this.effects.now();
+  }
+
   private scheduleTick(job: number): void {
     this.effects.later(() => {
       if (job !== this.roadJob || this.screen !== 'road' || !this.road || this.roadOver || this.roadCall) return;
       this.roadClock = Math.min(this.road.end, this.nextCall()?.at ?? this.road.end, this.roadClock + ROAD_STEP_MINUTES);
+      this.noteRing();
       // The ticks are not key presses, so they make their own sound: a soft click, the ring of a call, the finishing knock.
       this.effects.cue(this.roadCall ? 'ring' : this.roadOver ? 'finish' : 'move');
       // The clock waits while a phone rings; answering it starts the ticks again.
@@ -525,8 +544,11 @@ export class App {
     }, ROAD_TICK_MS);
   }
 
-  private roadKey(key: string): boolean {
+  private roadKey(key: string, repeat: boolean): boolean {
     const call = this.roadCall;
+    const go = key === ' ' || key === 'Enter';
+    // A held key neither answers nor skips, and a call that has just started ringing is not answered by a skip.
+    if (go && (repeat || (call && this.effects.now() - this.ringAt < RING_GUARD_MS))) return true;
     if (call) {
       const last = call.options.length - 1;
       const before = this.callSel;
@@ -539,6 +561,7 @@ export class App {
         this.answers.set(call.id, this.callSel);
         this.callSel = 0;
         this.sound('confirm');
+        this.noteRing();
         if (this.road && this.roadClock < this.road.end) this.scheduleTick(++this.roadJob);
         return true;
       }
@@ -549,10 +572,11 @@ export class App {
       }
       return false;
     }
-    if (key === ' ' || key === 'Enter') {
+    if (go) {
       if (!this.roadOver) {
         // Skipping runs on to the next call that is still to come, or to the end.
         this.roadClock = this.nextCall()?.at ?? this.road?.end ?? this.roadClock;
+        this.noteRing();
         this.sound(this.roadCall ? 'ring' : 'confirm');
       } else if (key === 'Enter') {
         this.screen = 'result';

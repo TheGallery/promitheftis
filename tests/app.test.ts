@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ROAD_STEP_MINUTES, ROAD_TICK_MS } from '../src/game/road';
-import { App, type Effects } from '../src/ui/app';
+import { App, RING_GUARD_MS, type Effects } from '../src/ui/app';
 import { allowCue, REPEAT_GAP, type CueArg, type Moment } from '../src/ui/cues';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 
 function fakeEffects() {
-  const log = { cues: [] as { moment: Moment; arg?: CueArg }[], printed: 0, sound: true, ticks: [] as (() => void)[] };
+  const log = { cues: [] as { moment: Moment; arg?: CueArg }[], printed: 0, sound: true, ticks: [] as (() => void)[], time: 0 };
   const effects: Effects = {
     cue: (moment, arg) => void log.cues.push({ moment, arg }),
     print: (lines) => {
@@ -16,6 +16,7 @@ function fakeEffects() {
     // The road clock waits for the test to run its ticks; the printer runs at once.
     later: (fn, ms) => (ms === ROAD_TICK_MS ? void log.ticks.push(fn) : fn()),
     toggleSound: () => (log.sound = !log.sound),
+    now: () => log.time,
   };
   return { effects, log };
 }
@@ -23,13 +24,18 @@ function fakeEffects() {
 function newApp(morning: 'small' | 'big' = 'small') {
   const fx = fakeEffects();
   const app = new App(fx.effects, () => {}, morning);
+  // The helpers press each key well after the one before, as a player reading the screen would.
   const press = (...keys: string[]) => {
-    for (const k of keys) app.press({ key: k });
+    for (const k of keys) {
+      fx.log.time += 1000;
+      app.press({ key: k });
+    }
   };
   /** The sounds made by pressing each key in turn; an empty entry is a silent key. */
   const heard = (...keys: string[]) =>
     keys.map((k) => {
       const before = fx.log.cues.length;
+      fx.log.time += 1000;
       app.press({ key: k });
       return fx.log.cues.slice(before).map((c) => c.moment);
     });
@@ -600,6 +606,56 @@ describe('a whole small morning', () => {
     expect(app.calls.length).toBeGreaterThanOrEqual(2);
     expect(app.roadOver).toBe(true);
     expect(app.answers.size).toBe(app.calls.length);
+  });
+
+  it('ignores ENTER and SPACE for a moment after a call starts ringing, then ENTER answers', () => {
+    const { app, press, log } = play();
+    press('F10', 'F9', ' ');
+    const call = app.roadCall!;
+    expect(call).not.toBeNull();
+    // A quick second press of the skip key does not answer the call that has just rung.
+    log.time += RING_GUARD_MS - 1;
+    app.press({ key: 'Enter' });
+    app.press({ key: ' ' });
+    expect(app.roadCall).toBe(call);
+    expect(app.answers.has(call.id)).toBe(false);
+    expect(app.status).toBe('');
+    // After the moment has passed, SPACE still does not answer, and ENTER does.
+    log.time += 1;
+    app.press({ key: ' ' });
+    expect(app.answers.has(call.id)).toBe(false);
+    expect(app.status).toContain('Answer the call');
+    app.press({ key: 'Enter' });
+    expect(app.answers.get(call.id)).toBe(0);
+  });
+
+  it('starts the moment when a tick makes the phone ring, not when a key is pressed', () => {
+    const { app, press, log } = play();
+    press('F10', 'F9');
+    let guard = 0;
+    while (!app.roadCall && guard++ < 200) log.ticks.shift()!();
+    const call = app.roadCall!;
+    app.press({ key: 'Enter' });
+    expect(app.answers.has(call.id)).toBe(false);
+    log.time += RING_GUARD_MS;
+    app.press({ key: 'Enter' });
+    expect(app.answers.has(call.id)).toBe(true);
+  });
+
+  it('neither answers nor skips with a held ENTER or SPACE', () => {
+    const { app, press, log } = play();
+    press('F10', 'F9');
+    const start = app.roadClock;
+    app.press({ key: ' ', repeat: true });
+    app.press({ key: 'Enter', repeat: true });
+    expect(app.roadClock).toBe(start);
+    press(' ');
+    const call = app.roadCall!;
+    log.time += RING_GUARD_MS * 10;
+    app.press({ key: 'Enter', repeat: true });
+    expect(app.answers.has(call.id)).toBe(false);
+    app.press({ key: 'Enter' });
+    expect(app.answers.has(call.id)).toBe(true);
   });
 
   it('does not let ENTER leave the road while a call is unanswered', () => {
