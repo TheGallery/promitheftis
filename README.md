@@ -15,11 +15,11 @@ Left out on purpose: the road, supplier ordering, end of day, customer moods ove
 
 ## Where it happens
 
-![A storybook map of the island: the walled Town in the middle, with Hollin, Rushmere, Oakley, Fenwick, Docks, Millford, Southgate and Ashby around it](docs/world-map.png)
+![A storybook map of the island: the walled town of Saltmarket in the middle, with Hollin, Rushmere, Oakley, Fenwick, Docks, Millford, Southgate and Ashby around it](docs/world-map.png)
 
-*The Nine Squares: our depot sits in Town, and every client lives somewhere on this little island.*
+*The Nine Squares: our depot sits in Saltmarket, and every client lives somewhere on this little island.*
 
-Promitheftis (Greek for "supplier") is set on a small imaginary island: a town with eight neighbouring places around it. There are woods and a lake to the north, fields in the south, a harbour on the east side and a railway line through Southgate. Some of the places and clients you will meet are on this map.
+Promitheftis (Greek for "supplier") is set on a small imaginary island: a town called Saltmarket with eight neighbouring places around it. There are woods and a lake to the north, fields in the south, a harbour on the east side and a railway line through Southgate. Some of the places and clients you will meet are on this map.
 
 ## Run it
 
