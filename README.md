@@ -13,6 +13,20 @@ It has four screens: the overnight messages, the order desk, the truck sheets, a
 
 Left out on purpose: the road, supplier ordering, end of day, customer moods over time, money, growth, more than one day, saving.
 
+## What it looks like
+
+![The overnight messages: nine messages waiting at 05:31, mostly orders, with the first one open below](docs/screens/overnight-messages.png)
+
+*The morning starts with the overnight messages: orders from clients, plus a note from a staff member and one from a supplier.*
+
+![The order desk: a list of orders, the lines of the current order with what was asked and what is on hand, two trucks and the nine squares of the island](docs/screens/order-desk.png)
+
+*The order desk: for each line you decide how much to give, and the stock on hand (here, no ketchup left) shows when someone will get less.*
+
+![The truck sheets in office blue, with truck 1 open to show its four orders and its route around the island](docs/screens/truck-sheets-blue.png)
+
+*The truck sheets, here in office blue (F2): each truck's orders, its route and when it is back at the depot.*
+
 ## Where it happens
 
 ![A storybook map of the island: the walled town of Saltmarket in the middle, with Hollin, Rushmere, Oakley, Fenwick, Docks, Millford, Southgate and Ashby around it](docs/world-map.png)
