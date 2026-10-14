@@ -181,7 +181,8 @@ export function deskScreen(app: App): Line[] {
     pad(headsUp(app), 120),
     status,
     keyBar([
-      ['TAB', 'next pane'], ['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next / pick truck'], ['F2', 'colours'], ['F4', 'sound'], ['F10', 'truck sheets'],
+      ['TAB', 'next pane'], ['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next / pick truck'],
+      ['F2', 'colours'], ['F4', 'sound'], ['F10', 'truck sheets'],
     ]),
   ];
   return layout(top, body, footer);
