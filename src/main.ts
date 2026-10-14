@@ -1,6 +1,7 @@
 import './style.css';
 import { App } from './ui/app';
 import { Sounds } from './ui/audio';
+import { browserStore } from './ui/store';
 import { screenHtml } from './ui/view';
 
 const screen = document.getElementById('screen');
@@ -13,6 +14,8 @@ const app: App = new App(
     print: (lines) => sounds.print(lines),
     later: (fn, ms) => void window.setTimeout(fn, ms),
     toggleSound: () => sounds.toggle(),
+    setSound: (on) => void (sounds.enabled = on),
+    store: browserStore(),
     now: () => performance.now(),
     random: () => Math.random(),
   },

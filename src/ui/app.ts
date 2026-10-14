@@ -8,18 +8,26 @@ import { loadMorning } from '../game/morning';
 import { mulberry32 } from '../game/random';
 import { buildResult, type MorningResult } from '../game/results';
 import { nextDay, outcomeOf, runFromMorning, type RunState } from '../game/run';
+import { decodeRun, decodeSettings, encodeRun, encodeSettings, type SavedRun } from '../game/save';
 import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
 import { callNotes, stockAfterDeliveries, Supply } from '../game/supply';
 import type { Morning } from '../game/types';
 import type { CueArg, Moment } from './cues';
 import { plural } from './format';
+import type { Store } from './store';
 
-export type Screen = 'messages' | 'desk' | 'sheets' | 'road' | 'result' | 'supply' | 'day';
+export type Screen = 'start' | 'messages' | 'desk' | 'sheets' | 'road' | 'result' | 'supply' | 'day';
 export type Pane = 'orders' | 'lines' | 'trucks';
 export type Tone = 'info' | 'warn';
 
 const PANES: readonly Pane[] = ['orders', 'lines', 'trucks'];
 const MAX_DIGITS = 3;
+/** Where the run and the settings are kept; the saved text carries its own version. */
+export const RUN_KEY = 'promitheftis.run';
+export const SETTINGS_KEY = 'promitheftis.settings';
+/** The choices on the opening screen, in the order they are listed. */
+export type StartChoice = 'continue' | 'small' | 'big';
+export const START_CHOICES: readonly StartChoice[] = ['continue', 'small', 'big'];
 /** How long ENTER and SPACE are ignored after a call starts ringing, in ms, so a skip does not answer it too. */
 export const RING_GUARD_MS = 600;
 
@@ -33,6 +41,10 @@ export interface Effects {
   later(fn: () => void, ms: number): void;
   /** Turns the sounds on or off; returns whether they are on now. */
   toggleSound(): boolean;
+  /** Sets the sounds on or off, as the settings of an earlier visit had them. */
+  setSound(on: boolean): void;
+  /** Where the run and the settings are saved between visits. */
+  store: Store;
   /** A real-time clock, in ms. */
   now(): number;
   /** A random number from 0 up to but not including 1: the new days, and the other things that differ from game to game. */
@@ -52,6 +64,9 @@ export interface KeyPress {
  */
 export class App {
   screen: Screen = 'messages';
+  /** The run kept from an earlier visit, while the opening screen offers to carry on with it; null otherwise. */
+  saved: SavedRun | null = null;
+  startSel = 0;
   morning: Morning;
   desk: Desk;
   /** What carries over between days, as the current day began. The next morning is worked out from it. */
@@ -117,6 +132,56 @@ export class App {
     this.morning = loadMorning(morningId);
     this.run = runFromMorning(this.morning);
     this.desk = new Desk(this.morning);
+    this.openSettings();
+    this.openRun();
+  }
+
+  /** Puts the colours and the sound back as the last visit left them. */
+  private openSettings(): void {
+    const text = this.effects.store.read(SETTINGS_KEY);
+    const settings = text == null ? null : decodeSettings(text);
+    if (!settings) return;
+    this.blue = settings.blue;
+    this.soundOn = settings.soundOn;
+    this.effects.setSound(settings.soundOn);
+  }
+
+  /**
+   * With a run saved, the first screen offers to carry on with it. Without one the run starts as it always did,
+   * and a save that cannot be used is left behind with a short note.
+   */
+  private openRun(): void {
+    const text = this.effects.store.read(RUN_KEY);
+    const saved = text == null ? null : decodeRun(text);
+    if (saved && this.dayOf(saved)) {
+      this.saved = saved;
+      this.screen = 'start';
+      return;
+    }
+    if (text != null) this.say('The saved run could not be used, so a new run has started.');
+    this.saveRun();
+  }
+
+  /** The morning a saved run was at, or null if it cannot be built from what was kept. */
+  private dayOf({ run, daySeed }: SavedRun): Morning | null {
+    try {
+      return this.morningOf(run, daySeed);
+    } catch {
+      return null;
+    }
+  }
+
+  private morningOf(run: RunState, daySeed: number): Morning {
+    return run.day === 1 ? loadMorning(run.kind) : generateDay(run, mulberry32(daySeed));
+  }
+
+  /** Keeps the run as the day begins, so that closing the page loses nothing but the day in play. */
+  private saveRun(): void {
+    this.effects.store.write(RUN_KEY, encodeRun(this.run, this.daySeed));
+  }
+
+  private saveSettings(): void {
+    this.effects.store.write(SETTINGS_KEY, encodeSettings({ blue: this.blue, soundOn: this.soundOn }));
   }
 
   /** Handles one key. Returns false for a key the game does not use. */
@@ -149,16 +214,20 @@ export class App {
   private route(key: string, shift: boolean, repeat: boolean, wasConfirming: boolean): boolean {
     if (key === 'F2') {
       this.blue = !this.blue;
+      this.saveSettings();
       this.sound('confirm');
       return true;
     }
     if (key === 'F4') {
       this.soundOn = this.effects.toggleSound();
+      this.saveSettings();
       this.say(this.soundOn ? 'Sound on.' : 'Sound off.');
       this.sound('confirm');
       return true;
     }
     switch (this.screen) {
+      case 'start':
+        return this.startKey(key);
       case 'messages':
         return this.messagesKey(key);
       case 'desk':
@@ -179,6 +248,47 @@ export class App {
   private say(text: string, tone: Tone = 'info'): void {
     this.status = text;
     this.tone = tone;
+  }
+
+  // ------------------------------------------------------------ opening screen
+  private startKey(key: string): boolean {
+    const before = this.startSel;
+    switch (key) {
+      case 'ArrowUp':
+      case 'ArrowDown':
+        this.startSel = Math.max(0, Math.min(START_CHOICES.length - 1, before + (key === 'ArrowUp' ? -1 : 1)));
+        if (this.startSel !== before) this.sound('move');
+        return true;
+      case 'Enter':
+        return this.choose(START_CHOICES[this.startSel] as StartChoice);
+      case 'c':
+      case 'C':
+        return this.choose('continue');
+      case 's':
+      case 'S':
+        return this.choose('small');
+      case 'b':
+      case 'B':
+        return this.choose('big');
+    }
+    return false;
+  }
+
+  private choose(choice: StartChoice): boolean {
+    if (choice === 'continue') this.resume();
+    else this.loadMorning(choice);
+    this.sound('confirm');
+    return true;
+  }
+
+  /** Carries on with the saved run, at the start of the day it was saved at: the same morning R plays again. */
+  private resume(): void {
+    const saved = this.saved;
+    if (!saved) return;
+    this.run = saved.run;
+    this.daySeed = saved.daySeed;
+    this.saved = null;
+    this.startDay(this.morningOf(saved.run, saved.daySeed));
   }
 
   // ------------------------------------------------------------ messages
@@ -223,12 +333,15 @@ export class App {
   loadMorning(id: 'small' | 'big'): void {
     const morning = loadMorning(id);
     this.run = runFromMorning(morning);
+    this.daySeed = 0;
+    this.saved = null;
     this.startDay(morning);
+    this.saveRun();
   }
 
   /** Plays the current day again from its overnight messages: the same orders, the same stock. */
   restartDay(): void {
-    this.startDay(this.run.day === 1 ? loadMorning(this.run.kind) : generateDay(this.run, mulberry32(this.daySeed)));
+    this.startDay(this.morningOf(this.run, this.daySeed));
   }
 
   /** The next morning: the stock left plus the supplier's delivery, the growth at work, and a made-up day of orders. */
@@ -237,6 +350,7 @@ export class App {
     this.run = nextDay(this.run, outcomeOf(left, supply, day, this.calls, this.answers, this.growth));
     this.daySeed = Math.floor(this.effects.random() * 4294967296);
     this.startDay(generateDay(this.run, mulberry32(this.daySeed)));
+    this.saveRun();
   }
 
   /** Puts a day's morning on the desk and clears everything the last day left on the screens. */

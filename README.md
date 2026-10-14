@@ -34,7 +34,18 @@ The game is a run of days. After the growth choice, **ENTER** goes on to the nex
 
 **R** plays the current day again, from its overnight messages, with the same orders; on day 1 that is the fixed morning. **B** and **S** load the fixed big or small morning and start the run over from day 1. The first day of every run is the same; the later days are made up from chance, so they differ from run to run.
 
-Left out on purpose: new clients ringing, answers that change anything beyond a promise for tomorrow, money, saving between visits.
+### Saving
+
+The run is saved in your browser (its local storage), by itself: there is no save key. It is saved when a day begins, that is, when the next morning starts after the growth choice, and when a new run starts. Closing the page loses only the day in play, and carrying on later puts you at the start of the day that was saved, at its overnight messages, exactly as **R** would play it again: the same orders, notes and calls. The growth choice is part of that: once the next morning has started, it is in the saved run. The colours (**F2**) and the sound (**F4**) are saved too.
+
+- **To carry on**, open the page again. When a run is saved, the first screen offers three choices with **↑ ↓** and **ENTER**: **Continue** (it says which day and date), or a new run from the small or the big morning. **C** continues, **S** and **B** start a new run.
+- **To start over**, choose a new run on that first screen, or press **B** or **S** at the overnight messages, the result or the end of the day. A new run replaces the saved one. **R** only plays the day again and leaves the save alone.
+- **If it cannot be read** (a save from an older version of the game, or one that has been damaged), it is ignored: a new run starts on the first day and a short note says so.
+- **If the browser will not keep anything** (a private window, blocked site data, no room left), the game plays as ever, just without saving.
+
+Only this browser on this computer has the save: there is no account, no cloud, one slot, and no way to move a run to another browser.
+
+Left out on purpose: new clients ringing, answers that change anything beyond a promise for tomorrow, money.
 
 ## What it looks like
 
@@ -101,7 +112,8 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 
 | Screen | Keys |
 | --- | --- |
-| Overnight messages | **↑ ↓** read through the messages · **SPACE** start the morning · **B** load the big morning · **S** load the small morning (both start the run over from day 1) |
+| Opening screen (when a run is saved) | **↑ ↓** pick **Continue** or a new run from the small or the big morning · **ENTER** go · **C** continue · **S** small morning · **B** big morning |
+| Overnight messages | **↑ ↓** read through the messages · **SPACE** start the morning · **B** load the big morning · **S** load the small morning (both start the run over from day 1 and replace the saved run) |
 | Order desk | **TAB** next pane (**Shift+TAB** back) · **↑ ↓** move within a pane · type a number or **← →** (one less / one more) for the amount on a line · **ENTER** accept the line and go to the next · **ENTER** on the highlighted truck in the TRUCKS pane puts the order on it · **F10** truck sheets |
 | Truck sheets | **↑ ↓** pick a truck · **ENTER** open or close it · **+** / **−** open or close all · **P** print the sheets (with the printer sound) · **ESC** back to the desk · **F9** send the trucks |
 | On the road | **SPACE** or **ENTER** skip ahead (it stops at each call) · when the phone rings, **↑ ↓** pick an answer and **ENTER** gives it · once every truck is back and the calls are answered, **ENTER** goes to the result |
@@ -134,8 +146,8 @@ Orders for the same place should go on the same truck. Places next to each other
 
 Plain TypeScript with Vite and no UI framework; Vitest for tests.
 
-- `src/game/` holds the rules and has no screen code: the map (`places.ts`), the two mornings (`morning.ts`), the order desk with stock, truck fullness and the clock (`desk.ts`), return times (`routes.ts`), the log of the drive (`road.ts`), the phone calls (`calls.ts`), shortages (`headsup.ts`), the result (`results.ts`), the supplier order (`supply.ts`), the end of the day (`day.ts`) with the client moods (`moods.ts`), the last two days of each client (`history.ts`) and the growth choices (`growth.ts`), the store rooms with their sizes and the space each item takes (`rooms.ts`), what carries over from day to day and how the growth choice is put to work (`run.ts`), and the made-up days after the first (`generate.ts`, with its random source in `random.ts`).
-- `src/ui/` holds the screens. Each screen builds lines of text of exactly 120 columns (`grid.ts`, `screens/`); `app.ts` holds the state and what each key does (the random source for the new days is passed in, so tests can make it fixed); `view.ts` and `main.ts` put the text on the page; `audio.ts` plays the sounds, with the Soft keys set in `softkeys.ts`.
+- `src/game/` holds the rules and has no screen code: the map (`places.ts`), the two mornings (`morning.ts`), the order desk with stock, truck fullness and the clock (`desk.ts`), return times (`routes.ts`), the log of the drive (`road.ts`), the phone calls (`calls.ts`), shortages (`headsup.ts`), the result (`results.ts`), the supplier order (`supply.ts`), the end of the day (`day.ts`) with the client moods (`moods.ts`), the last two days of each client (`history.ts`) and the growth choices (`growth.ts`), the store rooms with their sizes and the space each item takes (`rooms.ts`), what carries over from day to day and how the growth choice is put to work (`run.ts`), and the made-up days after the first (`generate.ts`, with its random source in `random.ts`), and the saved run and settings, with their version and checks on what is read back (`save.ts`).
+- `src/ui/` holds the screens. Each screen builds lines of text of exactly 120 columns (`grid.ts`, `screens/`); `app.ts` holds the state and what each key does (the random source for the new days is passed in, so tests can make it fixed); `view.ts` and `main.ts` put the text on the page; `audio.ts` plays the sounds, with the Soft keys set in `softkeys.ts`; `store.ts` is the one place that touches the browser's local storage and never throws.
 - `tests/` has the unit tests, including a full play-through of both mornings, and of the days after them, that checks that every screen is exactly 120 columns by 30 rows.
 
 ## Sounds and fonts

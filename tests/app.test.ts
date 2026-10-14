@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ROAD_STEP_MINUTES, ROAD_TICK_MS } from '../src/game/road';
 import { App, RING_GUARD_MS, type Effects } from '../src/ui/app';
+import { memoryStore } from '../src/ui/store';
 import { allowCue, REPEAT_GAP, type CueArg, type Moment } from '../src/ui/cues';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
@@ -16,6 +17,8 @@ function fakeEffects() {
     // The road clock waits for the test to run its ticks; the printer runs at once.
     later: (fn, ms) => (ms === ROAD_TICK_MS ? void log.ticks.push(fn) : fn()),
     toggleSound: () => (log.sound = !log.sound),
+    setSound: (on) => void (log.sound = on),
+    store: memoryStore(),
     now: () => log.time,
     random: () => 0,
   };
