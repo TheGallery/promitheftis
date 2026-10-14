@@ -2,6 +2,7 @@ import type { DaySummary } from './day';
 import type { Call } from './calls';
 import { BIG_TRUCKS } from './morning';
 import type { Growth } from './growth';
+import { clientDay, remember, type ClientDay, type History } from './history';
 import type { Mood } from './moods';
 import type { PlaceId } from './places';
 import { ROOM_GROWTH } from './rooms';
@@ -50,6 +51,8 @@ export interface RunState {
   clients: RunClient[];
   /** How the last day left each client, by name; a client with no entry has not had a day yet. */
   moods: Record<string, Mood>;
+  /** How each client's last two days went, the most recent first; a client with no entry has had no day yet. */
+  history: History;
   promises: Promised[];
   /** What came in overnight from the supplier. */
   delivery: Delivery;
@@ -62,6 +65,8 @@ export interface DayOutcome {
   /** What was ordered from the supplier, per item. */
   ordered: Record<string, number>;
   moods: Record<string, Mood>;
+  /** How the day went for each client, by name. */
+  today: Record<string, ClientDay>;
   promises: Promised[];
   growth: Growth | null;
 }
@@ -79,6 +84,7 @@ export function runFromMorning(m: Morning): RunState {
     capacity: { ...m.capacity },
     clients: m.orders.map((o) => ({ name: o.client, place: o.place, contact: o.contact, ...(o.before != null ? { before: o.before } : {}) })),
     moods: {},
+    history: {},
     promises: [],
     delivery: { items: 0, units: 0 },
   };
@@ -106,6 +112,7 @@ export function outcomeOf(
     left,
     ordered: Object.fromEntries(supply.ordered().map((o) => [o.item.id, o.amount])),
     moods: Object.fromEntries(day.orders.map((o) => [o.client, o.mood])),
+    today: Object.fromEntries(day.orders.map((o) => [o.client, clientDay(o)])),
     promises: promisesFrom(calls, answers),
     growth,
   };
@@ -148,6 +155,7 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
     capacity: { ...run.capacity },
     clients: run.clients.map((c) => ({ ...c })),
     moods: { ...outcome.moods },
+    history: remember(run.history, outcome.today),
     promises: outcome.promises.map((p) => ({ ...p })),
     delivery: {
       items: Object.values(outcome.ordered).filter((n) => n > 0).length,
