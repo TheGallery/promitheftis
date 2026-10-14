@@ -111,10 +111,25 @@ export function outcomeOf(
   };
 }
 
-/** The truck that joins when the player grows by one: the next of the big morning's trucks, then more of the same kinds. */
-export function newTruck(id: number): Truck {
+/** Drivers for the trucks that join beyond the big morning's nine. */
+export const EXTRA_DRIVERS: readonly string[] = [
+  'Nia', 'Olek', 'Rosa', 'Ben', 'Ines', 'Yusuf', 'Hana', 'Pete', 'Zara', 'Luca',
+  'Mei', 'Owen', 'Sofia', 'Ade', 'Greta', 'Ivan', 'Lou', 'Femi', 'Clara', 'Jonas',
+];
+
+/**
+ * The truck that joins when the player grows by one: the next of the big
+ * morning's trucks, then more of the same kinds, each with a driver no other
+ * truck has.
+ */
+export function newTruck(id: number, drivers: Iterable<string> = []): Truck {
+  const taken = new Set(drivers);
   const model = BIG_TRUCKS[(id - 1) % BIG_TRUCKS.length] as Truck;
-  return { ...model, id };
+  if (id <= BIG_TRUCKS.length && !taken.has(model.driver)) return { ...model, id };
+  const names = [...BIG_TRUCKS.map((t) => t.driver), ...EXTRA_DRIVERS];
+  let driver = names.find((n) => !taken.has(n));
+  for (let round = 2; !driver; round++) driver = names.map((n) => `${n} ${round}`).find((n) => !taken.has(n));
+  return { ...model, id, driver };
 }
 
 /** The state of the next morning: yesterday's stock with the supplier's delivery on top, and the growth put to work. */
@@ -127,6 +142,7 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
     ...run,
     day: run.day + 1,
     stock,
+    usual: { ...run.usual },
     trucks: run.trucks.map((t) => ({ ...t })),
     crews: run.crews.map((c) => ({ names: [...c.names], trucks: [...c.trucks] })),
     capacity: { ...run.capacity },
@@ -145,13 +161,18 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
 function grow(state: RunState, growth: Growth | null): void {
   if (!growth) return;
   if (growth.kind === 'truck') {
-    const truck = newTruck(Math.max(0, ...state.trucks.map((t) => t.id)) + 1);
+    const truck = newTruck(
+      Math.max(0, ...state.trucks.map((t) => t.id)) + 1,
+      state.trucks.map((t) => t.driver),
+    );
     state.trucks.push(truck);
     state.crews.at(-1)?.trucks.push(truck.id);
   } else if (growth.kind === 'room') {
     state.capacity[growth.room] += ROOM_GROWTH[growth.room];
   } else if (!state.clients.some((c) => c.name === growth.client.name)) {
     const { name, place, contact } = growth.client;
+    const before = state.clients.length;
+    if (before > 0) for (const [item, n] of Object.entries(state.usual)) state.usual[item] = n + Math.round(n / before);
     state.clients.push({ name, place, contact });
   }
 }

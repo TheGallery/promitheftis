@@ -4,7 +4,7 @@ import { generateDay } from '../src/game/generate';
 import { BIG_TRUCKS, bigMorning, smallMorning } from '../src/game/morning';
 import { mulberry32 } from '../src/game/random';
 import { ROOM_CAPACITY, ROOM_GROWTH } from '../src/game/rooms';
-import { nextDay, newTruck, promisesFrom, runFromMorning, type DayOutcome, type RunState } from '../src/game/run';
+import { EXTRA_DRIVERS, nextDay, newTruck, promisesFrom, runFromMorning, type DayOutcome, type RunState } from '../src/game/run';
 import { NEW_CLIENTS } from '../src/game/growth';
 import { stockAfterDeliveries } from '../src/game/supply';
 import type { Morning } from '../src/game/types';
@@ -121,7 +121,8 @@ describe('growing', () => {
     expect(next.trucks).toHaveLength(10);
     expect(next.trucks[9]!.id).toBe(10);
     expect(next.trucks[9]!.capacity).toBeGreaterThan(0);
-    expect(newTruck(10).driver).toBe(BIG_TRUCKS[0]!.driver);
+    expect(next.trucks[9]!.kind).toBe(BIG_TRUCKS[0]!.kind);
+    expect(next.trucks[9]!.driver).toBe(EXTRA_DRIVERS[0]);
     expect(next.crews.at(-1)!.trucks.at(-1)).toBe(10);
   });
 
@@ -138,6 +139,42 @@ describe('growing', () => {
     expect(next.clients).toHaveLength(8);
     expect(next.clients.at(-1)).toEqual(client);
     expect(nextDay(next, outcome({ growth: { kind: 'client', client } })).clients).toHaveLength(8);
+  });
+
+  it.each([
+    ['small', smallRun],
+    ['big', bigRun],
+  ] as const)('never gives two trucks the same driver on the %s run, however many are added', (_name, make) => {
+    let run = make();
+    const first = run.trucks.map((t) => ({ ...t }));
+    for (let i = 0; i < 60; i++) run = nextDay(run, outcome({ growth: { kind: 'truck' } }));
+    expect(run.trucks).toHaveLength(first.length + 60);
+    expect(new Set(run.trucks.map((t) => t.driver)).size).toBe(run.trucks.length);
+    expect(run.trucks.slice(0, first.length)).toEqual(first);
+    if (_name === 'small') expect(run.trucks.slice(0, 3)).toEqual(BIG_TRUCKS.slice(0, 3));
+    for (const t of run.trucks) {
+      expect(BIG_TRUCKS.some((b) => b.kind === t.kind && b.capacity === t.capacity)).toBe(true);
+    }
+  });
+
+  it('newTruck picks a driver no other truck has', () => {
+    expect(newTruck(10, BIG_TRUCKS.map((t) => t.driver)).driver).toBe(EXTRA_DRIVERS[0]);
+    expect(newTruck(3, ['Sam', 'Dev']).driver).not.toMatch(/^(Sam|Dev)$/);
+  });
+
+  it('a new client raises each usual amount by the average share of one client', () => {
+    const run = smallRun();
+    const clients = run.clients.length;
+    const next = nextDay(run, outcome({ growth: { kind: 'client', client: NEW_CLIENTS[0]! } }));
+    for (const [item, n] of Object.entries(run.usual)) expect(next.usual[item]).toBe(n + Math.round(n / clients));
+    const again = nextDay(next, outcome({ growth: { kind: 'client', client: NEW_CLIENTS[0]! } }));
+    expect(again.usual).toEqual(next.usual);
+  });
+
+  it('another truck or a bigger room leaves the usual amounts as they were', () => {
+    const run = smallRun();
+    expect(nextDay(run, outcome({ growth: { kind: 'truck' } })).usual).toEqual(run.usual);
+    expect(nextDay(run, outcome({ growth: { kind: 'room', room: 'dry' } })).usual).toEqual(run.usual);
   });
 });
 
