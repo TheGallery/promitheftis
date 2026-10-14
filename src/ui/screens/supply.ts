@@ -119,7 +119,7 @@ function rows(app: App, supply: Supply): Line[] {
     const done = supply.isConfirmed(r);
     const noted = (supply.notes.get(row.item.id)?.length ?? 0) > 0;
     const rest = `${String(row.onHand).padStart(9)}${String(row.usual).padStart(8)}`;
-    const base = done ? 'd' : '';
+    const base = done && !current ? 'd' : '';
     const hl = (cls: string) => (current ? `${cls} hl`.trim() : cls);
     out.push(cat(
       s(current ? '▶' : done ? '✓' : ' ', hl(base)),

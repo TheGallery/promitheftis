@@ -270,6 +270,18 @@ describe('the supplier ordering screen', () => {
     }
   });
 
+  it('does not dim a confirmed row while it is highlighted', () => {
+    const { app, press } = toResult(0);
+    press('Enter', 'Enter', 'ArrowUp');
+    const supply = app.supply!;
+    expect(supply.isConfirmed(0)).toBe(true);
+    expect(app.supplySel).toBe(0);
+    const line = screenLines(app).find((l) => l.some(([t]) => t.trim() === supply.rows[0]!.item.name))!;
+    const marked = line.filter(([, cls]) => cls.split(' ').includes('hl'));
+    expect(marked.length).toBeGreaterThan(0);
+    for (const [, cls] of marked) expect(cls.split(' ')).not.toContain('d');
+  });
+
   it('leaves the supplier screen without amounts, and the result screen shows them', () => {
     const { app, press } = toResult(0);
     const text = screen(app).join('\n');
