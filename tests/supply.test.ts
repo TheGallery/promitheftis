@@ -96,6 +96,25 @@ describe('the supplier order', () => {
     s.fillAll();
     s.rows.forEach((row, r) => expect(s.amount(r)).toBe(Math.max(0, row.usual - row.onHand)));
   });
+
+  it('leaves a row that already has an amount alone when filling it', () => {
+    const s = supply();
+    s.set(0, 7);
+    expect(s.fillRow(0)).toBe(7);
+    expect(s.amount(0)).toBe(7);
+  });
+
+  it('fills only the rows at zero when filling every row', () => {
+    const s = supply();
+    s.set(0, 7);
+    s.set(1, 1);
+    s.fillAll();
+    expect(s.amount(0)).toBe(7);
+    expect(s.amount(1)).toBe(1);
+    s.rows.forEach((row, r) => {
+      if (r > 1) expect(s.amount(r)).toBe(Math.max(0, row.usual - row.onHand));
+    });
+  });
 });
 
 function fakeEffects(): Effects {

@@ -101,7 +101,9 @@ export class Supply {
     if (r in this.confirmed) this.confirmed[r] = true;
   }
 
+  /** Fills a row that is at zero up to its gap; a row with an amount is left as it is. Returns the amount now. */
   fillRow(r: number): number {
+    if (this.amount(r) > 0) return this.amount(r);
     return this.set(r, this.gap(r));
   }
 

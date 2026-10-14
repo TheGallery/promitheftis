@@ -69,7 +69,7 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 | Truck sheets | **↑ ↓** pick a truck · **ENTER** open or close it · **+** / **−** open or close all · **P** print the sheets (with the printer sound) · **ESC** back to the desk · **F9** send the trucks |
 | On the road | **SPACE** or **ENTER** skip ahead (it stops at each call) · when the phone rings, **↑ ↓** pick an answer and **ENTER** gives it · once every truck is back and the calls are answered, **ENTER** goes to the result |
 | Result | **↑ ↓** look through the orders · **ENTER** supplier order · **R** play this morning again · **B** / **S** load the other morning |
-| Supplier order | **↑ ↓** pick an item · type a number or **← →** (one less / one more) · **ENTER** confirm the row and go to the next · **U** fill the row up to the usual amount · **A** fill every row · **F9** place the order · **ESC** back to the result · once the order is placed, **R** play this morning again · **B** / **S** load a morning |
+| Supplier order | **↑ ↓** pick an item · type a number or **← →** (one less / one more) · **ENTER** confirm the row and go to the next · **U** fill the row up to the usual amount · **A** fill every row (both leave a row that already has an amount alone) · **F9** place the order · **ESC** back to the result · once the order is placed, **R** play this morning again · **B** / **S** load a morning |
 
 ### How the desk plays
 
