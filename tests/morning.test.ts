@@ -90,6 +90,13 @@ describe('the big morning', () => {
     expect(short).toContain('ketchup');
     expect(short).toContain('chips');
   });
+  it('does not list anyone as working in the store room who is away in the overnight notes', () => {
+    const away = m.messages.flatMap((msg) => (msg.kind === 'staff' && /dentist/.test(msg.text) ? [msg.from] : []));
+    for (const name of away) {
+      expect(m.storeRoom).not.toContain(name);
+      expect(m.crews.flatMap((c) => c.names)).not.toContain(name);
+    }
+  });
   it('has the same client only once', () => {
     expect(new Set(m.orders.map((o) => o.client)).size).toBe(38);
   });

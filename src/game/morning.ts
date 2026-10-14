@@ -219,7 +219,7 @@ export function smallMorning(): Morning {
     orders,
     messages: buildMessages(orders, 2),
     crews,
-    storeRoom: ['Ines'],
+    storeRoom: ['Max'],
   };
 }
 
@@ -247,7 +247,7 @@ export function bigMorning(): Morning {
     orders,
     messages: buildMessages(orders, SUPPLIER_STAFF_NOTES.length),
     crews,
-    storeRoom: ['Ines', 'Max'],
+    storeRoom: ['Max'],
   };
 }
 
