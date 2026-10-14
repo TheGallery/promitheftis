@@ -4,11 +4,12 @@ import { Desk } from '../game/desk';
 import { loadMorning } from '../game/morning';
 import { buildResult, type MorningResult } from '../game/results';
 import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
+import { callNotes, stockAfterDeliveries, Supply } from '../game/supply';
 import type { Morning } from '../game/types';
 import type { CueArg, Moment } from './cues';
 import { plural } from './format';
 
-export type Screen = 'messages' | 'desk' | 'sheets' | 'road' | 'result';
+export type Screen = 'messages' | 'desk' | 'sheets' | 'road' | 'result' | 'supply';
 export type Pane = 'orders' | 'lines' | 'trucks';
 export type Tone = 'info' | 'warn';
 
@@ -82,6 +83,10 @@ export class App {
   result: MorningResult | null = null;
   resultSel = 0;
 
+  supply: Supply | null = null;
+  supplySel = 0;
+  supplyTyped = '';
+
   constructor(
     private readonly effects: Effects,
     private readonly changed: () => void = () => {},
@@ -141,6 +146,8 @@ export class App {
         return this.roadKey(key, repeat);
       case 'result':
         return this.resultKey(key);
+      case 'supply':
+        return this.supplyKey(key);
     }
   }
 
@@ -209,6 +216,9 @@ export class App {
     this.roadJob++;
     this.result = null;
     this.resultSel = 0;
+    this.supply = null;
+    this.supplySel = 0;
+    this.supplyTyped = '';
   }
 
   // ------------------------------------------------------------ order desk
@@ -609,6 +619,9 @@ export class App {
         this.loadMorning(this.morning.id);
         this.sound('confirm');
         return true;
+      case 'Enter':
+        this.openSupply();
+        return true;
       case 'b':
       case 'B':
         this.loadMorning('big');
@@ -624,5 +637,121 @@ export class App {
     }
     if (this.resultSel !== before) this.sound('move');
     return true;
+  }
+
+  // ------------------------------------------------------------ supplier order
+  /** Opens the 13:00 order to the supplier; coming back to it keeps what was filled in. */
+  private openSupply(): void {
+    if (!this.supply) {
+      this.supply = new Supply(this.morning, stockAfterDeliveries(this.desk), callNotes(this.calls, this.answers));
+      this.supplySel = 0;
+    }
+    this.supplyTyped = '';
+    this.screen = 'supply';
+    this.sound('confirm');
+  }
+
+  private supplyKey(key: string): boolean {
+    const supply = this.supply;
+    if (!supply) return false;
+    if (!/^\d$/.test(key) && key !== 'Backspace') this.supplyTyped = '';
+    const r = this.supplySel;
+    switch (key) {
+      case 'Escape':
+        this.screen = 'result';
+        this.sound('confirm');
+        return true;
+      case 'F9':
+        this.placeOrder(supply);
+        return true;
+      case 'r':
+      case 'R':
+        if (!supply.placed) break;
+        this.loadMorning(this.morning.id);
+        this.sound('confirm');
+        return true;
+      case 'b':
+      case 'B':
+        if (!supply.placed) break;
+        this.loadMorning('big');
+        this.sound('confirm');
+        return true;
+      case 's':
+      case 'S':
+        if (!supply.placed) break;
+        this.loadMorning('small');
+        this.sound('confirm');
+        return true;
+    }
+    if (supply.placed) return false;
+    switch (key) {
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        const before = this.supplySel;
+        this.supplySel = Math.max(0, Math.min(supply.count - 1, before + (key === 'ArrowUp' ? -1 : 1)));
+        if (this.supplySel !== before) this.sound('move');
+        return true;
+      }
+      case 'ArrowLeft':
+      case 'ArrowRight': {
+        const dir = key === 'ArrowRight' ? 1 : -1;
+        const before = supply.amount(r);
+        if (supply.nudge(r, dir) !== before) this.sound('nudge', { dir });
+        return true;
+      }
+      case 'Enter':
+        supply.confirm(r);
+        this.sound('confirm');
+        if (r < supply.count - 1) this.supplySel = r + 1;
+        else this.say('That was the last row. F9 places the order.');
+        return true;
+      case 'Backspace':
+        this.typeSupplyDigit(supply, null);
+        return true;
+      case 'u':
+      case 'U': {
+        const before = supply.amount(r);
+        const now = supply.fillRow(r);
+        if (now !== before) this.sound('confirm');
+        else this.say('That row is already up to the usual amount.');
+        return true;
+      }
+      case 'a':
+      case 'A':
+        supply.fillAll();
+        this.sound('confirm');
+        return true;
+    }
+    if (/^\d$/.test(key)) {
+      this.typeSupplyDigit(supply, key);
+      return true;
+    }
+    return false;
+  }
+
+  /** Typing a number sets the row as you type; null takes the last digit off. */
+  private typeSupplyDigit(supply: Supply, digit: string | null): void {
+    const before = [this.supplyTyped, supply.amount(this.supplySel)];
+    if (digit === null) this.supplyTyped = this.supplyTyped.slice(0, -1);
+    else if (this.supplyTyped.length < MAX_DIGITS) this.supplyTyped += digit;
+    const used = supply.set(this.supplySel, this.supplyTyped === '' ? 0 : Number(this.supplyTyped));
+    if (this.supplyTyped !== '') this.supplyTyped = String(used);
+    if (this.supplyTyped !== before[0] || used !== before[1]) this.sound('digit');
+  }
+
+  private placeOrder(supply: Supply): void {
+    if (supply.placed) {
+      this.say('The order is already placed.', 'warn');
+      return;
+    }
+    if (supply.total() === 0) {
+      this.say('Nothing is on the order yet: type amounts, U fills a row, A fills them all.', 'warn');
+      return;
+    }
+    supply.placed = true;
+    this.supplyTyped = '';
+    const lines = supply.ordered().length;
+    this.say(`Order placed for tomorrow: ${plural(lines, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
+    this.sound('finish');
   }
 }

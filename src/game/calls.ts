@@ -23,6 +23,8 @@ export interface CallOption {
   label: string;
   /** How the answer reads on the result screen. */
   record: string;
+  /** True when the answer promises the item on tomorrow's order. */
+  addsToOrder?: boolean;
 }
 
 export interface Call {
@@ -36,6 +38,8 @@ export interface Call {
   contact: string;
   /** What the call is about, short, for the result screen. */
   topic: string;
+  /** The item the call is about, when it is about one. */
+  item?: string;
   say: string;
   options: CallOption[];
 }
@@ -116,12 +120,13 @@ function shortCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | u
     client: o.client,
     contact: contactOf(desk, o),
     topic: `short on ${item}`,
+    item: worst.item,
     say:
       worst.given === 0
         ? `The delivery came, thank you! But there was no ${item} in it, and we asked for ${worst.asked}. Is some coming?`
         : `The delivery came, thank you! But we only got ${worst.given} of the ${worst.asked} ${item}. Is some more coming?`,
     options: [
-      { label: "Add the rest to tomorrow's order", record: 'added to tomorrow' },
+      { label: "Add the rest to tomorrow's order", record: 'added to tomorrow', addsToOrder: true },
       { label: 'Sorry, nothing more today', record: 'told not today' },
     ],
   };
@@ -141,9 +146,10 @@ function forgotCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | 
     client: o.client,
     contact: contactOf(desk, o),
     topic: `asked for ${name}`,
+    item: item.id,
     say: `Silly me, I forgot to put ${name} on the order. Could you send some?`,
     options: [
-      { label: "I'll add it to tomorrow's order", record: 'added to tomorrow' },
+      { label: "I'll add it to tomorrow's order", record: 'added to tomorrow', addsToOrder: true },
       { label: 'Sorry, not today', record: 'told not today' },
     ],
   };
