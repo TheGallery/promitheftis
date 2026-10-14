@@ -72,7 +72,7 @@ function routePanel(app: App): Line[] {
 
 export function sheetsScreen(app: App): Line[] {
   const d = app.desk;
-  const top = header('TRUCK SHEETS', clockLine(d.clock, true));
+  const top = header('TRUCK SHEETS', clockLine(app.morning.day, d.clock, true));
   const { rows, selectedRow } = truckRows(app);
   const head = s(`   ${'TRUCK'.padEnd(22)}${'FULL'.padEnd(19)}${'GOES TO'.padEnd(20)}${'STOPS'.padStart(5)}${'BACK'.padStart(9)}`, 'd');
   const visible = scrollRows(rows, selectedRow, 23);

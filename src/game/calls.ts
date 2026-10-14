@@ -66,7 +66,7 @@ export function beforeTime(minute: number): number {
  * quoted time is the time the route gives, and "short" means the delivery was short.
  */
 export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[] {
-  const kinds = desk.morning.id === 'big' ? BIG_KINDS : SMALL_KINDS;
+  const kinds = desk.morning.callKinds ?? (desk.morning.id === 'big' ? BIG_KINDS : SMALL_KINDS);
   const delivered = result.orders.filter((o) => o.arriveAt != null && o.truckId != null);
   const taken = new Set<number>();
   const calls: Omit<Call, 'id'>[] = [];
@@ -144,7 +144,7 @@ function forgotCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | 
   if (!o) return undefined;
   const asked = new Set(desk.order(o.orderIndex).lines.map((l) => l.item));
   const items = desk.morning.items.filter((i) => !asked.has(i.id));
-  const item = items[(o.orderIndex * 5 + 2) % items.length];
+  const item = items[(o.orderIndex * 5 + 2 + (desk.morning.callSalt ?? 0)) % items.length];
   if (!item) return undefined;
   const name = plainName(item.name);
   const qty = FORGOT_QTY_MIN + (o.orderIndex * 3 + items.indexOf(item)) % FORGOT_QTY_SPAN;

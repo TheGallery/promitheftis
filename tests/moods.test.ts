@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moodFacts, moodOf, moodPoints, moodReasons, type MoodFacts } from '../src/game/moods';
+import { moodEffect, moodFacts, moodOf, moodPoints, moodReasons, type MoodFacts } from '../src/game/moods';
 import type { Call } from '../src/game/calls';
 import type { OrderResult } from '../src/game/results';
 
@@ -76,5 +76,23 @@ describe('the facts for an order', () => {
 
   it('ignores a short call that was not answered', () => {
     expect(moodFacts(order, [call(1, 'short', 3)], new Map()).shortCall).toBeNull();
+  });
+});
+
+describe('what yesterday\'s mood does to today\'s order', () => {
+  it('leaves a pleased client, and one with no mood yet, asking for the usual amounts with no note', () => {
+    expect(moodEffect('pleased')).toEqual({ scale: 1, note: null });
+    expect(moodEffect(undefined)).toEqual(moodEffect('pleased'));
+  });
+
+  it('makes a client who was let down ask for a little less, and say so', () => {
+    const bit = moodEffect('a bit let down');
+    const let_down = moodEffect('let down');
+    expect(bit.scale).toBeLessThan(1);
+    expect(let_down.scale).toBeLessThan(bit.scale);
+    expect(let_down.scale).toBeGreaterThan(0.5);
+    expect(bit.note).toMatch(/\S/);
+    expect(let_down.note).toMatch(/\S/);
+    expect(bit.note).not.toBe(let_down.note);
   });
 });

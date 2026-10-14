@@ -4,7 +4,7 @@ import { place } from '../../game/places';
 import { placesLabel, plural } from '../format';
 import type { App } from '../app';
 import { bar, cat, clip, cols, header, keyBar, layout, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine } from './common';
+import { clockLine, otherMornings } from './common';
 
 const LEFT_W = 58;
 const RIGHT_W = 61;
@@ -104,7 +104,7 @@ function rightColumn(app: App): Line[] {
 
 export function resultScreen(app: App): Line[] {
   const r = app.result;
-  const top = header('THE TRUCKS HAVE GONE', clockLine(r?.departAt ?? app.desk.clock));
+  const top = header('THE TRUCKS HAVE GONE', clockLine(app.morning.day, r?.departAt ?? app.desk.clock));
   const left = leftColumn(app);
   const right = rightColumn(app);
   const n = Math.max(left.length, right.length);
@@ -119,7 +119,6 @@ export function resultScreen(app: App): Line[] {
         s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
       )
     : [];
-  const other = app.morning.id === 'small' ? ([['B', 'big morning']] as const) : ([['S', 'small morning']] as const);
-  const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...other, ['F2', 'colours'], ['F4', 'sound']])];
+  const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

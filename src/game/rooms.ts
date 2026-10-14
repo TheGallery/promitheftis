@@ -3,6 +3,9 @@ import type { Kept } from './types';
 /** How much each store room holds, in space units. */
 export const ROOM_CAPACITY: Record<Kept, number> = { freezer: 300, fridge: 520, dry: 800 };
 
+/** How much space a bigger room gains, in space units. */
+export const ROOM_GROWTH: Record<Kept, number> = { freezer: 100, fridge: 150, dry: 200 };
+
 /** The space one unit of each item takes in its room, in the same units. */
 export const SPACE_PER_UNIT: Record<string, number> = {
   chips: 3, peas: 3,

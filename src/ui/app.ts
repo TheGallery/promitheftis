@@ -2,9 +2,12 @@ import { buildCalls, callLine, type Call } from '../game/calls';
 import { DEPART_MINUTE } from '../game/clock';
 import { buildDay, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
+import { generateDay } from '../game/generate';
 import { growthOptions, newClientFor, type Growth, type GrowthOption, type NewClient } from '../game/growth';
 import { loadMorning } from '../game/morning';
+import { mulberry32 } from '../game/random';
 import { buildResult, type MorningResult } from '../game/results';
+import { nextDay, outcomeOf, runFromMorning, type RunState } from '../game/run';
 import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
 import { callNotes, stockAfterDeliveries, Supply } from '../game/supply';
 import type { Morning } from '../game/types';
@@ -32,7 +35,7 @@ export interface Effects {
   toggleSound(): boolean;
   /** A real-time clock, in ms. */
   now(): number;
-  /** A random number from 0 up to but not including 1, for the few things that differ from game to game. */
+  /** A random number from 0 up to but not including 1: the new days, and the other things that differ from game to game. */
   random(): number;
 }
 
@@ -51,6 +54,10 @@ export class App {
   screen: Screen = 'messages';
   morning: Morning;
   desk: Desk;
+  /** What carries over between days, as the current day began. The next morning is worked out from it. */
+  run: RunState;
+  /** Seeds the current day when it is made up, so playing it again gives the same day. */
+  private daySeed = 0;
   blue = false;
   soundOn = true;
   status = '';
@@ -97,7 +104,7 @@ export class App {
   growthOpen = false;
   /** The highlighted choice; once one is confirmed, that one. */
   growthSel = 0;
-  /** What was chosen to grow, or null until it is confirmed. Day part 7 reads it. */
+  /** What was chosen to grow, or null until it is confirmed. The next morning puts it to work. */
   growth: Growth | null = null;
   /** The restaurant that asks to join, picked at random when the order is placed so it stays the same while the day is on show. */
   private newClient: NewClient | null = null;
@@ -108,6 +115,7 @@ export class App {
     morningId: 'small' | 'big' = 'small',
   ) {
     this.morning = loadMorning(morningId);
+    this.run = runFromMorning(this.morning);
     this.desk = new Desk(this.morning);
   }
 
@@ -211,9 +219,29 @@ export class App {
     return true;
   }
 
-  /** Starts over with a morning, back at its overnight messages. */
+  /** Starts a new run with the fixed small or big morning, back at its overnight messages. */
   loadMorning(id: 'small' | 'big'): void {
-    this.morning = loadMorning(id);
+    const morning = loadMorning(id);
+    this.run = runFromMorning(morning);
+    this.startDay(morning);
+  }
+
+  /** Plays the current day again from its overnight messages: the same orders, the same stock. */
+  restartDay(): void {
+    this.startDay(this.run.day === 1 ? loadMorning(this.run.kind) : generateDay(this.run, mulberry32(this.daySeed)));
+  }
+
+  /** The next morning: the stock left plus the supplier's delivery, the growth at work, and a made-up day of orders. */
+  private nextMorning(day: DaySummary, supply: Supply): void {
+    const left = stockAfterDeliveries(this.desk);
+    this.run = nextDay(this.run, outcomeOf(left, supply, day, this.calls, this.answers, this.growth));
+    this.daySeed = Math.floor(this.effects.random() * 4294967296);
+    this.startDay(generateDay(this.run, mulberry32(this.daySeed)));
+  }
+
+  /** Puts a day's morning on the desk and clears everything the last day left on the screens. */
+  private startDay(morning: Morning): void {
+    this.morning = morning;
     this.desk = new Desk(this.morning);
     this.screen = 'messages';
     this.msgSel = 0;
@@ -639,7 +667,7 @@ export class App {
         break;
       case 'r':
       case 'R':
-        this.loadMorning(this.morning.id);
+        this.restartDay();
         this.sound('confirm');
         return true;
       case 'Enter':
@@ -755,7 +783,7 @@ export class App {
     this.growthOpen = false;
     this.growthSel = 0;
     this.growth = null;
-    this.newClient = newClientFor(this.morning.orders.map((o) => o.client), () => this.effects.random());
+    this.newClient = newClientFor(this.run.clients.map((c) => c.name), () => this.effects.random());
     this.screen = 'day';
     this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');
@@ -767,12 +795,12 @@ export class App {
     return this.day && this.newClient ? growthOptions(this.day, this.newClient) : [];
   }
 
-  /** R plays this morning again, B and S load a morning: all of them start over and drop the growth choice. */
+  /** R plays this day again, B and S start a new run from a fixed morning: all of them start over and drop the growth choice. */
   private restartKey(key: string): boolean {
     switch (key) {
       case 'r':
       case 'R':
-        this.loadMorning(this.morning.id);
+        this.restartDay();
         break;
       case 'b':
       case 'B':
@@ -829,10 +857,14 @@ export class App {
     }
     if (key === 'Enter') {
       const picked = options[this.growthSel];
-      if (this.growth) this.say('Already chosen: it takes effect tomorrow.');
-      else if (picked) {
+      if (this.growth) {
+        if (this.day && this.supply) {
+          this.nextMorning(this.day, this.supply);
+          this.sound('confirm');
+        }
+      } else if (picked) {
         this.growth = picked.growth;
-        this.say(`Chosen: ${picked.title}. It takes effect tomorrow.`);
+        this.say(`Chosen: ${picked.title}. It takes effect tomorrow. ENTER starts the next morning.`);
         this.sound('finish');
       }
       return true;

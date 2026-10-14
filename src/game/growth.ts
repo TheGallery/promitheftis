@@ -10,8 +10,8 @@ export interface NewClient {
 }
 
 /**
- * What the player chose to grow at the end of the day. It is only recorded here:
- * the next morning reads it, today is not changed by it.
+ * What the player chose to grow at the end of the day. Today is not changed by it:
+ * the next morning (see `run.ts`) puts it to work.
  */
 export type Growth =
   | { kind: 'truck' }
@@ -42,6 +42,16 @@ export const NEW_CLIENTS: readonly NewClient[] = [
   { name: 'Millford Chippy', place: 'millford', contact: 'Gordon' },
   { name: 'The Acorn Brasserie', place: 'oakley', contact: 'Hattie' },
   { name: 'Rushmere Boathouse', place: 'rushmere', contact: 'Callum' },
+  { name: "The Fisherman's Rest", place: 'docks', contact: 'Ottilie' },
+  { name: 'Oakley Smokehouse', place: 'oakley', contact: 'Rory' },
+  { name: 'Hollin Dairy Café', place: 'hollin', contact: 'Elsie' },
+  { name: 'Southgate Noodle Bar', place: 'southgate', contact: 'Mei' },
+  { name: 'The Gull and Anchor', place: 'millford', contact: 'Brendan' },
+  { name: 'Fenwick Bakehouse', place: 'fenwick', contact: 'Hester' },
+  { name: 'Ashby Fish Kitchen', place: 'ashby', contact: 'Luca' },
+  { name: 'Saltmarket Market Hall', place: 'saltmarket', contact: 'Hettie' },
+  { name: 'Rushmere Tea Garden', place: 'rushmere', contact: 'Beryl' },
+  { name: 'The Harbour Master', place: 'docks', contact: 'Ivor' },
 ];
 
 /** The room that will be fullest tomorrow; the first listed wins a tie. */
