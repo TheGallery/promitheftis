@@ -713,7 +713,7 @@ export class App {
         const before = supply.amount(r);
         const now = supply.fillRow(r);
         if (now !== before) this.sound('confirm');
-        else this.say('That row is already up to the usual amount.');
+        else this.say(before > 0 ? 'That row already has an amount.' : 'That row is already up to the usual amount.');
         return true;
       }
       case 'a':
