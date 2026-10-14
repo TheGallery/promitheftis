@@ -253,6 +253,29 @@ describe('on the screens', () => {
     expect(lines.join('\n')).toContain('!!');
   });
 
+  it('keeps the stock notes on the order desk when a long shortfall detail would not fit', () => {
+    const { app, press } = toNextMorning('1', 'big');
+    press(' ', 'Tab');
+    const stock = app.desk.morning.stock as Record<string, number>;
+    for (const item of Object.keys(stock)) stock[item] = 0;
+    const notesOf = (lines: string[]) => lines.map((l) => l.split('│')[1] ?? '').filter((l) => /left, |has room for|still to come/.test(l));
+    const everyLine = () =>
+      app.morning.orders.flatMap((o, i) =>
+        o.lines.map((_, l) => {
+          app.orderSel = i;
+          app.lineSel = l;
+          return { lines: screen(app), notes: notesOf(screen(app)) };
+        }),
+      );
+    const before = everyLine().map((v) => v.notes);
+    expect(before.flat().length).toBeGreaterThan(0);
+    const bad = { ...short(5, ['chips', 8, 0], ['peas', 8, 0], ['pork', 3, 0]), late: true };
+    app.run = { ...app.run, history: Object.fromEntries(app.morning.orders.map((o) => [o.client, [bad, bad]])) };
+    const after = everyLine();
+    expect(after.map((v) => v.notes)).toEqual(before);
+    for (const v of after) expect(v.lines.join('\n')).toMatch(/Yesterday: got 5%/);
+  });
+
   it('marks short two days running with two marks after a second short day', () => {
     const { app, press } = dayTwo();
     playToSupply(app, press);

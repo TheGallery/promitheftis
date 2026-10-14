@@ -102,7 +102,11 @@ function linesPane(app: App): Line[] {
   });
   out.push([], s(' type a number, or ←→ for one more / less', 'd'), [], s(' NOTES', 'd'));
   if (order.before != null) out.push(s(` Wanted there before ${String(Math.floor(order.before / 60)).padStart(2, '0')}:${String(order.before % 60).padStart(2, '0')}.`, 'w'));
-  out.push(...shortfallLines(app, order.client, LINES_W, 2), ...lineNotes(app));
+  const notes = lineNotes(app);
+  const room = Math.max(0, BODY_ROWS - out.length - notes.length);
+  const full = shortfallLines(app, order.client, LINES_W, 2);
+  const short = full.length > room ? shortfallLines(app, order.client, LINES_W, 2, 1).slice(0, room) : full;
+  out.push(...short, ...notes);
   return out;
 }
 
