@@ -90,6 +90,13 @@ describe('the new client', () => {
     expect(new Set(NEW_CLIENTS.map((c) => c.name)).size).toBe(NEW_CLIENTS.length);
   });
 
+  it('has at least one restaurant on every one of the nine squares', () => {
+    for (const p of PLACES) {
+      expect(NEW_CLIENTS.map((c) => c.place)).toContain(p.id);
+    }
+    expect(PLACES).toHaveLength(9);
+  });
+
   it('is picked with the random number it is given: the first at 0, the last just under 1', () => {
     const taken = clientsOf(smallMorning());
     expect(newClientFor(taken, () => 0)).toEqual(NEW_CLIENTS[0]);

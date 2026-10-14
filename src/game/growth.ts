@@ -40,6 +40,8 @@ export const NEW_CLIENTS: readonly NewClient[] = [
   { name: 'The Lantern Room', place: 'saltmarket', contact: 'Yusuf' },
   { name: 'Ashby Orchard Café', place: 'ashby', contact: 'Fern' },
   { name: 'Millford Chippy', place: 'millford', contact: 'Gordon' },
+  { name: 'The Acorn Brasserie', place: 'oakley', contact: 'Hattie' },
+  { name: 'Rushmere Boathouse', place: 'rushmere', contact: 'Callum' },
 ];
 
 /** The room that will be fullest tomorrow; the first listed wins a tie. */
