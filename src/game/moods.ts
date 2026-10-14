@@ -52,3 +52,20 @@ export function moodFacts(order: OrderResult, calls: readonly Call[], answers: R
   const shortCall = call == null || choice == null ? null : call.options[choice]?.addsToOrder ? 'promised' : 'refused';
   return { percent: order.percent, late: order.lateForAsk, shortCall };
 }
+
+/** How a client's mood the day before changes today's order: the share of the usual quantities it asks for, and a note. */
+export interface MoodEffect {
+  scale: number;
+  note: string | null;
+}
+
+const MOOD_EFFECT: Record<Mood, MoodEffect> = {
+  pleased: { scale: 1, note: null },
+  'a bit let down': { scale: 0.9, note: 'Last time was a bit thin. Please do your best.' },
+  'let down': { scale: 0.75, note: 'Last time was poor. We are counting on you today.' },
+};
+
+/** The effect of yesterday's mood on today's order; a client with no mood yet, such as a new one, is pleased. */
+export function moodEffect(mood: Mood | undefined): MoodEffect {
+  return MOOD_EFFECT[mood ?? 'pleased'];
+}

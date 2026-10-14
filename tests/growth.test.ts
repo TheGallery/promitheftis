@@ -157,17 +157,17 @@ describe('choosing what to grow', () => {
     expect(app.growth).toBeNull();
   });
 
-  it('records the choice as plain state when ENTER confirms, and a second ENTER changes nothing', () => {
+  it('records the choice as plain state when ENTER confirms, and the pick can no longer be changed', () => {
     const { app, press } = toDay(0, 'small', ['9', '9', '9']);
     press('Enter', '2', 'Enter');
     expect(app.growth).toEqual({ kind: 'room', room: tightestRoom(app.day!.rooms).kept });
     expect(app.status).toContain('Chosen: A bigger');
     expect(app.status).toContain('tomorrow');
     const chosen = app.growth;
-    press('1', 'ArrowUp', 'Enter');
+    press('1', 'ArrowUp', 'ArrowDown');
     expect(app.growthSel).toBe(1);
     expect(app.growth).toBe(chosen);
-    expect(app.status).toContain('Already chosen');
+    expect(app.screen).toBe('day');
   });
 
   it('records a truck and a new client as well', () => {
@@ -206,11 +206,15 @@ describe('choosing what to grow', () => {
     press('Enter', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'Enter');
     expect(cues).toEqual(['confirm', 'move', 'move', 'finish']);
     cues.length = 0;
-    press('ArrowDown', 'Enter', 'x');
+    press('ArrowDown', 'x');
     expect(cues).toEqual([]);
     press('Escape');
     expect(cues).toEqual(['confirm']);
     expect(app.growthOpen).toBe(false);
+    cues.length = 0;
+    press('Enter', 'Enter');
+    expect(cues).toEqual(['confirm', 'confirm']);
+    expect(app.screen).toBe('messages');
   });
 
   it.each(['r', 'R'])('%s plays the morning again and forgets the choice', (key) => {
@@ -330,6 +334,7 @@ describe('the growth screen', () => {
     expect(text).toContain(app.growthOptions[2]!.title);
     expect(text).toContain('chosen');
     expect(text).toContain('It takes effect tomorrow');
+    expect(lines[ROWS - 1]).toContain('next morning');
     expect(lines[ROWS - 1]).toContain('back to the day');
     expect(lines[ROWS - 1]).not.toContain('choose it');
     expect(lines[ROWS - 1]).not.toContain('1-3');

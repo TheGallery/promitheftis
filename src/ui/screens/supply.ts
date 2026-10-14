@@ -134,7 +134,7 @@ function rows(app: App, supply: Supply): Line[] {
 
 export function supplyScreen(app: App): Line[] {
   const supply = app.supply;
-  const top = header('SUPPLIER ORDER', clockLine(SUPPLIER_MINUTE));
+  const top = header('SUPPLIER ORDER', clockLine(app.morning.day, SUPPLIER_MINUTE));
   if (!supply) return layout(top, [], [rule(), [], keyBar([['F2', 'colours'], ['F4', 'sound']])]);
   const body = rows(app, supply);
   const status = app.status

@@ -136,7 +136,7 @@ function trucksPane(app: App): Line[] {
     const cursor = lit && i === app.truckSel;
     const mark = t.id === current ? '▶' : ' ';
     const row = cat(
-      s(`${mark}${t.id} ${t.driver.padEnd(6)} `, cursor ? 'hl' : ''),
+      s(`${mark}${t.id} ${t.driver.padEnd(t.id > 9 ? 5 : 6)} `, cursor ? 'hl' : ''),
       bar(pct, 8, cursor ? 'hl' : ''),
       s(` ${String(pct).padStart(3)}%  `, cursor ? 'hl' : ''),
       s((places.length ? placesLabel(places, 16) : '—').padEnd(16), `${places.length ? 'acc' : 'd'}${cursor ? ' hl' : ''}`),
@@ -166,7 +166,7 @@ function headsUp(app: App): Line {
 }
 
 export function deskScreen(app: App): Line[] {
-  const top = header('ORDER DESK', clockLine(app.desk.clock, true));
+  const top = header('ORDER DESK', clockLine(app.morning.day, app.desk.clock, true));
   const left = ordersPane(app);
   const mid = linesPane(app);
   const right = trucksPane(app);

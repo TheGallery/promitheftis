@@ -1,3 +1,4 @@
+import type { CallKind } from './calls';
 import type { PlaceId } from './places';
 
 /** Where an item is kept: the freezer, the fridge or the dry store. */
@@ -48,15 +49,24 @@ export interface Crew {
 }
 
 export interface Morning {
+  /** The run this morning belongs to: it began as the small or the big morning. */
   id: 'small' | 'big';
+  /** Which day of the run this is; the fixed morning is day 1. */
+  day: number;
   title: string;
   items: Item[];
   stock: Record<string, number>;
   /** The usual amount of each item used in a day: what the supplier order fills up to. */
   usual: Record<string, number>;
+  /** How much each store room holds, in space units. */
+  capacity: Record<Kept, number>;
   trucks: Truck[];
   orders: Order[];
   messages: Message[];
   crews: Crew[];
   storeRoom: string[];
+  /** The kinds of phone call this morning, in order; a morning without any uses its size's usual kinds. */
+  callKinds?: CallKind[];
+  /** Varies which item a client forgets, so the same client does not forget the same thing every day. */
+  callSalt?: number;
 }

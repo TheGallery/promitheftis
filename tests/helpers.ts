@@ -95,3 +95,31 @@ export function screen(app: App): string[] {
   return lines;
 }
 
+
+/**
+ * Plays the day on the desk, whatever its orders and trucks, as far as the supplier order: every line
+ * is given as asked, each order goes on the first truck from `first` with room, and every call is
+ * answered with the option at `answer`.
+ */
+export function playToSupply(app: App, press: (...keys: string[]) => void, answer = 0) {
+  const count = app.morning.trucks.length;
+  press(' ');
+  for (let n = 0; n < app.desk.orderCount; n++) {
+    const o = app.orderSel;
+    for (let l = 0; l < app.desk.order(o).lines.length; l++) press('Enter');
+    for (let i = 0; i < count && !app.desk.isFinished(o); i++) press(...Array(count).fill('ArrowUp'), ...Array((n + i) % count).fill('ArrowDown'), 'Enter');
+  }
+  press('F10', 'F10', 'F9');
+  for (let n = 0; n < 60 && !app.roadOver; n++) {
+    if (app.roadCall) press(...Array(answer).fill('ArrowDown'), 'Enter');
+    else press(' ');
+  }
+  press('Enter', 'Enter');
+}
+
+/** Plays the day to its end and the growth choice, then on to the next morning. `growth` is the number of the option to choose. */
+export function toNextMorning(growth: '1' | '2' | '3', morning: 'small' | 'big' = 'small', answer = 0, random: () => number = () => 0) {
+  const day = toDay(answer, morning, ['a'], [], random);
+  day.press('Enter', growth, 'Enter', 'Enter');
+  return day;
+}

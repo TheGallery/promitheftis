@@ -53,7 +53,7 @@ function detail(app: App): Line[] {
 export function messagesScreen(app: App): Line[] {
   const top = header(
     `OVERNIGHT MESSAGES · ${app.morning.title.toLowerCase()}: ${plural(app.morning.trucks.length, 'truck')}, ${plural(app.morning.orders.length, 'order')}`,
-    clockLine(app.desk.clock),
+    clockLine(app.morning.day, app.desk.clock),
   );
   const rows = app.morning.messages.map((_, i) => messageRow(app, i));
   const list = scrollRows(rows, app.msgSel, LIST_ROWS);
@@ -61,7 +61,9 @@ export function messagesScreen(app: App): Line[] {
   while (body.length < LIST_ROWS + 1) body.push([]);
   body.push(rule(), ...detail(app));
   const other: Array<readonly [string, string]> =
-    app.morning.id === 'small' ? [['B', 'big morning (9 trucks, 38 orders)']] : [['S', 'small morning (2 trucks, 7 orders)']];
+    app.morning.day > 1
+      ? [['B S', 'big / small morning']]
+      : app.morning.id === 'small' ? [['B', 'big morning (9 trucks, 38 orders)']] : [['S', 'small morning (2 trucks, 7 orders)']];
   const footer = [rule(), keyBar([['↑↓', 'message'], ['SPACE', 'start the morning'], ...other, ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

@@ -4,7 +4,15 @@ export const START_MINUTE = 5 * 60 + 31;
 export const DEPART_MINUTE = 7 * 60;
 /** Each action at the desk moves the clock on by this much. */
 export const MINUTES_PER_ACTION = 1;
-export const DATE_LABEL = 'TUE 14 MAR';
+
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/** The date of a day of the run, e.g. "TUE 14 MAR" for day 1 and "WED 15 MAR" for day 2. */
+export function dateLabel(day: number): string {
+  const d = new Date(Date.UTC(2023, 2, 14 + Math.max(1, Math.trunc(day)) - 1));
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
 
 /** Minutes since midnight as HH:MM; values past midnight wrap round. */
 export function formatTime(minutes: number): string {

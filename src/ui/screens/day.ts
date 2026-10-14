@@ -6,7 +6,7 @@ import { KEPT_LABEL } from '../../game/supply';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, clip, cols, header, keyBar, layout, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine } from './common';
+import { clockLine, otherMornings } from './common';
 
 const LEFT_W = 58;
 const RIGHT_W = 61;
@@ -139,7 +139,7 @@ function rightColumn(day: DaySummary): Line[] {
 
 export function dayScreen(app: App): Line[] {
   const day = app.day;
-  const top = header('END OF THE DAY', clockLine(DAY_END_MINUTE));
+  const top = header('END OF THE DAY', clockLine(app.morning.day, DAY_END_MINUTE));
   const body: Line[] = [];
   if (day) {
     const left = leftColumn(app, day);
@@ -152,6 +152,5 @@ export function dayScreen(app: App): Line[] {
     : day
       ? s(` ${pleased} of ${plural(day.orders.length, 'client')} pleased. ENTER to choose what to grow.`, 'd')
       : [];
-  const other = app.morning.id === 'small' ? ([['B', 'big morning']] as const) : ([['S', 'small morning']] as const);
-  return layout(top, body, [rule(), status, keyBar([['↑↓', 'look through the clients'], ['ENTER', 'what to grow'], ['R', 'play again'], ...other, ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([['↑↓', 'look through the clients'], ['ENTER', 'what to grow'], ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])]);
 }

@@ -1,4 +1,6 @@
 import type { PlaceId } from './places';
+import { mulberry32 } from './random';
+import { ROOM_CAPACITY } from './rooms';
 import type { Crew, Item, Message, Morning, Order, OrderLine, Truck } from './types';
 
 export const ITEMS: readonly Item[] = [
@@ -109,13 +111,13 @@ const BIG_USUAL: Record<string, number> = {
 };
 
 /** [weight when picking lines, lowest quantity, highest quantity] */
-const DEMAND: Record<string, [number, number, number]> = {
+export const DEMAND: Record<string, [number, number, number]> = {
   ketchup: [3, 2, 8], chips: [2, 1, 4], peas: [1.5, 1, 3], pork: [3, 4, 14],
   potatoes: [2.5, 2, 6], eggs: [2.5, 2, 6], mozzarella: [1.5, 2, 8], flour: [1.5, 1, 3],
   gravy: [1.5, 1, 3], tomatoes: [1.5, 6, 18], oil: [1.5, 1, 3], rice: [1.5, 1, 3],
 };
 
-const BIG_TRUCKS: readonly Truck[] = [
+export const BIG_TRUCKS: readonly Truck[] = [
   { id: 1, driver: 'Sam', kind: 'white van', capacity: 330 },
   { id: 2, driver: 'Ana', kind: 'old Bedford', capacity: 420 },
   { id: 3, driver: 'Dev', kind: 'box van', capacity: 380 },
@@ -127,24 +129,12 @@ const BIG_TRUCKS: readonly Truck[] = [
   { id: 9, driver: 'Raj', kind: 'Transit', capacity: 480 },
 ];
 
-/** Small deterministic random numbers, so the big morning is the same every time. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function parseClock(hhmm: string): number {
+export function parseClock(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
-function generateLines(rand: () => number): OrderLine[] {
+export function generateLines(rand: () => number): OrderLine[] {
   const scale = 0.7 + rand() * 0.8;
   const count = 3 + Math.floor(rand() * 3);
   const pool = ITEMS.map((i) => i.id);
@@ -169,7 +159,7 @@ function generateLines(rand: () => number): OrderLine[] {
 }
 
 /** Overnight messages arrive between 21:30 and 05:10, spread evenly. */
-function arrivalTime(index: number, count: number): number {
+export function arrivalTime(index: number, count: number): number {
   const first = 21 * 60 + 30;
   const last = 24 * 60 + 5 * 60 + 10;
   return count <= 1 ? first : first + Math.round((index * (last - first)) / (count - 1));
@@ -194,7 +184,7 @@ function buildOrders(clients: readonly Client[], rand: () => number): Order[] {
   });
 }
 
-const SUPPLIER_STAFF_NOTES: ReadonlyArray<Extract<Message, { kind: 'supplier' | 'staff' }>> = [
+export const SUPPLIER_STAFF_NOTES: ReadonlyArray<Extract<Message, { kind: 'supplier' | 'staff' }>> = [
   { kind: 'staff', from: 'Ines', text: 'In at 10 today, dentist. Max has the keys to the store room.', at: 24 * 60 + 3 * 60 + 30 },
   { kind: 'supplier', from: 'Grange Farm', text: 'Eggs and potatoes delivered at 04:00, all counted in.', at: 24 * 60 + 4 * 60 + 10 },
   { kind: 'supplier', from: 'Hartley', text: 'Dry goods are in. The ketchup order came up short again, sorry.', at: 24 * 60 + 4 * 60 + 40 },
@@ -213,7 +203,7 @@ function buildMessages(orders: readonly Order[], noteCount: number): Message[] {
   return all.sort((a, b) => a.at - b.at);
 }
 
-const ITEM_LIST: Item[] = ITEMS.map((i) => ({ ...i }));
+export const ITEM_LIST: Item[] = ITEMS.map((i) => ({ ...i }));
 
 export function smallMorning(): Morning {
   const rand = mulberry32(1987);
@@ -222,10 +212,12 @@ export function smallMorning(): Morning {
   const crews: Crew[] = [{ names: ['Joe', 'Bea'], trucks: [1, 2] }];
   return {
     id: 'small',
+    day: 1,
     title: 'A small morning',
     items: ITEM_LIST,
     stock: { ...SMALL_STOCK },
     usual: { ...SMALL_USUAL },
+    capacity: { ...ROOM_CAPACITY },
     trucks: BIG_TRUCKS.slice(0, 2).map((t) => ({ ...t })),
     orders,
     messages: buildMessages(orders, 2),
@@ -251,10 +243,12 @@ export function bigMorning(): Morning {
   ];
   return {
     id: 'big',
+    day: 1,
     title: 'The big morning',
     items: ITEM_LIST,
     stock,
     usual: { ...BIG_USUAL },
+    capacity: { ...ROOM_CAPACITY },
     trucks: BIG_TRUCKS.map((t) => ({ ...t })),
     orders,
     messages: buildMessages(orders, SUPPLIER_STAFF_NOTES.length),

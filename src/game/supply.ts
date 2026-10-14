@@ -1,6 +1,6 @@
 import type { Call } from './calls';
 import type { Desk } from './desk';
-import { ROOM_CAPACITY, roomSpace, spaceOf, type RoomSpace } from './rooms';
+import { roomSpace, spaceOf, type RoomSpace } from './rooms';
 import type { Item, Kept, Morning } from './types';
 
 /** The rooms in the order the screen lists them. */
@@ -54,12 +54,14 @@ export function callNotes(calls: readonly Call[], answers: ReadonlyMap<number, n
 export class Supply {
   readonly rows: SupplyRow[];
   readonly notes: Map<string, CallNote[]>;
+  private readonly capacity: Record<Kept, number>;
   private readonly amounts: number[];
   private readonly confirmed: boolean[];
   placed = false;
 
   constructor(morning: Morning, onHand: Record<string, number>, notes: Map<string, CallNote[]> = new Map()) {
     this.notes = notes;
+    this.capacity = morning.capacity;
     this.rows = KEPT_ORDER.flatMap((kept) =>
       morning.items
         .filter((item) => item.kept === kept)
@@ -122,7 +124,7 @@ export class Supply {
       inStore += row.onHand * space;
       ordered += this.amount(r) * space;
     });
-    return roomSpace(ROOM_CAPACITY[kept], inStore, ordered);
+    return roomSpace(this.capacity[kept], inStore, ordered);
   }
 
   /** The items with something to order, in the order listed. */

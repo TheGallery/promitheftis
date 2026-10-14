@@ -3,7 +3,7 @@ import { tightestRoom, type GrowthOption } from '../../game/growth';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, header, keyBar, layout, rule, s, wrapText, type Line } from '../grid';
-import { clockLine } from './common';
+import { clockLine, otherMornings } from './common';
 import { roomLine } from './day';
 
 /** Room for text after the 7-column indent of an option's details. */
@@ -41,7 +41,7 @@ function todayRows(app: App): Line[] {
 export function growthScreen(app: App): Line[] {
   const options = app.growthOptions;
   const chosen = app.growth ? options[app.growthSel] : undefined;
-  const top = header('END OF THE DAY', clockLine(DAY_END_MINUTE));
+  const top = header('END OF THE DAY', clockLine(app.morning.day, DAY_END_MINUTE));
   const intro: Line[] = chosen
     ? [
         s(' YOU CHOSE', 'b'),
@@ -54,14 +54,13 @@ export function growthScreen(app: App): Line[] {
         s(' It takes effect tomorrow, when the next morning starts.', 'd'),
       ];
   const body: Line[] = [...intro, [], ...optionRows(app, options), ...todayRows(app)];
-  const other = app.morning.id === 'small' ? ([['B', 'big morning']] as const) : ([['S', 'small morning']] as const);
   const keys = chosen
-    ? ([['ESC', 'back to the day']] as const)
+    ? ([['ENTER', 'next morning'], ['ESC', 'back to the day']] as const)
     : ([['↑↓ 1-3', 'pick one'], ['ENTER', 'choose it'], ['ESC', 'back to the day']] as const);
   const status = app.status
     ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
     : chosen
-      ? s(` Chosen: ${chosen.title}. It takes effect tomorrow.`, 'acc')
+      ? s(` Chosen: ${chosen.title}. It takes effect tomorrow. ENTER starts the next morning.`, 'acc')
       : [];
-  return layout(top, body, [rule(), status, keyBar([...keys, ['R', 'play again'], ...other, ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([...keys, ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])]);
 }
