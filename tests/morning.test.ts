@@ -14,6 +14,15 @@ describe.each([
 ])('the %s morning', (_name, load) => {
   const m = load();
 
+  it('does not list anyone as working in the store room who is away in the overnight notes', () => {
+    const away = m.messages.flatMap((msg) => (msg.kind === 'staff' && /dentist/.test(msg.text) ? [msg.from] : []));
+    expect(away).toEqual(['Ines']);
+    for (const name of away) {
+      expect(m.storeRoom).not.toContain(name);
+      expect(m.crews.flatMap((c) => c.names)).not.toContain(name);
+    }
+  });
+
   it('only asks for items in the catalogue, once per order, in amounts above zero', () => {
     const ids = new Set(m.items.map((i) => i.id));
     for (const o of m.orders) {
@@ -89,13 +98,6 @@ describe('the big morning', () => {
     const short = shortItems(m).map((s) => s.item);
     expect(short).toContain('ketchup');
     expect(short).toContain('chips');
-  });
-  it('does not list anyone as working in the store room who is away in the overnight notes', () => {
-    const away = m.messages.flatMap((msg) => (msg.kind === 'staff' && /dentist/.test(msg.text) ? [msg.from] : []));
-    for (const name of away) {
-      expect(m.storeRoom).not.toContain(name);
-      expect(m.crews.flatMap((c) => c.names)).not.toContain(name);
-    }
   });
   it('has the same client only once', () => {
     expect(new Set(m.orders.map((o) => o.client)).size).toBe(38);
