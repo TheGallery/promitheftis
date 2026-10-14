@@ -194,7 +194,10 @@ export class App {
         this.pickTruck(Number(key));
         return true;
       }
-      if (key === 'Escape') return true;
+      if (key === 'Escape') {
+        this.sound('move');
+        return true;
+      }
     }
     if (!/^\d$/.test(key) && key !== 'Backspace') this.typed = '';
 
@@ -443,6 +446,7 @@ export class App {
   private startPrint(): void {
     if (this.printing) {
       this.say('The printer is still going.');
+      this.sound('warn');
       return;
     }
     const total = this.morning.trucks.length + 2;

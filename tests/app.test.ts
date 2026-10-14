@@ -209,6 +209,26 @@ describe('sounds', () => {
     expect(app.screen).toBe('desk');
   });
 
+  it('makes the move sound when ESC drops a pending T', () => {
+    const { app, press, heard } = newApp();
+    press(' ');
+    expect(heard('t', 'Escape')).toEqual([['truckKey'], ['move']]);
+    expect(app.truckPending).toBe(false);
+  });
+
+  it('makes the warning sound, not the printer, for P while the printer is still going', () => {
+    const { app, press, heard, effects, log } = newApp();
+    press(' ', 'Enter', 't', '1', 'F10', 'F10');
+    effects.later = () => {};
+    expect(heard('p')).toEqual([[]]);
+    const printed = log.printed;
+    log.printed = 0;
+    expect(heard('p')).toEqual([['warn']]);
+    expect(app.status).toContain('still going');
+    expect(log.printed).toBe(0);
+    expect(printed).toBeGreaterThan(0);
+  });
+
   it('makes the confirm sound when the trucks are sent and the move sound on the result', () => {
     const { app, press, heard } = newApp();
     press(' ', 'Enter', 't', '1', 'F10', 'F10');
