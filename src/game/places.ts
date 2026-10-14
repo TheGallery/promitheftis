@@ -1,10 +1,10 @@
-/** The nine squares: Town in the middle, eight places around it. */
+/** The nine squares: Saltmarket in the middle, eight places around it. */
 export type PlaceId =
   | 'oakley'
   | 'hollin'
   | 'rushmere'
   | 'fenwick'
-  | 'town'
+  | 'saltmarket'
   | 'docks'
   | 'millford'
   | 'southgate'
@@ -24,15 +24,15 @@ export const PLACES: readonly Place[] = [
   { id: 'hollin', name: 'Hollin', code: 'HOL', col: 1, row: 0 },
   { id: 'rushmere', name: 'Rushmere', code: 'RUS', col: 2, row: 0 },
   { id: 'fenwick', name: 'Fenwick', code: 'FEN', col: 0, row: 1 },
-  { id: 'town', name: 'Town', code: 'TWN', col: 1, row: 1 },
+  { id: 'saltmarket', name: 'Saltmarket', code: 'SLT', col: 1, row: 1 },
   { id: 'docks', name: 'Docks', code: 'DCK', col: 2, row: 1 },
   { id: 'millford', name: 'Millford', code: 'MIL', col: 0, row: 2 },
   { id: 'southgate', name: 'Southgate', code: 'STH', col: 1, row: 2 },
   { id: 'ashby', name: 'Ashby', code: 'ASH', col: 2, row: 2 },
 ];
 
-/** The depot is in Town. */
-export const DEPOT: PlaceId = 'town';
+/** The depot is in Saltmarket. */
+export const DEPOT: PlaceId = 'saltmarket';
 
 const BY_ID = new Map<PlaceId, Place>(PLACES.map((p) => [p.id, p]));
 

@@ -8,8 +8,8 @@ describe('planRoute', () => {
     expect(planRoute([], 420)).toEqual({ visits: [], backAt: 420 });
   });
 
-  it('keeps a Town-only truck close to the depot', () => {
-    const plan = planRoute(stops('town', 'town', 'town', 'town'), 420);
+  it('keeps a Saltmarket-only truck close to the depot', () => {
+    const plan = planRoute(stops('saltmarket', 'saltmarket', 'saltmarket', 'saltmarket'), 420);
     expect(plan.backAt).toBe(420 + 4 * STOP_MINUTES);
     expect(plan.visits).toHaveLength(1);
     expect(plan.visits[0]?.stops.map((s) => s.arriveAt)).toEqual([420, 445, 470, 495]);
@@ -36,7 +36,7 @@ describe('planRoute', () => {
     expect(together.backAt - 420).toBe(2 * 20 + 2 * STOP_MINUTES);
   });
 
-  it('drives round the edge rather than back through Town twice', () => {
+  it('drives round the edge rather than back through Saltmarket twice', () => {
     const plan = planRoute(stops('oakley', 'hollin', 'rushmere'), 420);
     expect(plan.visits.map((v) => v.place)).toEqual(['oakley', 'hollin', 'rushmere']);
     expect(plan.backAt - 420).toBe(25 + 20 + 20 + 25 + 3 * STOP_MINUTES);
