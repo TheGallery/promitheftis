@@ -70,7 +70,7 @@ Orders for the same place should go on the same truck. Places next to each other
 Plain TypeScript with Vite and no UI framework; Vitest for tests.
 
 - `src/game/` holds the rules and has no screen code: the map (`places.ts`), the two mornings (`morning.ts`), the order desk with stock, truck fullness and the clock (`desk.ts`), return times (`routes.ts`), shortages (`headsup.ts`) and the result (`results.ts`).
-- `src/ui/` holds the screens. Each screen builds lines of text of exactly 120 columns (`grid.ts`, `screens/`); `app.ts` holds the state and what each key does; `view.ts` and `main.ts` put the text on the page; `audio.ts` makes the sounds.
+- `src/ui/` holds the screens. Each screen builds lines of text of exactly 120 columns (`grid.ts`, `screens/`); `app.ts` holds the state and what each key does; `view.ts` and `main.ts` put the text on the page; `audio.ts` plays the sounds, with the Soft keys set in `softkeys.ts`.
 - `tests/` has the unit tests, including a full play-through of both mornings that checks that every screen is exactly 120 columns by 30 rows.
 
 ## Sounds and fonts
