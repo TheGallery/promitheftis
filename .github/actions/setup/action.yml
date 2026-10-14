@@ -1,0 +1,44 @@
+name: Set up
+description: Install Node from .nvmrc and the project's dependencies through Socket Firewall.
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      with:
+        node-version-file: '.nvmrc'
+        # Every install goes through Socket Firewall; no dependency cache.
+        package-manager-cache: false
+    # Socket's binary CDN answers 504 often enough to fail the job on its own,
+    # and the action gives up after its internal retries. The npm registry
+    # serves the same firewall, so a download outage falls back to it instead
+    # of taking the job down. Never relax this into an unwrapped install: if
+    # both sources are unreachable, `sfw` is absent and the install below
+    # fails, which is the outcome we want.
+    - uses: socketdev/action@ba6de6cc0565af1f42295590380973573297e31f # v1.3.2
+      continue-on-error: true
+      with:
+        mode: firewall
+    - name: Install Socket Firewall from the npm registry
+      run: command -v sfw > /dev/null || npm install --global sfw@2.0.6
+      shell: bash
+    # `sfw` proxies the install and calls Socket's API as it goes, so a
+    # transient fault on its own connection takes the proxy down mid-install
+    # and kills the install with it (SIGKILL, exit 137). Retry that, and only
+    # that: the firewall refusing a package exits with npm's own status, which
+    # stays fatal here, so a blocked dependency can never be retried into a pass.
+    - name: Install dependencies through Socket Firewall
+      run: |
+        for attempt in 1 2 3; do
+          status=0
+          sfw npm ci || status=$?
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          if [ "$status" -ne 137 ]; then
+            exit "$status"
+          fi
+          echo "Socket Firewall was killed mid-install (exit 137) on attempt ${attempt}; retrying..."
+          sleep $((attempt * 10))
+        done
+        exit 137
+      shell: bash
