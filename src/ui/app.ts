@@ -846,7 +846,7 @@ export class App {
     return true;
   }
 
-  /** The growth choice: pick with ↑↓ or 1-3, ENTER confirms. Once confirmed it cannot be changed. */
+  /** The growth choice: pick with ↑↓ or 1-3, ENTER confirms, and U or BACKSPACE takes a confirmed choice back so another can be picked. It is final once the next morning starts. */
   private growthKey(key: string): boolean {
     const options = this.growthOptions;
     const before = this.growthSel;
@@ -867,6 +867,13 @@ export class App {
         this.say(`Chosen: ${picked.title}. It takes effect tomorrow. ENTER starts the next morning.`);
         this.sound('finish');
       }
+      return true;
+    }
+    if (key === 'u' || key === 'U' || key === 'Backspace') {
+      if (!this.growth) return false;
+      this.growth = null;
+      this.say('Choice taken back. Pick one of the three.');
+      this.sound('confirm');
       return true;
     }
     const number = /^[1-9]$/.test(key) && Number(key) <= options.length ? Number(key) - 1 : -1;
