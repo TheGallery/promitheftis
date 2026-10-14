@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { App, type Effects } from '../src/ui/app';
+import { allowCue, REPEAT_GAP, type CueArg, type Moment } from '../src/ui/cues';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 
 function fakeEffects() {
-  const log = { clicks: 0, printed: 0, sound: true };
+  const log = { cues: [] as { moment: Moment; arg?: CueArg }[], printed: 0, sound: true };
   const effects: Effects = {
-    click: () => void log.clicks++,
+    cue: (moment, arg) => void log.cues.push({ moment, arg }),
     print: (lines) => {
       log.printed = lines;
       return 100;
@@ -23,7 +24,14 @@ function newApp(morning: 'small' | 'big' = 'small') {
   const press = (...keys: string[]) => {
     for (const k of keys) app.press({ key: k });
   };
-  return { app, press, ...fx };
+  /** The sounds made by pressing each key in turn; an empty entry is a silent key. */
+  const heard = (...keys: string[]) =>
+    keys.map((k) => {
+      const before = fx.log.cues.length;
+      app.press({ key: k });
+      return fx.log.cues.slice(before).map((c) => c.moment);
+    });
+  return { app, press, heard, ...fx };
 }
 
 /** Every screen is exactly 120 columns by 30 rows. */
@@ -94,12 +102,142 @@ describe('overnight messages', () => {
     expect(log.sound).toBe(false);
   });
 
-  it('clicks for keys it uses and not for keys it does not', () => {
-    const { press, log } = newApp();
-    press('ArrowDown');
-    expect(log.clicks).toBe(1);
-    press('q');
-    expect(log.clicks).toBe(1);
+  it('makes no sound for keys it does not use', () => {
+    const { heard } = newApp();
+    expect(heard('ArrowDown', 'q')).toEqual([['move'], []]);
+  });
+});
+
+describe('sounds', () => {
+  it('makes a sound for each way of moving through the messages, and none at the ends', () => {
+    const { heard } = newApp();
+    expect(heard('ArrowUp', 'ArrowDown', 'PageDown', 'PageUp', 'ArrowUp')).toEqual([[], ['move'], ['move'], ['move'], []]);
+  });
+
+  it('makes the confirm sound for SPACE, B and S, and for F2 and F4', () => {
+    const { heard } = newApp();
+    expect(heard('b', 's', ' ', 'F2', 'F4')).toEqual([['confirm'], ['confirm'], ['confirm'], ['confirm'], ['confirm']]);
+  });
+
+  it('makes the move, tab and truck key sounds on the desk, and none when a move changes nothing', () => {
+    const { heard } = newApp();
+    heard(' ');
+    expect(heard('ArrowUp')).toEqual([[]]);
+    expect(heard('ArrowDown')).toEqual([['move']]);
+    expect(heard('Tab', 'Tab', 'ArrowDown', 'ArrowDown')).toEqual([['tab'], ['tab'], ['move'], ['move']]);
+    expect(heard('t')).toEqual([['truckKey']]);
+  });
+
+  it('tells a digit, a nudge either way and a backspace apart, and keeps still when the line cannot change', () => {
+    const { app, press, log } = newApp();
+    press(' ');
+    log.cues.length = 0;
+    press('3', 'ArrowRight', 'ArrowLeft', 'Backspace');
+    expect(log.cues).toEqual([
+      { moment: 'digit', arg: undefined },
+      { moment: 'nudge', arg: { dir: 1 } },
+      { moment: 'nudge', arg: { dir: -1 } },
+      { moment: 'digit', arg: undefined },
+    ]);
+    // Nothing more to take off: the key changes nothing and stays silent.
+    log.cues.length = 0;
+    press('Backspace', 'ArrowLeft');
+    expect(app.desk.given(0, 0)).toBe(0);
+    expect(log.cues.map((c) => c.moment)).toEqual([]);
+  });
+
+  it('makes the confirm sound for ENTER on a line and on an order, and no sound for a digit in another pane', () => {
+    const { heard } = newApp();
+    heard(' ');
+    expect(heard('Enter')).toEqual([['confirm']]);
+    heard('Tab', 'Tab');
+    expect(heard('5')).toEqual([[]]);
+    expect(heard('Enter')).toEqual([['confirm']]);
+  });
+
+  it('makes the truck sound when an order goes on a truck with lines still to do', () => {
+    const { heard } = newApp();
+    heard(' ');
+    expect(heard('t', '1')).toEqual([['truckKey'], ['truck']]);
+  });
+
+  it('makes the finish sound, not the confirm or truck sound, when an order is finished', () => {
+    const { app, press, heard } = newApp();
+    press(' ');
+    const lines = app.desk.order(0).lines.length;
+    const confirms = Array.from({ length: lines }, () => 'Enter');
+    expect(heard(...confirms)).toEqual(confirms.map(() => ['confirm']));
+    expect(heard('t', '2')).toEqual([['truckKey'], ['finish']]);
+
+    // The same, when ENTER on the last line is what finishes an order that already has a truck.
+    press('t', '2');
+    const next = app.desk.order(app.orderSel).lines.length;
+    const keys = Array.from({ length: next }, () => 'Enter');
+    const sounds = heard(...keys);
+    expect(sounds.slice(0, -1).every((s) => s[0] === 'confirm')).toBe(true);
+    expect(sounds.at(-1)).toEqual(['finish']);
+  });
+
+  it('makes the warning sound instead of the ordinary one', () => {
+    const { heard, press } = newApp();
+    press(' ');
+    expect(heard('t', '7')).toEqual([['truckKey'], ['warn']]);
+    // Ending the morning with orders left asks to be pressed again: a warning, then the ordinary sound.
+    expect(heard('F10', 'F10')).toEqual([['warn'], ['confirm']]);
+  });
+
+  it('makes the warning sound, and only that, when a truck is too full for an order', () => {
+    const { app, press, log } = newApp();
+    press(' ');
+    for (let i = 0; i < app.desk.orderCount && app.tone !== 'warn'; i++) handOutNext(press, app, 1);
+    expect(app.status).toContain('too full');
+    expect(log.cues.at(-1)).toEqual({ moment: 'warn', arg: undefined });
+    expect(log.cues.at(-2)?.moment).toBe('truckKey');
+  });
+
+  it('makes the sheet open and close sounds on the truck sheets, and keeps the printer to itself', () => {
+    const { app, press, heard, log } = newApp();
+    press(' ', 'Enter', 't', '1', 'F10', 'F10');
+    expect(app.screen).toBe('sheets');
+    expect(heard('ArrowUp')).toEqual([[]]);
+    expect(heard('ArrowDown')).toEqual([['move']]);
+    expect(heard('ArrowUp', 'Enter', 'Enter')).toEqual([['move'], ['sheetOpen'], ['sheetClose']]);
+    expect(heard('+', '+', '-', '-')).toEqual([['sheetOpen'], [], ['sheetClose'], []]);
+    expect(heard('p')).toEqual([[]]);
+    expect(log.printed).toBeGreaterThan(0);
+    expect(heard('Escape')).toEqual([['sheetClose']]);
+    expect(app.screen).toBe('desk');
+  });
+
+  it('makes the confirm sound when the trucks are sent and the move sound on the result', () => {
+    const { app, press, heard } = newApp();
+    press(' ', 'Enter', 't', '1', 'F10', 'F10');
+    expect(heard('F9')).toEqual([['confirm']]);
+    expect(app.screen).toBe('result');
+    expect(heard('ArrowUp', 'ArrowDown', 'q', 'r')).toEqual([[], ['move'], [], ['confirm']]);
+  });
+
+  it('plays nothing when the sounds are off: the effects decide, the app still asks', () => {
+    const { heard, log } = newApp();
+    expect(heard('F4')).toEqual([['confirm']]);
+    expect(log.sound).toBe(false);
+  });
+});
+
+describe('repeated sounds', () => {
+  it('drops the same moment within the repeat gap and lets a different one through', () => {
+    const last = new Map<Moment, number>();
+    expect(allowCue(last, 'move', 1)).toBe(true);
+    expect(allowCue(last, 'move', 1 + REPEAT_GAP / 2)).toBe(false);
+    expect(allowCue(last, 'warn', 1 + REPEAT_GAP / 2)).toBe(true);
+    expect(allowCue(last, 'move', 1 + REPEAT_GAP)).toBe(true);
+  });
+
+  it('measures the gap from the last sound that was played, not the last that was dropped', () => {
+    const last = new Map<Moment, number>();
+    expect(allowCue(last, 'move', 0)).toBe(true);
+    expect(allowCue(last, 'move', 0.02)).toBe(false);
+    expect(allowCue(last, 'move', 0.03)).toBe(true);
   });
 });
 

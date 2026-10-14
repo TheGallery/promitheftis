@@ -9,7 +9,7 @@ if (!screen) throw new Error('missing #screen');
 const sounds = new Sounds();
 const app: App = new App(
   {
-    click: (strong) => sounds.click(strong),
+    cue: (moment, arg) => sounds.cue(moment, arg),
     print: (lines) => sounds.print(lines),
     later: (fn, ms) => void window.setTimeout(fn, ms),
     toggleSound: () => sounds.toggle(),

@@ -75,7 +75,7 @@ Plain TypeScript with Vite and no UI framework; Vitest for tests.
 
 ## Sounds and fonts
 
-The key clicks and the dot-matrix printer are made in code with the Web Audio API, so there are no sound files. The font is [JetBrains Mono](https://www.jetbrains.com/lp/mono/), used under the SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+The sounds are made in code with the Web Audio API, so there are no sound files: gentle "soft key" keyboard clicks, a little deeper for ENTER, with a low double knock when an order is finished and a soft double thud for a warning, and the dot-matrix printer on the truck sheets. Each key press makes one sound at most, and a key that changes nothing is silent. The font is [JetBrains Mono](https://www.jetbrains.com/lp/mono/), used under the SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 
 ## License
 

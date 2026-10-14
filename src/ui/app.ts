@@ -3,6 +3,7 @@ import { Desk } from '../game/desk';
 import { loadMorning } from '../game/morning';
 import { buildResult, type MorningResult } from '../game/results';
 import type { Morning } from '../game/types';
+import type { CueArg, Moment } from './cues';
 import { plural } from './format';
 
 export type Screen = 'messages' | 'desk' | 'sheets' | 'result';
@@ -14,8 +15,8 @@ const MAX_DIGITS = 3;
 
 /** What the app needs from the browser, so the game can run without one. */
 export interface Effects {
-  /** A key click. */
-  click(strong: boolean): void;
+  /** The sound for one moment of play; at most one per key press. */
+  cue(moment: Moment, arg?: CueArg): void;
   /** Starts the dot-matrix printer for this many lines; returns how long it will run, in ms. */
   print(lines: number): number;
   /** Runs `fn` after `ms`. */
@@ -51,6 +52,8 @@ export class App {
   typed = '';
   truckPending = false;
   private confirmEnd = false;
+  /** The sound this key press makes: the last one asked for wins. Null is silence. */
+  private heard: { moment: Moment; arg?: CueArg } | null = null;
 
   sheetSel = 0;
   sheetOpen = new Set<number>();
@@ -76,21 +79,36 @@ export class App {
     this.confirmEnd = false;
     this.status = '';
     this.tone = 'info';
+    this.heard = null;
 
     const handled = this.route(key, shift, wasConfirming);
-    if (handled) this.effects.click(key === 'Enter' || key === ' ' || key.startsWith('F'));
+    if (handled) {
+      // One sound per key press: a warning replaces the ordinary sound, and a key that changed nothing is silent.
+      const heard = this.heardNow();
+      if (heard) this.effects.cue(heard.moment, heard.arg);
+    }
     this.changed();
     return handled;
+  }
+
+  private heardNow(): { moment: Moment; arg?: CueArg } | null {
+    return this.tone === 'warn' ? { moment: 'warn' } : this.heard;
+  }
+
+  private sound(moment: Moment, arg?: CueArg): void {
+    this.heard = { moment, arg };
   }
 
   private route(key: string, shift: boolean, wasConfirming: boolean): boolean {
     if (key === 'F2') {
       this.blue = !this.blue;
+      this.sound('confirm');
       return true;
     }
     if (key === 'F4') {
       this.soundOn = this.effects.toggleSound();
       this.say(this.soundOn ? 'Sound on.' : 'Sound off.');
+      this.sound('confirm');
       return true;
     }
     switch (this.screen) {
@@ -113,32 +131,39 @@ export class App {
   // ------------------------------------------------------------ messages
   private messagesKey(key: string): boolean {
     const last = this.morning.messages.length - 1;
+    const before = this.msgSel;
     switch (key) {
       case 'ArrowUp':
         this.msgSel = Math.max(0, this.msgSel - 1);
-        return true;
+        break;
       case 'ArrowDown':
         this.msgSel = Math.min(last, this.msgSel + 1);
-        return true;
+        break;
       case 'PageUp':
         this.msgSel = Math.max(0, this.msgSel - 10);
-        return true;
+        break;
       case 'PageDown':
         this.msgSel = Math.min(last, this.msgSel + 10);
-        return true;
+        break;
       case ' ':
         this.screen = 'desk';
+        this.sound('confirm');
         return true;
       case 'b':
       case 'B':
         this.loadMorning('big');
+        this.sound('confirm');
         return true;
       case 's':
       case 'S':
         this.loadMorning('small');
+        this.sound('confirm');
         return true;
+      default:
+        return false;
     }
-    return false;
+    if (this.msgSel !== before) this.sound('move');
+    return true;
   }
 
   /** Starts over with a morning, back at its overnight messages. */
@@ -176,6 +201,7 @@ export class App {
     switch (key) {
       case 'Tab':
         this.nextPane(shift ? -1 : 1);
+        this.sound('tab');
         return true;
       case 'F10':
         this.endMorning(wasConfirming);
@@ -184,6 +210,7 @@ export class App {
       case 'T':
         this.truckPending = true;
         this.say('T: now press the truck number, 1 to 9.');
+        this.sound('truckKey');
         return true;
       case 'ArrowUp':
         this.moveWithin(-1);
@@ -194,8 +221,11 @@ export class App {
       case 'ArrowLeft':
       case 'ArrowRight':
         if (this.pane === 'lines') {
-          this.desk.nudgeGive(this.orderSel, this.lineSel, key === 'ArrowRight' ? 1 : -1);
+          const dir = key === 'ArrowRight' ? 1 : -1;
+          const before = this.desk.given(this.orderSel, this.lineSel);
+          this.desk.nudgeGive(this.orderSel, this.lineSel, dir);
           this.noteTruckFull();
+          if (this.desk.given(this.orderSel, this.lineSel) !== before) this.sound('nudge', { dir });
         }
         return true;
       case 'Enter':
@@ -226,6 +256,12 @@ export class App {
   }
 
   private moveWithin(step: number): void {
+    const before = [this.orderSel, this.lineSel, this.truckSel];
+    this.stepWithin(step);
+    if (before.some((n, i) => n !== [this.orderSel, this.lineSel, this.truckSel][i])) this.sound('move');
+  }
+
+  private stepWithin(step: number): void {
     if (this.pane === 'orders') {
       this.orderSel = Math.max(0, Math.min(this.desk.orderCount - 1, this.orderSel + step));
       this.lineSel = this.desk.firstUndecidedLine(this.orderSel);
@@ -241,12 +277,14 @@ export class App {
   private typeDigit(digit: string | null): void {
     const o = this.orderSel;
     const l = this.lineSel;
+    const before = [this.typed, this.desk.given(o, l)];
     if (digit === null) this.typed = this.typed.slice(0, -1);
     else if (this.typed.length < MAX_DIGITS) this.typed += digit;
     const wanted = this.typed === '' ? 0 : Number(this.typed);
     const used = this.desk.setGive(o, l, wanted);
     if (this.typed !== '') this.typed = String(used);
     this.noteTruckFull(wanted > used);
+    if (this.typed !== before[0] || this.desk.given(o, l) !== before[1]) this.sound('digit');
   }
 
   /** Says why a line cannot take any more, when it is the truck and not the stock. */
@@ -267,6 +305,7 @@ export class App {
     if (this.pane === 'orders') {
       this.pane = 'lines';
       this.lineSel = this.desk.firstUndecidedLine(this.orderSel);
+      this.sound('confirm');
     } else if (this.pane === 'trucks') {
       const truck = this.morning.trucks[this.truckSel];
       if (truck) this.pickTruck(truck.id);
@@ -282,6 +321,7 @@ export class App {
     const l = this.lineSel;
     d.acceptLine(o, l);
     this.typed = '';
+    this.sound('confirm');
     if (l < d.order(o).lines.length - 1) {
       this.lineSel = l + 1;
       return;
@@ -295,6 +335,7 @@ export class App {
       this.say('Now pick a truck: T then 1 to 9, or ENTER on the one marked.');
     } else {
       d.finishOrder(o);
+      this.sound('finish');
       this.advance();
     }
   }
@@ -313,8 +354,10 @@ export class App {
     this.truckSel = this.truckIndexOf(truckId) ?? this.truckSel;
     if (d.allLinesDecided(o)) {
       d.finishOrder(o);
+      this.sound('finish');
       this.advance();
     } else {
+      this.sound('truck');
       this.pane = 'lines';
       this.lineSel = d.firstUndecidedLine(o);
       this.say(`${d.order(o).client} goes on truck ${truckId}. Some lines are still to do.`);
@@ -343,6 +386,7 @@ export class App {
       return;
     }
     this.screen = 'sheets';
+    this.sound('confirm');
     this.sheetSel = 0;
     this.sheetOpen = new Set();
     this.printed = false;
@@ -353,31 +397,40 @@ export class App {
   // ------------------------------------------------------------ truck sheets
   private sheetsKey(key: string): boolean {
     const last = this.morning.trucks.length - 1;
+    const before = this.sheetSel;
+    const openBefore = this.sheetOpen.size;
     switch (key) {
       case 'ArrowUp':
         this.sheetSel = Math.max(0, this.sheetSel - 1);
+        if (this.sheetSel !== before) this.sound('move');
         return true;
       case 'ArrowDown':
         this.sheetSel = Math.min(last, this.sheetSel + 1);
+        if (this.sheetSel !== before) this.sound('move');
         return true;
       case 'Enter':
         if (this.sheetOpen.has(this.sheetSel)) this.sheetOpen.delete(this.sheetSel);
         else this.sheetOpen.add(this.sheetSel);
+        this.sound(this.sheetOpen.size > openBefore ? 'sheetOpen' : 'sheetClose');
         return true;
       case '+':
       case '=':
         this.sheetOpen = new Set(this.morning.trucks.map((_, i) => i));
+        if (this.sheetOpen.size !== openBefore) this.sound('sheetOpen');
         return true;
       case '-':
       case '_':
         this.sheetOpen = new Set();
+        if (openBefore > 0) this.sound('sheetClose');
         return true;
       case 'p':
       case 'P':
+        // The printer is the sound of this key.
         this.startPrint();
         return true;
       case 'Escape':
         this.screen = 'desk';
+        this.sound('sheetClose');
         return true;
       case 'F9':
         this.sendTrucks();
@@ -423,37 +476,45 @@ export class App {
     this.result = buildResult(this.desk, departAt);
     this.resultSel = 0;
     this.screen = 'result';
+    this.sound('confirm');
   }
 
   // ------------------------------------------------------------ result
   private resultKey(key: string): boolean {
     const last = this.morning.orders.length - 1;
+    const before = this.resultSel;
     switch (key) {
       case 'ArrowUp':
         this.resultSel = Math.max(0, this.resultSel - 1);
-        return true;
+        break;
       case 'ArrowDown':
         this.resultSel = Math.min(last, this.resultSel + 1);
-        return true;
+        break;
       case 'PageUp':
         this.resultSel = Math.max(0, this.resultSel - 10);
-        return true;
+        break;
       case 'PageDown':
         this.resultSel = Math.min(last, this.resultSel + 10);
-        return true;
+        break;
       case 'r':
       case 'R':
         this.loadMorning(this.morning.id);
+        this.sound('confirm');
         return true;
       case 'b':
       case 'B':
         this.loadMorning('big');
+        this.sound('confirm');
         return true;
       case 's':
       case 'S':
         this.loadMorning('small');
+        this.sound('confirm');
         return true;
+      default:
+        return false;
     }
-    return false;
+    if (this.resultSel !== before) this.sound('move');
+    return true;
   }
 }

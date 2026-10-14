@@ -1,11 +1,19 @@
+import { allowCue, type CueArg, type Moment } from './cues';
+import { playSoftKey } from './softkeys';
+
+/** The loudness the key sounds start at: a volume of 0.40 on the curve gain = volume^1.6. */
+const KEY_VOLUME = Math.pow(0.4, 1.6);
+
 /**
- * Key clicks and the dot-matrix printer, made in code with Web Audio so there
- * are no sound files to license. The audio context is created on the first key
- * press, as browsers require.
+ * Soft key clicks and the dot-matrix printer, made in code with Web Audio so
+ * there are no sound files to license. The audio context is created on the
+ * first key press, as browsers require.
  */
 export class Sounds {
   private ctx: AudioContext | null = null;
   private noise: AudioBuffer | null = null;
+  private master: GainNode | null = null;
+  private readonly lastCue = new Map<Moment, number>();
   enabled = true;
 
   private context(): AudioContext | null {
@@ -18,6 +26,16 @@ export class Sounds {
       this.noise = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+      // The key sounds go through a master volume and a gentle limiter.
+      this.master = this.ctx.createGain();
+      this.master.gain.value = KEY_VOLUME;
+      const limiter = this.ctx.createDynamicsCompressor();
+      limiter.threshold.value = -20;
+      limiter.knee.value = 12;
+      limiter.ratio.value = 4;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.12;
+      this.master.connect(limiter).connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     return this.ctx;
@@ -28,35 +46,12 @@ export class Sounds {
     return this.enabled;
   }
 
-  /** A short click, a little lower and heavier for ENTER and SPACE. */
-  click(strong: boolean): void {
+  /** The sound of one moment of play, in the Soft keys set. A quick repeat of the same moment is dropped. */
+  cue(moment: Moment, arg: CueArg = {}): void {
     const ctx = this.context();
-    if (!ctx || !this.noise) return;
-    const now = ctx.currentTime;
-    const src = ctx.createBufferSource();
-    src.buffer = this.noise;
-    src.playbackRate.value = 0.9 + Math.random() * 0.25;
-    const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.value = strong ? 1400 : 2600;
-    band.Q.value = 0.9;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(strong ? 0.5 : 0.32, now + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0005, now + (strong ? 0.05 : 0.03));
-    src.connect(band).connect(gain).connect(ctx.destination);
-    src.start(now, Math.random() * 0.5, 0.06);
-    if (strong) {
-      const thump = ctx.createOscillator();
-      const tg = ctx.createGain();
-      thump.frequency.setValueAtTime(170, now);
-      thump.frequency.exponentialRampToValueAtTime(80, now + 0.04);
-      tg.gain.setValueAtTime(0.18, now);
-      tg.gain.exponentialRampToValueAtTime(0.0005, now + 0.05);
-      thump.connect(tg).connect(ctx.destination);
-      thump.start(now);
-      thump.stop(now + 0.06);
-    }
+    if (!ctx || !this.noise || !this.master) return;
+    if (!allowCue(this.lastCue, moment, performance.now() / 1000)) return;
+    playSoftKey(moment, { ctx, out: this.master, noise: this.noise }, ctx.currentTime, arg);
   }
 
   /**
