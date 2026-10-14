@@ -221,6 +221,26 @@ describe('the supplier ordering screen', () => {
     expect(withNote).toHaveLength(new Set(noted.map((c) => c.item)).size);
   });
 
+  it('leaves the supplier screen without amounts, and the result screen shows them', () => {
+    const { app, press } = toResult(0);
+    const text = screen(app).join('\n');
+    for (const call of app.calls.filter((c) => c.qty != null)) expect(text).toContain(`added ${call.qty} to tomorrow`);
+    press('Enter');
+    const supplier = screen(app).join('\n');
+    expect(supplier).not.toContain('PROMISED');
+    expect(supplier).not.toContain('promised');
+    expect(supplier).not.toMatch(/added \d+ to tomorrow/);
+  });
+
+  it('keeps the amounts typed when going back to the result screen and in again', () => {
+    const { app, press } = toResult(0);
+    press('Enter', '5', 'ArrowDown', '7', 'Escape');
+    expect(app.screen).toBe('result');
+    press('Enter');
+    expect(app.supply!.amount(0)).toBe(5);
+    expect(app.supply!.amount(1)).toBe(7);
+  });
+
   it('shows no notes when every call was answered "not today"', () => {
     const { app, press } = toResult(1);
     press('Enter');
