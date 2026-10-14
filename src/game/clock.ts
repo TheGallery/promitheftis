@@ -15,3 +15,5 @@ export function formatTime(minutes: number): string {
 }
 /** The supplier is rung at 13:00. */
 export const SUPPLIER_MINUTE = 13 * 60;
+/** The day is wrapped up at 18:00. */
+export const DAY_END_MINUTE = 18 * 60;

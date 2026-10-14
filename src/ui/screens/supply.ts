@@ -1,5 +1,4 @@
 import { SUPPLIER_MINUTE } from '../../game/clock';
-import { plainName } from '../../game/headsup';
 import type { RoomSpace } from '../../game/rooms';
 import { KEPT_LABEL, KEPT_ORDER, type Supply } from '../../game/supply';
 import type { Kept } from '../../game/types';
@@ -83,7 +82,7 @@ function padTo(line: Line, w: number): Line {
 }
 
 function orderCell(app: App, supply: Supply, r: number): Line {
-  const editing = !supply.placed && r === app.supplySel;
+  const editing = r === app.supplySel;
   if (editing) return s(`[${String(supply.amount(r)).padStart(3)}_]`.padStart(9), 'cur');
   const amount = supply.amount(r);
   return s(String(amount).padStart(9), amount === 0 ? 'd' : 'acc');
@@ -102,7 +101,7 @@ function noteLines(supply: Supply, itemId: string): Line[] {
 function panel(app: App, supply: Supply): Line[] {
   const out: Line[] = [legend(), []];
   for (const kept of KEPT_ORDER) out.push(cat(s(' '), roomLine(kept, supply.roomSpace(kept))));
-  const row = supply.placed ? undefined : supply.rows[app.supplySel];
+  const row = supply.rows[app.supplySel];
   if (row) out.push([], ...noteLines(supply, row.item.id));
   return out;
 }
@@ -115,7 +114,7 @@ function rows(app: App, supply: Supply): Line[] {
       kept = row.kept;
       out.push(s(` ${KEPT_LABEL[row.kept]}`, 'b'));
     }
-    const current = !supply.placed && r === app.supplySel;
+    const current = r === app.supplySel;
     const done = supply.isConfirmed(r);
     const noted = (supply.notes.get(row.item.id)?.length ?? 0) > 0;
     const rest = `${String(row.onHand).padStart(9)}${String(row.usual).padStart(8)}`;
@@ -133,29 +132,16 @@ function rows(app: App, supply: Supply): Line[] {
   return out.map((line, i) => (side[i] && side[i]!.length ? cat(padTo(line, PANEL_AT), side[i]!) : line));
 }
 
-function placedBlock(supply: Supply): Line[] {
-  const list = supply
-    .ordered()
-    .map((o) => `${o.amount} × ${plainName(o.item.name)}`)
-    .join(', ');
-  return [
-    [],
-    s(' ORDER PLACED FOR TOMORROW', 'acc b'),
-    ...wrapText(list, 116).slice(0, 4).map((t) => s(` ${t}`)),
-  ];
-}
-
 export function supplyScreen(app: App): Line[] {
   const supply = app.supply;
   const top = header('SUPPLIER ORDER', clockLine(SUPPLIER_MINUTE));
   if (!supply) return layout(top, [], [rule(), [], keyBar([['F2', 'colours'], ['F4', 'sound']])]);
-  const body = [...rows(app, supply)];
-  if (supply.placed) body.push(...placedBlock(supply));
+  const body = rows(app, supply);
   const status = app.status
     ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
     : s(` Tomorrow's order: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')}. Stock arrives the next morning.`, 'd');
-  const keys: Array<readonly [string, string]> = supply.placed
-    ? [['ESC', 'back'], ['R', 'play again'], ['B', 'big morning'], ['S', 'small morning']]
-    : [['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next row'], ['U', 'fill row'], ['A', 'fill all'], ['F9', 'place order'], ['ESC', 'back']];
+  const keys: Array<readonly [string, string]> = [
+    ['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next row'], ['U', 'fill row'], ['A', 'fill all'], ['F9', 'place order'], ['ESC', 'back'],
+  ];
   return layout(top, body, [rule(), status, keyBar([...keys, ['F2', 'colours'], ['F4', 'sound']])]);
 }

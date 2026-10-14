@@ -1,5 +1,6 @@
 import { buildCalls, callLine, type Call } from '../game/calls';
 import { DEPART_MINUTE } from '../game/clock';
+import { buildDay, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
 import { loadMorning } from '../game/morning';
 import { buildResult, type MorningResult } from '../game/results';
@@ -9,7 +10,7 @@ import type { Morning } from '../game/types';
 import type { CueArg, Moment } from './cues';
 import { plural } from './format';
 
-export type Screen = 'messages' | 'desk' | 'sheets' | 'road' | 'result' | 'supply';
+export type Screen = 'messages' | 'desk' | 'sheets' | 'road' | 'result' | 'supply' | 'day';
 export type Pane = 'orders' | 'lines' | 'trucks';
 export type Tone = 'info' | 'warn';
 
@@ -87,6 +88,9 @@ export class App {
   supplySel = 0;
   supplyTyped = '';
 
+  day: DaySummary | null = null;
+  daySel = 0;
+
   constructor(
     private readonly effects: Effects,
     private readonly changed: () => void = () => {},
@@ -148,6 +152,8 @@ export class App {
         return this.resultKey(key);
       case 'supply':
         return this.supplyKey(key);
+      case 'day':
+        return this.dayKey(key);
     }
   }
 
@@ -219,6 +225,8 @@ export class App {
     this.supply = null;
     this.supplySel = 0;
     this.supplyTyped = '';
+    this.day = null;
+    this.daySel = 0;
   }
 
   // ------------------------------------------------------------ order desk
@@ -664,26 +672,7 @@ export class App {
       case 'F9':
         this.placeOrder(supply);
         return true;
-      case 'r':
-      case 'R':
-        if (!supply.placed) break;
-        this.loadMorning(this.morning.id);
-        this.sound('confirm');
-        return true;
-      case 'b':
-      case 'B':
-        if (!supply.placed) break;
-        this.loadMorning('big');
-        this.sound('confirm');
-        return true;
-      case 's':
-      case 'S':
-        if (!supply.placed) break;
-        this.loadMorning('small');
-        this.sound('confirm');
-        return true;
     }
-    if (supply.placed) return false;
     switch (key) {
       case 'ArrowUp':
       case 'ArrowDown': {
@@ -740,18 +729,55 @@ export class App {
   }
 
   private placeOrder(supply: Supply): void {
-    if (supply.placed) {
-      this.say('The order is already placed.', 'warn');
-      return;
-    }
     if (supply.total() === 0) {
       this.say('Nothing is on the order yet: type amounts, U fills a row, A fills them all.', 'warn');
       return;
     }
     supply.placed = true;
     this.supplyTyped = '';
-    const lines = supply.ordered().length;
-    this.say(`Order placed for tomorrow: ${plural(lines, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
+    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply);
+    this.daySel = 0;
+    this.screen = 'day';
+    this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');
+  }
+
+  // ------------------------------------------------------------ end of the day
+  private dayKey(key: string): boolean {
+    const last = (this.day?.orders.length ?? 1) - 1;
+    const before = this.daySel;
+    switch (key) {
+      case 'ArrowUp':
+        this.daySel = Math.max(0, this.daySel - 1);
+        break;
+      case 'ArrowDown':
+        this.daySel = Math.min(last, this.daySel + 1);
+        break;
+      case 'PageUp':
+        this.daySel = Math.max(0, this.daySel - 10);
+        break;
+      case 'PageDown':
+        this.daySel = Math.min(last, this.daySel + 10);
+        break;
+      case 'r':
+      case 'R':
+        this.loadMorning(this.morning.id);
+        this.sound('confirm');
+        return true;
+      case 'b':
+      case 'B':
+        this.loadMorning('big');
+        this.sound('confirm');
+        return true;
+      case 's':
+      case 'S':
+        this.loadMorning('small');
+        this.sound('confirm');
+        return true;
+      default:
+        return false;
+    }
+    if (this.daySel !== before) this.sound('move');
+    return true;
   }
 }

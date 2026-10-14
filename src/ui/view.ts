@@ -1,5 +1,6 @@
 import type { App } from './app';
 import { toHtml, type Line } from './grid';
+import { dayScreen } from './screens/day';
 import { deskScreen } from './screens/desk';
 import { messagesScreen } from './screens/messages';
 import { roadScreen } from './screens/road';
@@ -22,6 +23,8 @@ export function screenLines(app: App): Line[] {
       return resultScreen(app);
     case 'supply':
       return supplyScreen(app);
+    case 'day':
+      return dayScreen(app);
   }
 }
 
