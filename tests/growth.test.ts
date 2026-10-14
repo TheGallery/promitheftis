@@ -114,8 +114,10 @@ describe('choosing what to grow', () => {
     expect(app.growthSel).toBe(2);
     press('1');
     expect(app.growthSel).toBe(0);
+    press('4');
+    expect(app.growthSel).toBe(0);
     press('9');
-    expect(app.growthSel).toBe(2);
+    expect(app.growthSel).toBe(0);
     expect(app.growth).toBeNull();
   });
 

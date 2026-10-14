@@ -831,7 +831,7 @@ export class App {
       }
       return true;
     }
-    const number = /^[1-9]$/.test(key) ? Number(key) - 1 : -1;
+    const number = /^[1-9]$/.test(key) && Number(key) <= options.length ? Number(key) - 1 : -1;
     if (key === 'ArrowUp' || key === 'ArrowDown' || number >= 0) {
       if (this.growth) return true;
       const to = number >= 0 ? number : this.growthSel + (key === 'ArrowUp' ? -1 : 1);
