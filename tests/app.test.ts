@@ -418,6 +418,23 @@ describe('a whole small morning', () => {
     return t;
   }
 
+  it('shows the game name in the header of every screen', () => {
+    const { app, press } = play();
+    const header = () => expectFullScreen(app)[0];
+    press('F10');
+    expect(app.screen).toBe('sheets');
+    expect(header()).toContain(' PROMITHEFTIS · ');
+    press('F9');
+    expect(app.screen).toBe('result');
+    expect(header()).toContain(' PROMITHEFTIS · ');
+    press('r');
+    expect(app.screen).toBe('messages');
+    expect(header()).toContain(' PROMITHEFTIS · ');
+    press(' ');
+    expect(app.screen).toBe('desk');
+    expect(header()).toContain(' PROMITHEFTIS · ');
+  });
+
   it('finishes every order and says so', () => {
     const { app } = play();
     expect(app.desk.unfinishedCount()).toBe(0);

@@ -104,7 +104,7 @@ export function bar(pct: number, cells: number, extra = ''): Line {
 
 /** Header line and rule: title on the left, date and clock on the right. */
 export function header(title: string, right: Line): Line[] {
-  return [spread(s(' PROVISIONS · ' + title, 'b'), right), rule()];
+  return [spread(s(' PROMITHEFTIS · ' + title, 'b'), right), rule()];
 }
 
 /** The key-hint bar along the bottom of every screen. */
