@@ -16,6 +16,10 @@ const TIME_BEFORE = 40;
 /** A client does not ring until the trucks have been out this long. */
 const FIRST_RING_AFTER = 10;
 
+/** A forgotten item is asked for in a small amount: this many, up to span - 1 more. */
+const FORGOT_QTY_MIN = 2;
+const FORGOT_QTY_SPAN = 4;
+
 export type CallKind = 'short' | 'time' | 'forgot';
 
 export interface CallOption {
@@ -40,6 +44,8 @@ export interface Call {
   topic: string;
   /** The item the call is about, when it is about one. */
   item?: string;
+  /** How many the client is promised for tomorrow if the player adds them: what was missing, or what they ask for. */
+  qty?: number;
   say: string;
   options: CallOption[];
 }
@@ -113,6 +119,7 @@ function shortCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | u
   const worst = o.shortLines.slice().sort((a, b) => a.given / a.asked - b.given / b.asked)[0];
   if (!worst) return undefined;
   const item = plainName(desk.item(worst.item).name);
+  const qty = worst.asked - worst.given;
   return {
     kind: 'short',
     at: (o.arriveAt as number) + SHORT_AFTER,
@@ -121,12 +128,13 @@ function shortCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | u
     contact: contactOf(desk, o),
     topic: `short on ${item}`,
     item: worst.item,
+    qty,
     say:
       worst.given === 0
         ? `The delivery came, thank you! But there was no ${item} in it, and we asked for ${worst.asked}. Is some coming?`
         : `The delivery came, thank you! But we only got ${worst.given} of the ${worst.asked} ${item}. Is some more coming?`,
     options: [
-      { label: "Add the rest to tomorrow's order", record: 'added to tomorrow', addsToOrder: true },
+      { label: "Add the rest to tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
       { label: 'Sorry, nothing more today', record: 'told not today' },
     ],
   };
@@ -139,6 +147,7 @@ function forgotCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | 
   const item = items[(o.orderIndex * 5 + 2) % items.length];
   if (!item) return undefined;
   const name = plainName(item.name);
+  const qty = FORGOT_QTY_MIN + (o.orderIndex * 3 + items.indexOf(item)) % FORGOT_QTY_SPAN;
   return {
     kind: 'forgot',
     at: (o.arriveAt as number) + FORGOT_AFTER,
@@ -147,9 +156,10 @@ function forgotCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | 
     contact: contactOf(desk, o),
     topic: `asked for ${name}`,
     item: item.id,
-    say: `Silly me, I forgot to put ${name} on the order. Could you send some?`,
+    qty,
+    say: `Silly me, I forgot to put ${name} on the order. Could you send ${qty}?`,
     options: [
-      { label: "I'll add it to tomorrow's order", record: 'added to tomorrow', addsToOrder: true },
+      { label: "I'll add it to tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
       { label: 'Sorry, not today', record: 'told not today' },
     ],
   };

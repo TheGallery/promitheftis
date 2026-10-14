@@ -687,6 +687,32 @@ describe('a whole small morning', () => {
     expect(text).toContain('told not today');
   });
 
+  it('goes on to an indented second line when a call line is too long, so the amount always shows', () => {
+    const { app, press } = play();
+    press('F10', 'F9');
+    leaveRoad(press, app);
+    const base = app.calls.find((c) => c.kind === 'short')!;
+    const long = {
+      ...base,
+      id: 99,
+      client: 'The Grand Harbourside Seafood Brasserie',
+      topic: 'short on extra-large frozen king prawns',
+      qty: 12,
+      options: [{ label: "Add the rest to tomorrow's order", record: 'added 12 to tomorrow', addsToOrder: true }],
+    };
+    app.calls = [...app.calls, long];
+    app.answers.set(99, 0);
+    const lines = expectFullScreen(app);
+    const at = lines.findIndex((l) => l.includes('The Grand Harbourside Seafood Brasserie'));
+    expect(at).toBeGreaterThan(-1);
+    const rows = [lines[at]!, lines[at + 1]!].map((l) => l.slice(0, 58).trimEnd());
+    expect(rows[0]).not.toContain('…');
+    expect(rows[1]).toMatch(/^ {3}\S/);
+    expect(rows.map((r) => r.trim()).join(' ')).toBe(
+      'The Grand Harbourside Seafood Brasserie · short on extra-large frozen king prawns · added 12 to tomorrow',
+    );
+  });
+
   it('forgets the calls when the morning is played again', () => {
     const { app, press } = play();
     press('F10', 'F9');
@@ -773,6 +799,12 @@ describe('the big morning', () => {
     expect(app.callLines).toHaveLength(app.calls.length);
     press('Enter');
     expect(app.screen).toBe('result');
+    // Every call is on the screen in full, below the CALLS heading of the left column.
+    const left = expectFullScreen(app).map((l) => l.slice(0, 58).trimEnd());
+    const calls = left.slice(left.findIndex((l) => l === ' CALLS') + 1).filter((l) => l.startsWith(' '));
+    expect(calls.join('\n')).not.toContain('…');
+    const joined = calls.map((l) => l.trim()).join(' ');
+    for (const line of app.callLines) expect(joined).toContain(line);
     for (let i = 0; i < 40; i++) {
       press('ArrowDown');
       expectFullScreen(app);

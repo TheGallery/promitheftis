@@ -50,11 +50,18 @@ function leftColumn(app: App): Line[] {
   return [...out, ...calls];
 }
 
-/** One short line for each call that was answered on the road. */
+/** One short line for each call that was answered on the road; a long one goes on, indented, under it. */
 function callsBlock(app: App): Line[] {
   const lines = app.callLines;
   if (lines.length === 0) return [];
-  return [[], s(' CALLS', 'b'), ...lines.map((l) => s(` ${clip(l, LEFT_W - 2)}`))];
+  return [[], s(' CALLS', 'b'), ...lines.flatMap(callRows)];
+}
+
+/** A call line as rows of the left column, never cut: the amount and the answer always show. */
+function callRows(line: string): Line[] {
+  const first = wrapText(line, LEFT_W - 2)[0] ?? '';
+  const rest = line.slice(first.length).trim();
+  return [s(` ${first}`), ...(rest ? wrapText(rest, LEFT_W - 4) : []).map((r) => s(`   ${r}`))];
 }
 
 function rightColumn(app: App): Line[] {

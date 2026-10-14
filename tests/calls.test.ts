@@ -73,6 +73,32 @@ describe('buildCalls', () => {
     expect(ordered.some((name) => call!.say.includes(name))).toBe(false);
   });
 
+  it('promises a short client exactly what was missing', () => {
+    const { result, calls } = smallDay();
+    for (const call of calls.filter((c) => c.kind === 'short')) {
+      const line = result.orders[call.orderIndex]!.shortLines.find((l) => l.item === call.item)!;
+      expect(call.qty).toBe(line.asked - line.given);
+      expect(call.qty).toBeGreaterThan(0);
+      expect(call.options[0]!.record).toBe(`added ${call.qty} to tomorrow`);
+    }
+  });
+
+  it('has a client who forgot an item name a small amount, and promises that amount', () => {
+    for (const day of [smallDay()]) {
+      for (const call of day.calls.filter((c) => c.kind === 'forgot')) {
+        expect(call.qty).toBeGreaterThanOrEqual(2);
+        expect(call.qty).toBeLessThanOrEqual(5);
+        expect(call.say).toContain(`Could you send ${call.qty}?`);
+        expect(call.options[0]!.record).toBe(`added ${call.qty} to tomorrow`);
+      }
+    }
+  });
+
+  it('gives a time call no amount', () => {
+    const call = smallDay().calls.find((c) => c.kind === 'time')!;
+    expect(call.qty).toBeUndefined();
+  });
+
   it('quotes a delivery time that matches the route', () => {
     const { result, calls } = smallDay();
     const call = calls.find((c) => c.kind === 'time');
@@ -93,7 +119,7 @@ describe('buildCalls', () => {
   it('writes a short line for each answer', () => {
     const { calls } = smallDay();
     const call = calls.find((c) => c.kind === 'short')!;
-    expect(callLine(call, 0)).toBe(`${call.client} · ${call.topic} · added to tomorrow`);
+    expect(callLine(call, 0)).toBe(`${call.client} · ${call.topic} · added ${call.qty} to tomorrow`);
     expect(callLine(call, 1)).toContain('told not today');
   });
 
