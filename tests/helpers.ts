@@ -8,6 +8,7 @@ import { buildResult } from '../src/game/results';
 import { buildRoad, ROAD_TICK_MS } from '../src/game/road';
 import { stockAfterDeliveries, Supply } from '../src/game/supply';
 import { App, type Effects } from '../src/ui/app';
+import { memoryStore, type Store } from '../src/ui/store';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 
@@ -39,12 +40,14 @@ export function summary(answer: number, leaveOut: string[] = [], amounts: Record
   return { d, result, calls, answers, supply, day: buildDay(result, calls, answers, supply) };
 }
 
-export function fakeEffects(cues: string[] = [], random: () => number = () => 0): Effects {
+export function fakeEffects(cues: string[] = [], random: () => number = () => 0, store: Store = memoryStore()): Effects {
   return {
     cue: (moment) => void cues.push(moment),
     print: () => 100,
     later: (fn, ms) => (ms === ROAD_TICK_MS ? undefined : fn()),
     toggleSound: () => true,
+    setSound: () => {},
+    store,
     now: (() => {
       let t = 0;
       return () => (t += 1000);
@@ -60,8 +63,9 @@ export function toDay(
   typed = ['a'],
   cues: string[] = [],
   random: () => number = () => 0,
+  store: Store = memoryStore(),
 ) {
-  const app = new App(fakeEffects(cues, random), () => {}, morning);
+  const app = new App(fakeEffects(cues, random, store), () => {}, morning);
   const press = (...keys: string[]) => keys.forEach((key) => app.press({ key }));
   press(' ');
   if (morning === 'small') {
@@ -86,6 +90,13 @@ export function toDay(
   }
   press('Enter', 'Enter', ...typed, 'F9');
   return { app, press };
+}
+
+/** Holds B or S down for a new run until the button is full, then lets go: what the player does to start over from a later day. */
+export function holdNewRun(app: App, key: string) {
+  app.press({ key });
+  for (let n = 0; n < 5 && app.holding; n++) app.tick();
+  app.release(key);
 }
 
 export function screen(app: App): string[] {
@@ -118,8 +129,14 @@ export function playToSupply(app: App, press: (...keys: string[]) => void, answe
 }
 
 /** Plays the day to its end and the growth choice, then on to the next morning. `growth` is the number of the option to choose. */
-export function toNextMorning(growth: '1' | '2' | '3', morning: 'small' | 'big' = 'small', answer = 0, random: () => number = () => 0) {
-  const day = toDay(answer, morning, ['a'], [], random);
+export function toNextMorning(
+  growth: '1' | '2' | '3',
+  morning: 'small' | 'big' = 'small',
+  answer = 0,
+  random: () => number = () => 0,
+  store: Store = memoryStore(),
+) {
+  const day = toDay(answer, morning, ['a'], [], random, store);
   day.press('Enter', growth, 'Enter', 'Enter');
   return day;
 }

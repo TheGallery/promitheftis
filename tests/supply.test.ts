@@ -4,6 +4,7 @@ import { bigMorning, smallMorning } from '../src/game/morning';
 import { callNotes, KEPT_ORDER, stockAfterDeliveries, Supply } from '../src/game/supply';
 import { ROAD_TICK_MS } from '../src/game/road';
 import { App, type Effects } from '../src/ui/app';
+import { memoryStore } from '../src/ui/store';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 
@@ -123,6 +124,8 @@ function fakeEffects(): Effects {
     print: () => 100,
     later: (fn, ms) => (ms === ROAD_TICK_MS ? undefined : fn()),
     toggleSound: () => true,
+    setSound: () => {},
+    store: memoryStore(),
     now: (() => {
       let t = 0;
       return () => (t += 1000);

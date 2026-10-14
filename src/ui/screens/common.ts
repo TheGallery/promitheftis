@@ -2,7 +2,7 @@ import { dateLabel, DEPART_MINUTE, formatTime } from '../../game/clock';
 import { plainName } from '../../game/headsup';
 import { shortNotes } from '../../game/history';
 import type { App } from '../app';
-import { cat, clip, s, wrapText, type Line } from '../grid';
+import { bar, cat, clip, s, wrapText, type Line } from '../grid';
 
 /** Date of the day, clock and the time the trucks leave, shown at the right of every header. */
 export function clockLine(day: number, minute: number, trucksWaiting = false): Line {
@@ -33,4 +33,24 @@ export function shortfallLines(app: App, client: string, wide: number, named: nu
     const kept = wrapped.length > rows ? [...wrapped.slice(0, rows - 1), clip(wrapped.slice(rows - 1).join(' '), wide - 3)] : wrapped;
     return kept.map((row, i) => s(i === 0 ? ` ${row}` : `   ${row}`, 'w'));
   });
+}
+
+/** Cells in the bar that fills while the key for a new run is held down. */
+const HOLD_CELLS = 16;
+
+/**
+ * The question shown from day 2 on after B or S: a button to hold down while its bar fills from left to right,
+ * in the accent colour; null when there is no question.
+ */
+export function newRunPrompt(app: App): Line | null {
+  const id = app.newRunAsk;
+  if (!id) return null;
+  const key = id === 'big' ? 'B' : 'S';
+  return cat(
+    s(` Start a new run? It replaces your saved day ${app.run.day}. `),
+    s(`[ HOLD ${key} TO START A NEW RUN ]`, 'b'),
+    s(' '),
+    bar(app.holdProgress * 100, HOLD_CELLS),
+    s('  ESC keeps playing', 'd'),
+  );
 }
