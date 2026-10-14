@@ -19,10 +19,8 @@ export interface RoomSpace {
   capacity: number;
   /** Stock in the room now, after today's deliveries. */
   inStore: number;
-  /** Already ordered for the room, not counting the row being edited. */
+  /** Ordered for the room. */
   ordered: number;
-  /** The row being edited. */
-  editing: number;
   /** Space left, never below zero. */
   free: number;
   /** How far past full the room is, in space units. */
@@ -33,10 +31,10 @@ export interface RoomSpace {
   overPct: number;
 }
 
-export function roomSpace(capacity: number, inStore: number, ordered: number, editing: number): RoomSpace {
-  const used = inStore + ordered + editing;
+export function roomSpace(capacity: number, inStore: number, ordered: number): RoomSpace {
+  const used = inStore + ordered;
   const overBy = Math.max(0, used - capacity);
   const overPct = overBy > 0 ? Math.ceil((overBy * 100) / capacity) : 0;
   const pct = overBy > 0 ? 100 + overPct : Math.round((used * 100) / capacity);
-  return { capacity, inStore, ordered, editing, free: Math.max(0, capacity - used), overBy, pct, overPct };
+  return { capacity, inStore, ordered, free: Math.max(0, capacity - used), overBy, pct, overPct };
 }

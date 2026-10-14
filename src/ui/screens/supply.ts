@@ -1,31 +1,33 @@
 import { SUPPLIER_MINUTE } from '../../game/clock';
 import { plainName } from '../../game/headsup';
 import type { RoomSpace } from '../../game/rooms';
-import { KEPT_LABEL, type Supply } from '../../game/supply';
+import { KEPT_LABEL, KEPT_ORDER, type Supply } from '../../game/supply';
 import type { Kept } from '../../game/types';
 import { plural } from '../format';
 import type { App } from '../app';
-import { cat, clip, header, keyBar, layout, rule, s, wrapText, type Line } from '../grid';
+import { cat, header, keyBar, layout, rule, s, width, wrapText, type Line } from '../grid';
 import { clockLine } from './common';
 
 const NAME_W = 21;
-const NOTE_W = 66;
-/** Where the room bars start: after the item, on hand, usual and order columns. */
-const BAR_AT = 50;
-const BAR_W = 36;
+/** Where the panel on the right starts: the room bars, with the call notes below them. */
+const PANEL_AT = 56;
+const PANEL_W = 120 - PANEL_AT;
+const LABEL_W = 11;
+const BAR_W = 32;
 
 /** What each shade of the room bars stands for. */
 const SHADES = [
   ['█', 'rs', 'in store'],
   ['▓', 'ro', 'ordered'],
-  ['▒', 're', 'this row'],
   ['░', 'rf', 'free'],
 ] as const;
 
 function titles(): Line {
-  const head = s(` ${'ITEM'.padEnd(NAME_W + 1)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(8)}${'ORDER'.padStart(9)}`.padEnd(BAR_AT), 'd');
-  const legend = SHADES.flatMap(([glyph, cls, label], i) => cat(s(i ? '  ' : ''), s(glyph, cls), s(` ${label}`, 'd')));
-  return cat(head, legend);
+  return s(` ${'ITEM'.padEnd(NAME_W + 1)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(8)}${'ORDER'.padStart(9)}`, 'd');
+}
+
+function legend(): Line {
+  return SHADES.flatMap(([glyph, cls, label], i) => cat(s(i ? '  ' : ''), s(glyph, cls), s(` ${label}`, 'd')));
 }
 
 /**
@@ -58,22 +60,26 @@ export function barCells(parts: readonly number[], capacity: number, cells: numb
   return [...out, cells - total()];
 }
 
-/** A room's bar: stock now █, already ordered ▓, the row being edited ▒, space left ░. */
+/** A room's bar: stock now █, ordered ▓, space left ░. */
 export function roomBar(space: RoomSpace, cells = BAR_W): Line {
-  const [store, ordered, editing, free] = barCells([space.inStore, space.ordered, space.editing], space.capacity, cells) as [number, number, number, number];
-  return cat(s('█'.repeat(store), 'rs'), s('▓'.repeat(ordered), 'ro'), s('▒'.repeat(editing), 're'), s('░'.repeat(free), 'rf'));
+  const [store, ordered, free] = barCells([space.inStore, space.ordered], space.capacity, cells) as [number, number, number];
+  return cat(s('█'.repeat(store), 'rs'), s('▓'.repeat(ordered), 'ro'), s('░'.repeat(free), 'rf'));
 }
 
-/** The room's heading: its name, its bar and how full it is, with a warning when the order does not fit. */
+/** A room's name, its bar and how full it is, with a warning when the order does not fit. */
 function roomLine(kept: Kept, space: RoomSpace): Line {
-  const label = KEPT_LABEL[kept];
   const over = space.overPct > 0;
   return cat(
-    s(` ${label}`.padEnd(BAR_AT), 'b'),
+    s(KEPT_LABEL[kept].padEnd(LABEL_W), 'b'),
     roomBar(space),
     s(` ${String(space.pct).padStart(3)}%`, over ? 'w' : ''),
-    over ? s(`  ${label} over by ${space.overPct}%`, 'w') : [],
+    over ? s(`  over by ${space.overPct}%`, 'w') : [],
   );
+}
+
+/** Pads a line with spaces out to `w` columns. */
+function padTo(line: Line, w: number): Line {
+  return cat(line, s(' '.repeat(Math.max(0, w - width(line)))));
 }
 
 function orderCell(app: App, supply: Supply, r: number): Line {
@@ -83,29 +89,48 @@ function orderCell(app: App, supply: Supply, r: number): Line {
   return s(String(amount).padStart(9), amount === 0 ? 'd' : 'acc');
 }
 
-/** Who rang to have this item put on tomorrow's order, as a short note. */
-function noteFor(supply: Supply, itemId: string): Line {
+/** Who rang to have this item put on tomorrow's order, as lines for the panel. */
+function noteLines(supply: Supply, itemId: string): Line[] {
   const who = supply.notes.get(itemId)?.map((n) => n.client);
   if (!who || who.length === 0) return [];
   const names = who.length > 2 ? `${who.slice(0, 2).join(', ')} +${who.length - 2}` : who.join(', ');
-  return s(`  ← ${clip(`${names} rang: add it to tomorrow's order`, NOTE_W - 4)}`, 'w');
+  const [first = '', ...rest] = wrapText(`${names} rang: add it to tomorrow's order`, PANEL_W - 4);
+  return [s(` ← ${first}`, 'w'), ...rest.slice(0, 2).map((t) => s(`   ${t}`, 'w'))];
+}
+
+/** The right-hand side, one line per screen line: the legend, a room bar for each room, then the note for the highlighted row. */
+function panel(app: App, supply: Supply): Line[] {
+  const out: Line[] = [legend(), []];
+  for (const kept of KEPT_ORDER) out.push(cat(s(' '), roomLine(kept, supply.roomSpace(kept))));
+  const row = supply.placed ? undefined : supply.rows[app.supplySel];
+  if (row) out.push([], ...noteLines(supply, row.item.id));
+  return out;
 }
 
 function rows(app: App, supply: Supply): Line[] {
   const out: Line[] = [titles()];
-  const editing = supply.placed ? null : app.supplySel;
   let kept: string | null = null;
   supply.rows.forEach((row, r) => {
     if (row.kept !== kept) {
       kept = row.kept;
-      out.push(roomLine(row.kept, supply.roomSpace(row.kept, editing)));
+      out.push(s(` ${KEPT_LABEL[row.kept]}`, 'b'));
     }
     const current = !supply.placed && r === app.supplySel;
-    const mark = current ? '▶' : supply.isConfirmed(r) ? '✓' : ' ';
-    const base = `${mark}${row.item.name.padEnd(NAME_W)}${String(row.onHand).padStart(9)}${String(row.usual).padStart(8)}`;
-    out.push(cat(s(base, current ? 'hl' : supply.isConfirmed(r) ? 'd' : ''), orderCell(app, supply, r), noteFor(supply, row.item.id)));
+    const done = supply.isConfirmed(r);
+    const noted = (supply.notes.get(row.item.id)?.length ?? 0) > 0;
+    const rest = `${String(row.onHand).padStart(9)}${String(row.usual).padStart(8)}`;
+    const base = done && !current ? 'd' : '';
+    const hl = (cls: string) => (current ? `${cls} hl`.trim() : cls);
+    out.push(cat(
+      s(current ? '▶' : done ? '✓' : ' ', hl(base)),
+      s(row.item.name.padEnd(NAME_W), hl(noted ? 'w' : base)),
+      s(rest, hl(base)),
+      orderCell(app, supply, r),
+    ));
   });
-  return out;
+  const side = panel(app, supply);
+  while (out.length < side.length) out.push([]);
+  return out.map((line, i) => (side[i] && side[i]!.length ? cat(padTo(line, PANEL_AT), side[i]!) : line));
 }
 
 function placedBlock(supply: Supply): Line[] {

@@ -98,11 +98,12 @@ body {
 #screen .be { color: var(--dim); }
 #screen .rs { color: var(--fg); }
 #screen .ro { color: var(--accent); }
-#screen .re { color: var(--head); }
 #screen .rf { color: var(--dim); }
 #screen .w { color: var(--warn); }
 #screen .hl { background: var(--row); }
 body[data-theme='blue'] #screen .hl { color: #000000; }
+/* A highlighted row that carries a call note: dark amber, as light amber is hard to read on the highlight. */
+body[data-theme='blue'] #screen .hl.w { color: #3d2200; font-weight: 700; }
 #screen .cur { background: var(--cursor-bg); color: var(--cursor-fg); }
 #screen .pane { background: var(--pane-bg); color: var(--pane-fg); }
 #screen .focus { background: var(--focus-bg); color: var(--focus-fg); font-weight: 700; }
