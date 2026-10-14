@@ -92,6 +92,8 @@ export class App {
   newRunAsk: 'small' | 'big' | null = null;
   /** When the key for the new run went down, in real time; null while it is up. */
   private holdSince: number | null = null;
+  /** The key (lower case) that has to be held for the new run asked for. */
+  private holdKey = '';
   /** The key that has just started a new run and may still be held down, whose repeats are then ignored. */
   private spentKey: string | null = null;
   /** The sound this key press makes: the last one asked for wins. Null is silence. */
@@ -163,7 +165,9 @@ export class App {
     const saved = text == null ? null : decodeRun(text);
     if (saved && this.dayOf(saved)) {
       this.saved = saved;
-      this.screen = 'start';
+      // Nothing is lost by leaving a first day, so there is nothing to ask: it simply opens.
+      if (saved.run.day === 1) this.resume();
+      else this.screen = 'start';
       return;
     }
     if (text != null) this.say('The saved run could not be used, so a new run has started.');
@@ -198,7 +202,7 @@ export class App {
     if (repeat && key0 === this.spentKey) return true;
     if (!repeat) this.spentKey = null;
     const asked = this.newRunAsk;
-    if (asked && key0 === (asked === 'big' ? 'b' : 's')) {
+    if (asked && key0 === this.holdKey) {
       // The key the button asks to be held: the first press starts the fill, the keyboard repeating it changes nothing.
       if (!repeat && this.holdSince == null) {
         this.holdSince = this.effects.now();
@@ -285,24 +289,28 @@ export class App {
         if (this.startSel !== before) this.sound('move');
         return true;
       case 'Enter':
-        return this.choose(START_CHOICES[this.startSel] as StartChoice);
+        return this.choose(START_CHOICES[this.startSel] as StartChoice, key);
       case 'c':
       case 'C':
-        return this.choose('continue');
+        return this.choose('continue', key);
       case 's':
       case 'S':
-        return this.choose('small');
+        return this.choose('small', key);
       case 'b':
       case 'B':
-        return this.choose('big');
+        return this.choose('big', key);
     }
     return false;
   }
 
-  private choose(choice: StartChoice): boolean {
-    if (choice === 'continue') this.resume();
-    else this.loadMorning(choice);
-    this.sound('confirm');
+  /** Continue is one press; a new run replaces the save, so the key that chose it has to be held down (see `tick`). */
+  private choose(choice: StartChoice, key: string): boolean {
+    if (choice === 'continue') {
+      this.resume();
+      this.sound('confirm');
+    } else {
+      this.askNewRun(choice, key);
+    }
     return true;
   }
 
@@ -356,13 +364,23 @@ export class App {
    */
   private newRun(id: 'small' | 'big'): boolean {
     if (this.run.day > 1) {
-      this.newRunAsk = id;
-      this.holdSince = this.effects.now();
+      this.askNewRun(id, id === 'big' ? 'b' : 's');
       return true;
     }
     this.loadMorning(id);
     this.sound('confirm');
     return true;
+  }
+
+  private askNewRun(id: 'small' | 'big', key: string): void {
+    this.newRunAsk = id;
+    this.holdKey = key.toLowerCase();
+    this.holdSince = this.effects.now();
+  }
+
+  /** The name of the key to hold, as the button shows it. */
+  get holdKeyName(): string {
+    return this.holdKey.toUpperCase();
   }
 
   private cancelNewRun(): void {
@@ -386,7 +404,7 @@ export class App {
     if (!id || this.holdSince == null) return;
     if (this.holdProgress >= 1) {
       this.loadMorning(id);
-      this.spentKey = id === 'big' ? 'b' : 's';
+      this.spentKey = this.holdKey;
       this.effects.cue('confirm');
     }
     this.changed();
@@ -396,7 +414,7 @@ export class App {
   release(key: string): void {
     if (key.toLowerCase() === this.spentKey) this.spentKey = null;
     const id = this.newRunAsk;
-    if (!id || this.holdSince == null || key.toLowerCase() !== (id === 'big' ? 'b' : 's')) return;
+    if (!id || this.holdSince == null || key.toLowerCase() !== this.holdKey) return;
     this.holdSince = null;
     this.changed();
   }
