@@ -112,7 +112,7 @@ Keys that work everywhere: **F2** switches between soft green and office blue, *
 
 | Screen | Keys |
 | --- | --- |
-| Opening screen (when a run is saved) | **↑ ↓** pick **Continue** or a new run from the small or the big morning · **ENTER** go · **C** continue · **S** small morning · **B** big morning |
+| Opening screen (when a run from day 2 on is saved) | **↑ ↓** pick **Continue** or a new run from the small or the big morning · **ENTER** go · **C** continue · **S** small morning · **B** big morning (a new run, by **ENTER**, **S** or **B**, replaces the saved run: hold the key down until the bar beside the button fills; a tap only asks) |
 | Overnight messages | **↑ ↓** read through the messages · **SPACE** start the morning · **B** load the big morning · **S** load the small morning (both start the run over from day 1 and replace the saved run; from day 2 on, hold the key down until the bar beside the button fills; a tap only asks) |
 | Order desk | **TAB** next pane (**Shift+TAB** back) · **↑ ↓** move within a pane · type a number or **← →** (one less / one more) for the amount on a line · **ENTER** accept the line and go to the next · **ENTER** on the highlighted truck in the TRUCKS pane puts the order on it · **F10** truck sheets |
 | Truck sheets | **↑ ↓** pick a truck · **ENTER** open or close it · **+** / **−** open or close all · **P** print the sheets (with the printer sound) · **ESC** back to the desk · **F9** send the trucks |
