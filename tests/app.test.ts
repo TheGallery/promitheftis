@@ -277,6 +277,15 @@ describe('order desk', () => {
     }
   });
 
+  it('shows the full Saltmarket name in the orders list', () => {
+    const { app, press } = newApp();
+    press(' ');
+    const lines = expectFullScreen(app);
+    const row = lines.find((l) => l.includes('Café Lumen'));
+    expect(row).toContain('Saltmarket');
+    expect(lines.join('\n')).not.toContain('Saltmark…');
+  });
+
   it('moves between panes with TAB and back with shift-TAB', () => {
     const { app, press } = newApp();
     press(' ');

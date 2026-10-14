@@ -5,8 +5,8 @@ import type { App } from '../app';
 import { bar, cat, clip, cols, header, keyBar, layout, pad, rule, s, scrollRows, wrapText, type Line } from '../grid';
 import { clockLine } from './common';
 
-const ORDERS_W = 33;
-const LINES_W = 44;
+const ORDERS_W = 34;
+const LINES_W = 43;
 const TRUCKS_W = 41;
 const BODY_ROWS = 24;
 
@@ -19,13 +19,13 @@ function ordersPane(app: App): Line[] {
   const lit = app.pane === 'orders';
   const out: Line[] = [
     paneTitle('ORDERS', lit, s(`  ${app.orderSel + 1} of ${d.orderCount}`, 'd')),
-    s(`   ${''.padEnd(17)}${'PLACE'.padEnd(10)}TRK`, 'd'),
+    s(`   ${''.padEnd(17)}${'PLACE'.padEnd(11)}TRK`, 'd'),
   ];
   const rows: Line[] = d.morning.orders.map((o, i) => {
     const current = i === app.orderSel;
     const mark = current ? '▶' : d.isFinished(i) ? '✓' : ' ';
     const truck = d.truckFor(i);
-    const text = ` ${mark} ${clip(o.client, 16).padEnd(17)}${clip(place(o.place).name, 9).padEnd(10)}${truck ?? ''}`;
+    const text = ` ${mark} ${clip(o.client, 16).padEnd(17)}${clip(place(o.place).name, 10).padEnd(11)}${truck ?? ''}`;
     return s(text, current ? 'hl' : d.isFinished(i) ? 'd' : '');
   });
   out.push(...scrollRows(rows, app.orderSel, BODY_ROWS - out.length));
