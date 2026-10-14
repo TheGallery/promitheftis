@@ -89,10 +89,6 @@ const SOFT_KEYS: Record<Moment, (v: Voice, t: number, arg: CueArg) => void> = {
     burst(v, t, { f: 1200, q: 0.7, dur: 0.06, gain: 0.4 });
     burst(v, t + 0.07, { f: 2200, q: 1, dur: 0.02, gain: 0.14 });
   },
-  truckKey(v, t) {
-    burst(v, t, { f: 2000, q: 0.9, dur: 0.03, gain: 0.22 });
-    tone(v, t, { f: 200, f2: 140, dur: 0.04, gain: 0.1 });
-  },
   truck(v, t) {
     burst(v, t, { f: 1700, q: 0.8, dur: 0.04, gain: 0.32 });
     tone(v, t, { f: 150, f2: 100, dur: 0.06, gain: 0.3 });

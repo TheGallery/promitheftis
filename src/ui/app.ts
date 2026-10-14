@@ -50,7 +50,6 @@ export class App {
   lineSel = 0;
   truckSel = 0;
   typed = '';
-  truckPending = false;
   private confirmEnd = false;
   /** The sound this key press makes: the last one asked for wins. Null is silence. */
   private heard: { moment: Moment; arg?: CueArg } | null = null;
@@ -178,7 +177,6 @@ export class App {
     this.lineSel = 0;
     this.truckSel = 0;
     this.typed = '';
-    this.truckPending = false;
     this.sheetSel = 0;
     this.sheetOpen = new Set();
     this.printing = null;
@@ -189,17 +187,6 @@ export class App {
 
   // ------------------------------------------------------------ order desk
   private deskKey(key: string, shift: boolean, wasConfirming: boolean): boolean {
-    if (this.truckPending) {
-      this.truckPending = false;
-      if (/^[1-9]$/.test(key)) {
-        this.pickTruck(Number(key));
-        return true;
-      }
-      if (key === 'Escape') {
-        this.sound('move');
-        return true;
-      }
-    }
     if (!/^\d$/.test(key) && key !== 'Backspace') this.typed = '';
 
     switch (key) {
@@ -209,12 +196,6 @@ export class App {
         return true;
       case 'F10':
         this.endMorning(wasConfirming);
-        return true;
-      case 't':
-      case 'T':
-        this.truckPending = true;
-        this.say('T: now press the truck number, 1 to 9.');
-        this.sound('truckKey');
         return true;
       case 'ArrowUp':
         this.moveWithin(-1);
@@ -242,7 +223,7 @@ export class App {
     if (/^\d$/.test(key)) {
       if (this.pane === 'lines') this.typeDigit(key);
       else {
-        this.say('To put this order on a truck, press T and then 1 to 9.');
+        this.say('Amounts are typed in the LINES pane: TAB to it first.');
         this.sound('warn');
       }
       return true;
@@ -339,7 +320,7 @@ export class App {
     } else if (d.truckFor(o) == null) {
       this.pane = 'trucks';
       this.truckSel = Math.min(this.truckSel, this.morning.trucks.length - 1);
-      this.say('Now pick a truck: T then 1 to 9, or ENTER on the one marked.');
+      this.say('Choose a truck: ↑↓ then ENTER.');
     } else {
       d.finishOrder(o);
       this.sound('finish');

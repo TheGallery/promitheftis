@@ -5,7 +5,6 @@ export type Moment =
   | 'digit'
   | 'nudge'
   | 'confirm'
-  | 'truckKey'
   | 'truck'
   | 'finish'
   | 'warn'
