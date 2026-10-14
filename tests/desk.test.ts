@@ -139,7 +139,7 @@ describe('the places a truck goes to', () => {
     desk.assignTruck(idx(m, 'Golden Dragon'), 1);
     desk.assignTruck(idx(m, 'Burger Shack'), 1);
     desk.assignTruck(idx(m, 'Café Lumen'), 1);
-    expect(desk.placesOf(1)).toEqual(['town', 'docks']);
+    expect(desk.placesOf(1)).toEqual(['saltmarket', 'docks']);
     expect(desk.placesOf(2)).toEqual([]);
   });
 

@@ -110,7 +110,7 @@ export function nineSquares(app: App): Line[] {
     cells.forEach((p) => {
       const lit = p.id === here;
       const trucks = trucksAt(p.id);
-      const name = p.id === 'town' ? 'TOWN' : p.name;
+      const name = p.id === 'saltmarket' ? 'SALTMARKET' : p.name;
       const nums = trucks.join(' ');
       top.push(['│', 'd'], [` ${clip(name, CELL - 1).padEnd(CELL - 1)}`, lit ? 'cur' : 'b']);
       const text = lit ? `▶ ${nums || 'no truck'}` : nums || '·';

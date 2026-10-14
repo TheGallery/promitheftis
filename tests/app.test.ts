@@ -272,7 +272,7 @@ describe('order desk', () => {
     const { app, press } = newApp();
     press(' ');
     const text = expectFullScreen(app).join('\n');
-    for (const word of ['ORDERS', 'LINES', 'TRUCKS', 'HEADS UP', 'ketchup: 16 asked today, 12 on hand', 'TOWN', 'Oakley', 'Ashby']) {
+    for (const word of ['ORDERS', 'LINES', 'TRUCKS', 'HEADS UP', 'ketchup: 16 asked today, 12 on hand', 'SALTMARKET', 'Oakley', 'Ashby']) {
       expect(text).toContain(word);
     }
   });
@@ -400,7 +400,7 @@ describe('a whole small morning', () => {
   function play() {
     const t = newApp();
     t.press(' ');
-    // Truck 1: Town and Docks. Truck 2: Fenwick and Millford.
+    // Truck 1: Saltmarket and Docks. Truck 2: Fenwick and Millford.
     const trucks: Record<string, number> = {
       'Café Lumen': 1, "Rosa's": 2, 'The Anchor': 2, 'Golden Dragon': 1, 'Hotel Bellevue': 1, 'Burger Shack': 1, 'The Plough': 2,
     };
@@ -426,7 +426,7 @@ describe('a whole small morning', () => {
     expect(text).toContain('TRUCK SHEETS');
     expect(text).toContain('LOADING');
     expect(text).toContain('STORE ROOM');
-    expect(text).toContain('Town, Docks');
+    expect(text).toContain('Saltmarket, Docks');
     press('Enter');
     text = expectFullScreen(app).join('\n');
     expect(text).toContain('TRUCK 1 · ROUTE');

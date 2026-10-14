@@ -60,7 +60,7 @@ function routePanel(app: App): Line[] {
     return [s(' ROUTE', 'b'), [], s(' ENTER opens a truck and', 'd'), s(' shows where it goes.', 'd')];
   }
   const route = d.routeOf(t.id, departureOf(app));
-  const out: Line[] = [s(` TRUCK ${t.id} · ROUTE`, 'b'), [], s(' depot (Town)', 'd')];
+  const out: Line[] = [s(` TRUCK ${t.id} · ROUTE`, 'b'), [], s(' depot (Saltmarket)', 'd')];
   if (route.visits.length === 0) return [...out, s('   │'), s(' nothing to deliver', 'd')];
   for (const v of route.visits) {
     out.push(s('   │'));

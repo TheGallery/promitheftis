@@ -89,7 +89,7 @@ describe('buildResult', () => {
     handOut(d, 'Hotel Bellevue', 1);
     const r = buildResult(d, DEPART_MINUTE);
     expect(r.trucks[0]?.stops).toBe(2);
-    expect(r.trucks[0]?.places).toEqual(['town']);
+    expect(r.trucks[0]?.places).toEqual(['saltmarket']);
     expect(r.trucks[0]?.backAt).toBe(DEPART_MINUTE + 2 * STOP_MINUTES);
     expect(r.trucks[1]?.backAt).toBeNull();
     expect(r.lastBack).toBe(DEPART_MINUTE + 2 * STOP_MINUTES);
