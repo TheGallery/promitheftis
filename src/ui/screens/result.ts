@@ -113,6 +113,6 @@ export function resultScreen(app: App): Line[] {
       )
     : [];
   const other = app.morning.id === 'small' ? ([['B', 'big morning']] as const) : ([['S', 'small morning']] as const);
-  const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['R', 'play this morning again'], ...other, ['F2', 'colours'], ['F4', 'sound']])];
+  const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...other, ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

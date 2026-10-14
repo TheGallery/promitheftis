@@ -1,11 +1,15 @@
 import type { PlaceId } from './places';
 
+/** Where an item is kept: the freezer, the fridge or the dry store. */
+export type Kept = 'freezer' | 'fridge' | 'dry';
+
 export interface Item {
   id: string;
   /** Display name, at most 19 characters so it fits the LINES pane. */
   name: string;
   /** Truck space taken by one unit. */
   size: number;
+  kept: Kept;
 }
 
 export interface OrderLine {
@@ -48,6 +52,8 @@ export interface Morning {
   title: string;
   items: Item[];
   stock: Record<string, number>;
+  /** The usual amount of each item used in a day: what the supplier order fills up to. */
+  usual: Record<string, number>;
   trucks: Truck[];
   orders: Order[];
   messages: Message[];

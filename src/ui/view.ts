@@ -5,6 +5,7 @@ import { messagesScreen } from './screens/messages';
 import { roadScreen } from './screens/road';
 import { resultScreen } from './screens/result';
 import { sheetsScreen } from './screens/sheets';
+import { supplyScreen } from './screens/supply';
 
 /** The lines of whichever screen the app is on. */
 export function screenLines(app: App): Line[] {
@@ -19,6 +20,8 @@ export function screenLines(app: App): Line[] {
       return roadScreen(app);
     case 'result':
       return resultScreen(app);
+    case 'supply':
+      return supplyScreen(app);
   }
 }
 

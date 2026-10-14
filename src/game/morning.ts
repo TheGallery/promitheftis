@@ -2,18 +2,18 @@ import type { PlaceId } from './places';
 import type { Crew, Item, Message, Morning, Order, OrderLine, Truck } from './types';
 
 export const ITEMS: readonly Item[] = [
-  { id: 'ketchup', name: 'Ketchup, bottle', size: 1 },
-  { id: 'chips', name: 'Frozen chips, 10 kg', size: 8 },
-  { id: 'peas', name: 'Frozen peas, 10 kg', size: 8 },
-  { id: 'pork', name: 'Pork shoulder, kg', size: 2 },
-  { id: 'potatoes', name: 'Potatoes, 25 kg box', size: 6 },
-  { id: 'eggs', name: 'Eggs, tray', size: 2 },
-  { id: 'mozzarella', name: 'Mozzarella, kg', size: 2 },
-  { id: 'flour', name: 'Flour, sack', size: 6 },
-  { id: 'gravy', name: 'Gravy granules, tub', size: 2 },
-  { id: 'tomatoes', name: 'Tomatoes, tin', size: 1 },
-  { id: 'oil', name: 'Cooking oil, 5 l', size: 4 },
-  { id: 'rice', name: 'Rice, 5 kg bag', size: 4 },
+  { id: 'ketchup', name: 'Ketchup, bottle', size: 1, kept: 'dry' },
+  { id: 'chips', name: 'Frozen chips, 10 kg', size: 8, kept: 'freezer' },
+  { id: 'peas', name: 'Frozen peas, 10 kg', size: 8, kept: 'freezer' },
+  { id: 'pork', name: 'Pork shoulder, kg', size: 2, kept: 'fridge' },
+  { id: 'potatoes', name: 'Potatoes, 25 kg box', size: 6, kept: 'dry' },
+  { id: 'eggs', name: 'Eggs, tray', size: 2, kept: 'fridge' },
+  { id: 'mozzarella', name: 'Mozzarella, kg', size: 2, kept: 'fridge' },
+  { id: 'flour', name: 'Flour, sack', size: 6, kept: 'dry' },
+  { id: 'gravy', name: 'Gravy granules, tub', size: 2, kept: 'dry' },
+  { id: 'tomatoes', name: 'Tomatoes, tin', size: 1, kept: 'dry' },
+  { id: 'oil', name: 'Cooking oil, 5 l', size: 4, kept: 'dry' },
+  { id: 'rice', name: 'Rice, 5 kg bag', size: 4, kept: 'dry' },
 ];
 
 interface Client {
@@ -96,6 +96,16 @@ const BIG_STOCK_DEFAULT_COVER = 1.15;
 const SMALL_STOCK: Record<string, number> = {
   ketchup: 12, chips: 14, peas: 11, pork: 40, potatoes: 20, eggs: 18,
   mozzarella: 10, flour: 14, gravy: 9, tomatoes: 36, oil: 6, rice: 8,
+};
+
+const SMALL_USUAL: Record<string, number> = {
+  ketchup: 16, chips: 16, peas: 10, pork: 40, potatoes: 18, eggs: 18,
+  mozzarella: 10, flour: 10, gravy: 8, tomatoes: 24, oil: 6, rice: 6,
+};
+
+const BIG_USUAL: Record<string, number> = {
+  ketchup: 70, chips: 60, peas: 32, pork: 200, potatoes: 80, eggs: 64,
+  mozzarella: 44, flour: 22, gravy: 22, tomatoes: 100, oil: 24, rice: 26,
 };
 
 /** [weight when picking lines, lowest quantity, highest quantity] */
@@ -215,6 +225,7 @@ export function smallMorning(): Morning {
     title: 'A small morning',
     items: ITEM_LIST,
     stock: { ...SMALL_STOCK },
+    usual: { ...SMALL_USUAL },
     trucks: BIG_TRUCKS.slice(0, 2).map((t) => ({ ...t })),
     orders,
     messages: buildMessages(orders, 2),
@@ -243,6 +254,7 @@ export function bigMorning(): Morning {
     title: 'The big morning',
     items: ITEM_LIST,
     stock,
+    usual: { ...BIG_USUAL },
     trucks: BIG_TRUCKS.map((t) => ({ ...t })),
     orders,
     messages: buildMessages(orders, SUPPLIER_STAFF_NOTES.length),

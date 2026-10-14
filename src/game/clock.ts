@@ -13,3 +13,5 @@ export function formatTime(minutes: number): string {
   const mm = String(m % 60).padStart(2, '0');
   return `${hh}:${mm}`;
 }
+/** The supplier is rung at 13:00. */
+export const SUPPLIER_MINUTE = 13 * 60;
