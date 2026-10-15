@@ -192,7 +192,7 @@ describe('the supplier ordering screen', () => {
     for (const item of app.morning.items) {
       const row = rowOf(lines, item.name);
       expect(row).toContain(item.name);
-      expect(row).toContain(`${String(left[item.id]).padStart(9)}${String(app.morning.usual[item.id]).padStart(8)}`);
+      expect(row).toContain(`${String(left[item.id]).padStart(8)}${String(app.morning.usual[item.id]).padStart(7)}`);
     }
   });
 
@@ -375,7 +375,7 @@ describe('the supplier ordering screen', () => {
       for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) {
         const line = heading(lines, room);
         const space = app.supply!.roomSpace(room === 'FREEZER' ? 'freezer' : room === 'FRIDGE' ? 'fridge' : 'dry');
-        expect(line).toMatch(/[█▓░]{32} +\d+%/);
+        expect(line).toMatch(/[█▓░]{26} +\d+%/);
         expect(line).toContain(`${space.pct}%`);
         expect(line).not.toContain('over by');
         // To the right of the item columns, and at least one empty line below the legend.
@@ -422,7 +422,7 @@ describe('the supplier ordering screen', () => {
       expect(line).toContain(`over by ${space.overPct}%`);
       expect(line).toContain(`${space.pct}%`);
       expect(shades(line)['░']).toBe(0);
-      expect([...line].filter((c) => '█▓'.includes(c))).toHaveLength(32);
+      expect([...line].filter((c) => '█▓'.includes(c))).toHaveLength(26);
       const amber = screenLines(app).find((l) => l.some(([t]) => t.includes('over by')));
       expect(amber!.filter(([t]) => t.includes('over by') || /^ +\d+%$/.test(t)).every(([, cls]) => cls === 'w')).toBe(true);
       // The other rooms are not over, so say nothing about them.

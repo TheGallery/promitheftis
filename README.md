@@ -12,7 +12,7 @@ Each morning you hand out the overnight orders against the stock on hand and put
 
 ![The order desk: cash in the bank at the top, a list of orders, the lines of the current order, two trucks and the nine squares of the island](docs/screens/order-desk.png)
 
-![The end of the day: how each client's order went, the trucks, calls, money and tomorrow's order](docs/screens/end-of-day.png)
+![The end of the day: how each client's order went, the trucks with what each cost, calls, money and tomorrow's order](docs/screens/end-of-day.png)
 
 ![The how-to-play screen, in office blue](docs/screens/how-to-play.png)
 

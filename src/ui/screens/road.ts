@@ -94,7 +94,7 @@ function trucksColumn(road: Road, clock: number): Line[] {
 export function roadScreen(app: App): Line[] {
   const road = app.road;
   const clock = app.roadClock;
-  const top = header('ON THE ROAD', clockLine(app.morning.day, clock));
+  const top = header('ON THE ROAD', clockLine(app.morning.day, clock, false, app.cash));
   const body: Line[] = [];
   if (road) {
     const left = logColumn(app, road, clock);

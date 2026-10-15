@@ -68,3 +68,13 @@ export function travelMinutes(a: PlaceId, b: PlaceId): number {
   const manhattan = dc + dr;
   return 20 * reach + 5 * (manhattan - reach);
 }
+
+/**
+ * Squares driven between two squares of the map: the steps across and the steps up or down, so that a corner
+ * neighbour is two squares away and a side neighbour one.
+ */
+export function travelSquares(a: PlaceId, b: PlaceId): number {
+  const pa = place(a);
+  const pb = place(b);
+  return Math.abs(pa.col - pb.col) + Math.abs(pa.row - pb.row);
+}

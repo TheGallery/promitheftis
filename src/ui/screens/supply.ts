@@ -1,18 +1,21 @@
 import { SUPPLIER_MINUTE } from '../../game/clock';
+import { formatMoney } from '../../game/money';
 import type { RoomSpace } from '../../game/rooms';
 import { KEPT_LABEL, KEPT_ORDER, type Supply } from '../../game/supply';
 import type { Kept } from '../../game/types';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, header, keyBar, layout, rule, s, width, wrapText, type Line } from '../grid';
-import { clockLine } from './common';
+import { clockLine, moneySeg } from './common';
 
-const NAME_W = 21;
-/** Where the panel on the right starts: the room bars, with the call notes below them. */
-const PANEL_AT = 56;
+const NAME_W = 20;
+/** Where the panel on the right starts: the room bars and the money, with the call notes below them. */
+const PANEL_AT = 60;
 const PANEL_W = 120 - PANEL_AT;
 const LABEL_W = 11;
-const BAR_W = 32;
+const BAR_W = 26;
+const MONEY_LABEL_W = 12;
+const MONEY_W = 9;
 
 /** What each shade of the room bars stands for. */
 const SHADES = [
@@ -22,7 +25,7 @@ const SHADES = [
 ] as const;
 
 function titles(): Line {
-  return s(` ${'ITEM'.padEnd(NAME_W + 1)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(8)}${'ORDER'.padStart(9)}`, 'd');
+  return s(` ${'ITEM'.padEnd(NAME_W)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(7)}${'PRICE'.padStart(7)}${'ORDER'.padStart(8)}${'COST'.padStart(8)}`, 'd');
 }
 
 function legend(): Line {
@@ -83,9 +86,15 @@ function padTo(line: Line, w: number): Line {
 
 function orderCell(app: App, supply: Supply, r: number): Line {
   const editing = r === app.supplySel;
-  if (editing) return s(`[${String(supply.amount(r)).padStart(3)}_]`.padStart(9), 'cur');
+  if (editing) return s(`[${String(supply.amount(r)).padStart(3)}_]`.padStart(8), 'cur');
   const amount = supply.amount(r);
-  return s(String(amount).padStart(9), amount === 0 ? 'd' : 'acc');
+  return s(String(amount).padStart(8), amount === 0 ? 'd' : 'acc');
+}
+
+/** What a row's amount costs, or a dash while nothing is ordered. */
+function costCell(supply: Supply, r: number, cls: string): Line {
+  const cost = supply.cost(r);
+  return s((cost > 0 ? formatMoney(cost) : '—').padStart(8), cls);
 }
 
 /** Who rang to have this item put on tomorrow's order, as lines for the panel. */
@@ -97,10 +106,29 @@ function noteLines(supply: Supply, itemId: string): Line[] {
   return [s(` ← ${first}`, 'w'), ...rest.slice(0, 2).map((t) => s(`   ${t}`, 'w'))];
 }
 
-/** The right-hand side, one line per screen line: the legend, a room bar for each room, then the note for the highlighted row. */
+/** What the order costs, the cash in the bank now and what is left of it; amber, with a line to say so, when it falls below zero. */
+function moneyLines(app: App, supply: Supply): Line[] {
+  const cost = supply.totalCost();
+  const left = app.cash - cost;
+  const short = supply.shortfall(app.cash);
+  const line = (label: string, amount: number, extra = ''): Line =>
+    cat(s(` ${label.padEnd(MONEY_LABEL_W)}`, extra), moneySeg(amount, formatMoney(amount).padStart(MONEY_W), extra));
+  return [
+    s(' MONEY', 'b'),
+    line('Order costs', cost),
+    line('Cash now', app.cash),
+    line('Cash after', left, 'b'),
+    ...(short > 0
+      ? [s(` This order leaves you ${formatMoney(short)} short.`, 'w'), s(' You can still place it; the cash goes below zero.', 'd')]
+      : []),
+  ];
+}
+
+/** The right-hand side, one line per screen line: the legend, a room bar for each room, the money, then the note for the highlighted row. */
 function panel(app: App, supply: Supply): Line[] {
   const out: Line[] = [legend(), []];
   for (const kept of KEPT_ORDER) out.push(cat(s(' '), roomLine(kept, supply.roomSpace(kept))));
+  out.push([], ...moneyLines(app, supply));
   const row = supply.rows[app.supplySel];
   if (row) out.push([], ...noteLines(supply, row.item.id));
   return out;
@@ -117,7 +145,7 @@ function rows(app: App, supply: Supply): Line[] {
     const current = r === app.supplySel;
     const done = supply.isConfirmed(r);
     const noted = (supply.notes.get(row.item.id)?.length ?? 0) > 0;
-    const rest = `${String(row.onHand).padStart(9)}${String(row.usual).padStart(8)}`;
+    const rest = `${String(row.onHand).padStart(8)}${String(row.usual).padStart(7)}${formatMoney(supply.price(r)).padStart(7)}`;
     const base = done && !current ? 'd' : '';
     const hl = (cls: string) => (current ? `${cls} hl`.trim() : cls);
     out.push(cat(
@@ -125,6 +153,7 @@ function rows(app: App, supply: Supply): Line[] {
       s(row.item.name.padEnd(NAME_W), hl(noted ? 'w' : base)),
       s(rest, hl(base)),
       orderCell(app, supply, r),
+      costCell(supply, r, current ? (supply.cost(r) > 0 ? 'acc hl' : 'hl') : done || supply.cost(r) === 0 ? 'd' : 'acc'),
     ));
   });
   const side = panel(app, supply);
@@ -134,7 +163,7 @@ function rows(app: App, supply: Supply): Line[] {
 
 export function supplyScreen(app: App): Line[] {
   const supply = app.supply;
-  const top = header('SUPPLIER ORDER', clockLine(app.morning.day, SUPPLIER_MINUTE));
+  const top = header('SUPPLIER ORDER', clockLine(app.morning.day, SUPPLIER_MINUTE, false, app.cash));
   if (!supply) return layout(top, [], [rule(), [], keyBar([['F2', 'colours'], ['F4', 'sound']])]);
   const body = rows(app, supply);
   const status = app.status

@@ -109,9 +109,10 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'MONEY',
         text:
-          'One number: the cash in the bank, £1,000 to start. It is at the top of the order desk and of the growth choice, and turns amber ' +
-          'below zero; nothing stops play when it does. Restaurants pay for what arrives, and being late costs nothing. The supplier ' +
-          'order and each truck sent out cost money. The end of the day lists what was taken in, what went out, today\'s total and the cash now.',
+          'One number: the cash in the bank, £1,000 to start, at the top of every screen and amber below zero; nothing stops play when ' +
+          'it is. Restaurants pay for what arrives, item by item, and being late costs nothing. Each item has its own supplier price, and ' +
+          'the supplier order shows what the order costs and the cash left after it. A truck costs a driver plus the squares it drives. ' +
+          'The end of the day breaks it all down; what a client paid shows under their name.',
       },
       {
         head: 'WHAT TO GROW',

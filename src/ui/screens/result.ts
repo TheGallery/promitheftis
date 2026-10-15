@@ -1,5 +1,6 @@
 import { formatTime } from '../../game/clock';
 import { plainName } from '../../game/headsup';
+import { formatMoney } from '../../game/money';
 import { place } from '../../game/places';
 import { placesLabel, plural } from '../format';
 import type { App } from '../app';
@@ -104,13 +105,14 @@ function rightColumn(app: App): Line[] {
 
 export function resultScreen(app: App): Line[] {
   const r = app.result;
-  const top = header('THE TRUCKS HAVE GONE', clockLine(app.morning.day, r?.departAt ?? app.desk.clock));
+  const top = header('THE TRUCKS HAVE GONE', clockLine(app.morning.day, r?.departAt ?? app.desk.clock, false, app.cash));
   const left = leftColumn(app);
   const right = rightColumn(app);
   const n = Math.max(left.length, right.length);
   const body: Line[] = [];
   for (let i = 0; i < n; i++) body.push(cols([left[i] ?? [], right[i] ?? []], [LEFT_W, RIGHT_W]));
   const total = app.morning.orders.length;
+  const money = app.morningMoney();
   const summary = app.status
     ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
     : r
@@ -119,6 +121,7 @@ export function resultScreen(app: App): Line[] {
           s(`${r.inFull} of ${plural(total, 'order')} in full`, 'b'),
           s(` · ${plural(r.gotLess.length, 'client')} got less`),
           s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
+          s(` · restaurants paid ${formatMoney(money.takenIn)}, trucks cost ${formatMoney(money.trucks)}`, 'd'),
         )
       : [];
   const footer = [rule(), summary, keyBar([['SPACE', 'supplier order'], ['↑↓ PgUp PgDn', 'orders'], ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];

@@ -1,4 +1,4 @@
-import { DEPOT, placeIndex, travelMinutes, type PlaceId } from './places';
+import { DEPOT, placeIndex, travelMinutes, travelSquares, type PlaceId } from './places';
 
 /** Minutes spent at each client: unloading, a signature, a word. */
 export const STOP_MINUTES = 25;
@@ -25,6 +25,8 @@ export interface RoutePlan {
   visits: Visit[];
   /** When the truck is back at the depot. */
   backAt: number;
+  /** Squares of the map driven, out from the depot through every place and back. */
+  squares: number;
 }
 
 /**
@@ -82,12 +84,14 @@ function bestOrder(places: PlaceId[]): PlaceId[] {
 /** Plans one truck's drive: out from the depot, every stop, and home again. */
 export function planRoute(stops: readonly Stop[], departAt: number): RoutePlan {
   const places = [...new Set(stops.map((s) => s.place))].sort((a, b) => placeIndex(a) - placeIndex(b));
-  if (places.length === 0) return { visits: [], backAt: departAt };
+  if (places.length === 0) return { visits: [], backAt: departAt, squares: 0 };
   let now = departAt;
   let here: PlaceId = DEPOT;
+  let squares = 0;
   const visits: Visit[] = [];
   for (const p of bestOrder(places)) {
     now += travelMinutes(here, p);
+    squares += travelSquares(here, p);
     const visit: Visit = { place: p, arriveAt: now, stops: [] };
     for (const s of stops) {
       if (s.place !== p) continue;
@@ -98,5 +102,6 @@ export function planRoute(stops: readonly Stop[], departAt: number): RoutePlan {
     here = p;
   }
   now += travelMinutes(here, DEPOT);
-  return { visits, backAt: now };
+  squares += travelSquares(here, DEPOT);
+  return { visits, backAt: now, squares };
 }

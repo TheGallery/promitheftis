@@ -9,6 +9,8 @@ export interface TruckResult {
   fullness: number;
   departAt: number;
   backAt: number | null;
+  /** Squares of the map the truck drives; none for a truck that stays in the yard. */
+  squares: number;
 }
 
 export interface ShortLine {
@@ -67,6 +69,7 @@ export function buildResult(desk: Desk, departAt: number): MorningResult {
       fullness: desk.fullness(t.id),
       departAt,
       backAt: stops.length === 0 ? null : route.backAt,
+      squares: stops.length === 0 ? 0 : route.squares,
     };
   });
 
