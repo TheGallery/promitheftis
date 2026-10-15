@@ -58,7 +58,7 @@ function detail(app: App): Line[] {
 export function messagesScreen(app: App): Line[] {
   const top = header(
     `OVERNIGHT MESSAGES · ${app.morning.title.toLowerCase()}: ${plural(app.morning.trucks.length, 'truck')}, ${plural(app.morning.orders.length, 'order')}`,
-    clockLine(app.morning.day, app.desk.clock),
+    clockLine(app.morning.day, app.desk.clock, false, app.cash),
   );
   const rows = app.morning.messages.map((_, i) => messageRow(app, i));
   const list = scrollRows(rows, app.msgSel, LIST_ROWS);

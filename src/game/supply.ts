@@ -1,5 +1,6 @@
 import type { Call } from './calls';
 import type { Desk } from './desk';
+import { shortBy, supplierPrice } from './money';
 import { roomSpace, spaceOf, type RoomSpace } from './rooms';
 import type { Item, Kept, Morning } from './types';
 
@@ -81,6 +82,28 @@ export class Supply {
 
   isConfirmed(r: number): boolean {
     return this.confirmed[r] ?? false;
+  }
+
+  /** What the supplier charges for one unit of a row's item. */
+  price(r: number): number {
+    const row = this.rows[r];
+    return row ? supplierPrice(row.item.id) : 0;
+  }
+
+  /** What a row's amount costs: the amount times the price of one unit. */
+  cost(r: number): number {
+    return this.amount(r) * this.price(r);
+  }
+
+  /** What the whole order costs. */
+  totalCost(): number {
+    return this.rows.reduce((sum, _, r) => sum + this.cost(r), 0);
+  }
+
+  /** How far below zero the order leaves `cash`; zero when the cash covers it. */
+  shortfall(cash: number): number {
+    const cost = this.totalCost();
+    return cost > 0 ? shortBy(cash, cost) : 0;
   }
 
   /** What it takes to bring a row up to the usual daily amount. */

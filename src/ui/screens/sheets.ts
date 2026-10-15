@@ -1,12 +1,13 @@
 import { DEPART_MINUTE, formatTime } from '../../game/clock';
+import { formatMoney, PRICES, truckCost } from '../../game/money';
 import { place } from '../../game/places';
 import { plural, placesLabel } from '../format';
 import type { App } from '../app';
 import { bar, cat, clip, cols, header, keyBar, layout, rule, s, scrollRows, type Line } from '../grid';
 import { clockLine } from './common';
 
-const LIST_W = 83;
-const SIDE_W = 36;
+const LIST_W = 86;
+const SIDE_W = 33;
 
 export function departureOf(app: App): number {
   return Math.max(DEPART_MINUTE, app.desk.clock);
@@ -29,10 +30,14 @@ function truckRows(app: App): { rows: Line[]; selectedRow: number } {
     rows.push(
       cat(
         s(` ${open ? '▾' : '▸'} ${t.id} ${t.driver.padEnd(6)}${t.kind.padEnd(13)} `, cls),
-        bar(pct, 12, selected ? 'hl' : ''),
+        bar(pct, 8, selected ? 'hl' : ''),
         s(` ${String(pct).padStart(3)}%  `, cls),
         s((used ? placesLabel(route.visits.map((v) => v.place), 19) : 'not used').padEnd(20), `${used ? 'acc' : 'd'}${selected ? ' hl' : ''}`),
-        s(`${String(stops.length).padStart(5)}${(used ? `~${formatTime(route.backAt)}` : '—').padStart(9)} `, cls),
+        s(
+          `${String(stops.length).padStart(5)}${(used ? String(route.squares) : '—').padStart(4)}${(used ? formatMoney(truckCost(route.squares)) : '—').padStart(6)}` +
+            `${(used ? `~${formatTime(route.backAt)}` : '—').padStart(9)} `,
+          cls,
+        ),
       ),
     );
     if (open) {
@@ -66,15 +71,17 @@ function routePanel(app: App): Line[] {
     out.push(s('   │'));
     out.push(cat(s(` ${place(v.place).name}`, 'acc'), s(`   ${plural(v.stops.length, 'stop')} · ~${formatTime(v.arriveAt)}`)));
   }
-  out.push(s('   │'), s(` back at the depot ~${formatTime(route.backAt)}`, 'd'));
+  out.push(s('   │'), s(` back at the depot ~${formatTime(route.backAt)}`, 'd'), []);
+  out.push(s(` ${plural(route.squares, 'square')} driven`), s(` ${formatMoney(PRICES.truckDriver)} driver + ${formatMoney(route.squares * PRICES.truckPerSquare)} road`, 'd'));
+  out.push(cat(s(' costs '), s(formatMoney(truckCost(route.squares)), 'b')));
   return out;
 }
 
 export function sheetsScreen(app: App): Line[] {
   const d = app.desk;
-  const top = header('TRUCK SHEETS', clockLine(app.morning.day, d.clock, true));
+  const top = header('TRUCK SHEETS', clockLine(app.morning.day, d.clock, true, app.cash));
   const { rows, selectedRow } = truckRows(app);
-  const head = s(`   ${'TRUCK'.padEnd(22)}${'FULL'.padEnd(19)}${'GOES TO'.padEnd(20)}${'STOPS'.padStart(5)}${'BACK'.padStart(9)}`, 'd');
+  const head = s(`   ${'TRUCK'.padEnd(22)}${'FULL'.padEnd(15)}${'GOES TO'.padEnd(20)}${'STOPS'.padStart(5)}${'SQ'.padStart(4)}${'COST'.padStart(6)}${'BACK'.padStart(9)}`, 'd');
   const visible = scrollRows(rows, selectedRow, 23);
   const left: Line[] = [head, ...visible];
   const right = routePanel(app);
@@ -91,6 +98,9 @@ export function sheetsScreen(app: App): Line[] {
     status = s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc');
   } else if (app.printed) {
     status = s(' Truck sheets printed.', 'acc');
+  } else {
+    const cost = d.morning.trucks.reduce((sum, t) => sum + (d.stopsOf(t.id).length > 0 ? truckCost(d.routeOf(t.id, departureOf(app)).squares) : 0), 0);
+    status = s(` Sending these trucks costs ${formatMoney(cost)}: the driver and the road, by the squares driven.`, 'd');
   }
   const footer = [
     rule(),

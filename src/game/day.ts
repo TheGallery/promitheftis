@@ -1,7 +1,7 @@
 import { callLine, type Call } from './calls';
 import type { History } from './history';
 import { moodFacts, moodOf, moodReasons, type Mood } from './moods';
-import { dayMoney, STARTING_CASH, type DayMoney, type Units } from './money';
+import { dayMoney, STARTING_CASH, takenIn, tripCosts, type DayMoney, type Trip, type Units } from './money';
 import type { MorningResult, OrderResult } from './results';
 import { KEPT_ORDER, type Supply } from './supply';
 import type { RoomSpace } from './rooms';
@@ -11,6 +11,8 @@ export interface DayOrder extends OrderResult {
   mood: Mood;
   /** Why the client is in that mood. */
   reasons: string[];
+  /** What the client paid for what arrived. */
+  paid: number;
 }
 
 export interface DayTruck {
@@ -20,6 +22,9 @@ export interface DayTruck {
   backAt: number | null;
   /** The clients it reached after the time they asked for. */
   lateTo: string[];
+  /** Squares of the map it drove, and what that cost; nothing for a truck that stayed in the yard. */
+  squares: number;
+  cost: number;
 }
 
 export interface DayCall {
@@ -46,6 +51,24 @@ export interface DaySummary {
   money: DayMoney;
 }
 
+/** What the orders were given, line by line, with the room each item is kept in. */
+export function unitsOf(orders: readonly OrderResult[], kept: (item: string) => Kept): Units[] {
+  return orders.flatMap((o) => o.delivered.map((d): Units => ({ item: d.item, kept: kept(d.item), units: d.units })));
+}
+
+/** What the morning's deliveries brought in, and what the trucks that took them cost: the cash it adds to the bank is the difference. */
+export function morningMoney(result: MorningResult, kept: (item: string) => Kept): { takenIn: number; trucks: number } {
+  return {
+    takenIn: takenIn(unitsOf(result.orders, kept)),
+    trucks: tripCosts(tripsOf(result)).reduce((sum, t) => sum + t.cost, 0),
+  };
+}
+
+/** The trucks that went out, with how far each drove. */
+export function tripsOf(result: MorningResult): Trip[] {
+  return result.trucks.filter((t) => t.backAt != null).map((t) => ({ truckId: t.truckId, driver: t.driver, squares: t.squares }));
+}
+
 /** Everything the end-of-day screen says, worked out once the supplier order is placed. */
 export function buildDay(
   result: MorningResult,
@@ -55,22 +78,24 @@ export function buildDay(
   history: History = {},
   cash = STARTING_CASH,
 ): DaySummary {
+  const keptOf = new Map(supply.rows.map((row) => [row.item.id, row.kept]));
+  const kept = (item: string): Kept => keptOf.get(item) ?? 'dry';
   const orders = result.orders.map((o): DayOrder => {
     const facts = moodFacts(o, calls, answers, history[o.client]);
-    return { ...o, mood: moodOf(facts), reasons: moodReasons(facts, o.truckId == null) };
+    return { ...o, mood: moodOf(facts), reasons: moodReasons(facts, o.truckId == null), paid: takenIn(unitsOf([o], kept)) };
   });
+  const costs = new Map(tripCosts(tripsOf(result)).map((t) => [t.truckId, t.cost]));
   const trucks = result.trucks.map((t): DayTruck => ({
     truckId: t.truckId,
     driver: t.driver,
     backAt: t.backAt,
     lateTo: result.orders.filter((o) => o.truckId === t.truckId && o.lateForAsk).map((o) => o.client),
+    squares: t.squares,
+    cost: costs.get(t.truckId) ?? 0,
   }));
   const answered = calls.filter((c) => answers.has(c.id));
   const rooms = KEPT_ORDER.map((kept): DayRoom => ({ kept, space: supply.roomSpace(kept) }));
-  const keptOf = new Map(supply.rows.map((row) => [row.item.id, row.kept]));
-  const delivered = result.orders.flatMap((o): Units[] => o.delivered.map((d) => ({ kept: keptOf.get(d.item) ?? 'dry', units: d.units })));
-  const ordered = supply.ordered().map((o): Units => ({ kept: o.item.kept, units: o.amount }));
-  const trucksOut = result.trucks.filter((t) => t.backAt != null).length;
+  const ordered = supply.ordered().map((o): Units => ({ item: o.item.id, kept: o.item.kept, units: o.amount }));
   return {
     orders,
     trucks,
@@ -82,6 +107,6 @@ export function buildDay(
     units: supply.total(),
     rooms,
     overFull: rooms.filter((r) => r.space.overBy > 0),
-    money: dayMoney(cash, delivered, ordered, trucksOut),
+    money: dayMoney(cash, unitsOf(result.orders, kept), ordered, tripsOf(result)),
   };
 }

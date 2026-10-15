@@ -5,7 +5,7 @@ const stops = (...places: Array<Stop['place']>): Stop[] => places.map((place, i)
 
 describe('planRoute', () => {
   it('has nothing to do for a truck with no stops', () => {
-    expect(planRoute([], 420)).toEqual({ visits: [], backAt: 420 });
+    expect(planRoute([], 420)).toEqual({ visits: [], backAt: 420, squares: 0 });
   });
 
   it('keeps a Saltmarket-only truck close to the depot', () => {
