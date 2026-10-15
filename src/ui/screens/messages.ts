@@ -1,3 +1,4 @@
+import { garageNotice } from '../../game/breakdown';
 import { formatTime } from '../../game/clock';
 import { shortMarker } from '../../game/history';
 import { place } from '../../game/places';
@@ -69,7 +70,8 @@ export function messagesScreen(app: App): Line[] {
     app.morning.day > 1
       ? [['B S', 'hold: big / small morning']]
       : app.morning.id === 'small' ? [['B', 'big morning (9 trucks, 38 orders)']] : [['S', 'small morning (2 trucks, 7 orders)']];
-  const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : [];
+  const notice = app.morning.garage ? s(` ${garageNotice(app.morning.garage)}`, 'w') : [];
+  const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : notice;
   const footer = [rule(), status, keyBar([['SPACE', 'start the morning'], ['↑↓', 'message'], ...other, ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

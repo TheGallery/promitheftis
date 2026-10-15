@@ -81,7 +81,7 @@ function truckCell(t: DaySummary['trucks'][number], wide: boolean): Line {
   const late = t.lateTo.length > 0 ? `${t.lateTo.length} late` : t.backAt != null ? 'on time' : '';
   const lateClass = t.lateTo.length > 0 ? 'w' : 'd';
   if (wide) {
-    const back = t.backAt != null ? `back ${formatTime(t.backAt)}` : 'stayed in yard';
+    const back = t.backAt != null ? `back ${formatTime(t.backAt)}` : t.garage ? 'at the garage' : 'stayed in yard';
     return cat(
       s(` ${t.truckId} ${clip(t.driver, 7).padEnd(8)}${back.padEnd(15)}`),
       s(late.padEnd(9), lateClass),
@@ -89,6 +89,7 @@ function truckCell(t: DaySummary['trucks'][number], wide: boolean): Line {
       s(money.padStart(7)),
     );
   }
+  if (t.garage) return cat(s(` ${String(t.truckId).padEnd(2)}${clip(t.driver, 5).padEnd(5)} `), s('at the garage'.padEnd(21), 'w'));
   const back = t.backAt != null ? formatTime(t.backAt) : 'yard';
   return cat(s(` ${String(t.truckId).padEnd(2)}${clip(t.driver, 5).padEnd(5)} ${back.padEnd(5)} `), s((t.lateTo.length > 0 ? late : '').padEnd(7), lateClass), s(` ${squares.padStart(2)} ${money.padStart(4)}`));
 }

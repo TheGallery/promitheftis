@@ -14,6 +14,8 @@ export interface TruckResult {
   backAt: number | null;
   /** Squares of the map the truck drives; none for a truck that stays in the yard. */
   squares: number;
+  /** True for the truck that was at the garage all day. */
+  garage: boolean;
 }
 
 export interface ShortLine {
@@ -75,6 +77,7 @@ export function buildResult(desk: Desk, departAt: number): MorningResult {
       departAt,
       backAt: stops.length === 0 ? null : route.backAt,
       squares: stops.length === 0 ? 0 : route.squares,
+      garage: desk.inGarage(t.id),
     };
   });
 

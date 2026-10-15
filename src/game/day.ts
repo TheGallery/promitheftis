@@ -31,6 +31,8 @@ export interface DayTruck {
   /** The space it was loaded with, and the space it has. */
   load: number;
   capacity: number;
+  /** True for the truck that was at the garage all day. */
+  garage: boolean;
 }
 
 export interface DayCall {
@@ -112,6 +114,7 @@ export function buildDay(
     cost: costs.get(t.truckId) ?? 0,
     load: t.load,
     capacity: t.capacity,
+    garage: t.garage,
   }));
   const answered = calls.filter((c) => answers.has(c.id));
   const rooms = KEPT_ORDER.map((kept): DayRoom => ({ kept, space: supply.roomSpace(kept) }));

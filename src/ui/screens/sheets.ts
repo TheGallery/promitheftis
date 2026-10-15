@@ -1,3 +1,4 @@
+import { shortReason } from '../../game/breakdown';
 import { DEPART_MINUTE, formatTime } from '../../game/clock';
 import { formatMoney, PRICES, truckCost } from '../../game/money';
 import { place } from '../../game/places';
@@ -49,13 +50,13 @@ function truckRows(app: App): { rows: Line[]; selectedRow: number } {
     const used = stops.length > 0;
     const route = d.routeOf(t.id, departAt);
     const cls = selected ? 'hl' : used ? '' : 'd';
+    const garage = d.inGarage(t.id);
     const lateStops = timedOn(app, t.id).filter((x) => x.late).length;
     rows.push(
       cat(
         s(` ${open ? '▾' : '▸'} ${t.id} ${t.driver.padEnd(6)}${t.kind.padEnd(13)} `, cls),
-        bar(pct, 8, selected ? 'hl' : ''),
-        s(` ${String(pct).padStart(3)}%  `, cls),
-        s((used ? placesLabel(route.visits.map((v) => v.place), 19) : 'not used').padEnd(20), `${used ? 'acc' : 'd'}${selected ? ' hl' : ''}`),
+        garage ? s('at the garage'.padEnd(8 + 7), selected ? 'w hl' : 'w') : cat(bar(pct, 8, selected ? 'hl' : ''), s(` ${String(pct).padStart(3)}%  `, cls)),
+        s((garage ? clip(shortReason(d.morning.garage?.reason ?? ''), 19) : used ? placesLabel(route.visits.map((v) => v.place), 19) : 'not used').padEnd(20), `${used ? 'acc' : 'd'}${selected ? ' hl' : ''}`),
         s(' ', cls),
         s(lateStops > 0 ? '✗' : ' ', lateStops > 0 ? `w ${cls}`.trim() : cls),
         s(
@@ -80,7 +81,7 @@ function truckRows(app: App): { rows: Line[]; selectedRow: number } {
           ),
         );
       });
-      if (!used) rows.push(s('       nothing loaded', 'd'));
+      if (!used) rows.push(s(garage ? '       at the garage, back tomorrow' : '       nothing loaded', 'd'));
     }
   });
   return { rows, selectedRow };
@@ -94,6 +95,9 @@ function routePanel(app: App): Line[] {
     return [s(' ROUTE', 'b'), [], s(' ENTER opens a truck and', 'd'), s(' shows where it goes.', 'd')];
   }
   const route = d.routeOf(t.id, departureOf(app));
+  if (d.inGarage(t.id)) {
+    return [s(` TRUCK ${t.id} · ROUTE`, 'b'), [], s(' At the garage with', 'w'), s(` ${d.morning.garage?.reason}.`, 'w'), s(' Back tomorrow.', 'd'), s(' It costs nothing today.', 'd')];
+  }
   const out: Line[] = [s(` TRUCK ${t.id} · ROUTE`, 'b'), [], s(' depot (Saltmarket)', 'd')];
   if (route.visits.length === 0) return [...out, s('   │'), s(' nothing to deliver', 'd')];
   for (const v of route.visits) {

@@ -40,7 +40,7 @@ describe('a bot plays many days', () => {
           // An order no truck can take is left, and the trucks go without it.
           if (app.desk.unfinishedCount() === 0 || stuck > 40) { stuck = 0; P(' '); break; }
           if (app.pane === 'trucks') {
-            if (/too full/.test(app.status)) {
+            if (/too full|garage/.test(app.status)) {
               stuck++;
               if (app.truckSel === app.morning.trucks.length - 1) for (let i = 0; i < app.truckSel; i++) P('ArrowUp');
               else P('ArrowDown');

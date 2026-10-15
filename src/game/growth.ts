@@ -33,7 +33,10 @@ export interface GrowthOption {
 export interface Fleet {
   trucks: number;
   out: number;
+  /** Trucks that were free to go and stayed in the yard. */
   yard: number;
+  /** Trucks that were at the garage, which had no space to give: they are left out of the space and of how full it was. */
+  garage: number;
   /** The space of all the trucks together, and the share of it that was loaded, in whole per cent. */
   space: number;
   use: number;
@@ -49,10 +52,11 @@ const ROOM_NAME: Record<Kept, string> = { freezer: 'freezer', fridge: 'fridge', 
 
 /** How full the trucks were today. */
 export function fleetOf(day: DaySummary): Fleet {
-  const space = day.trucks.reduce((n, t) => n + t.capacity, 0);
-  const load = day.trucks.reduce((n, t) => n + t.load, 0);
-  const out = day.trucks.filter((t) => t.backAt != null).length;
-  return { trucks: day.trucks.length, out, yard: day.trucks.length - out, space, use: space > 0 ? Math.round((load * 100) / space) : 0 };
+  const free = day.trucks.filter((t) => !t.garage);
+  const space = free.reduce((n, t) => n + t.capacity, 0);
+  const load = free.reduce((n, t) => n + t.load, 0);
+  const out = free.filter((t) => t.backAt != null).length;
+  return { trucks: day.trucks.length, out, yard: free.length - out, garage: day.trucks.length - free.length, space, use: space > 0 ? Math.round((load * 100) / space) : 0 };
 }
 
 /** The room that will be tightest tomorrow: the one with the most that will spoil, then the fullest; the first listed wins a tie. */
@@ -74,7 +78,7 @@ function truckGain(day: DaySummary, business: Business, next: Truck): string[] {
   const fleet = fleetOf(day);
   const yard = fleet.yard > 0 ? `, ${fleet.yard} stayed in the yard` : '';
   return [
-    `A ${next.kind} with room for ${next.capacity}, on top of the ${grouped(fleet.space)} your ${plural(fleet.trucks, 'truck')} hold. Orders are planned to fill at most ${Math.round(TRUCK_SHARE * 100)}% of the trucks, ` +
+    `A ${next.kind} with room for ${next.capacity}, on top of the ${grouped(fleet.space)} your ${plural(fleet.trucks - fleet.garage, 'truck')} hold. Orders are planned to fill at most ${Math.round(TRUCK_SHARE * 100)}% of the trucks, ` +
       `so it only helps once yours near that: today they were ${fleet.use}% full${yard}. ` +
       `The next truck after it will cost ${formatMoney(truckPrice(business.clients.length, business.trucks.length + 1))}.`,
   ];
