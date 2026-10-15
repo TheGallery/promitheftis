@@ -151,7 +151,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'PLAYING A DAY AGAIN',
         text:
           '{R} plays the current day again from its overnight messages, with the same orders and the same stock. It leaves the saved run alone. ' +
-          'On the end of the day, where it would drop your order, you hold {R} like the other steps.',
+          'On the end of the day and the growth choice, where it would drop your order, you hold {R} like the other steps.',
       },
     ],
   },
@@ -176,8 +176,8 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'STARTING OVER',
         text:
           '{B} starts a new run with the big morning (9 trucks, 38 orders) and {S} with the small one (2 trucks, 7 orders). On day 1 one ' +
-          'press is enough. From day 2 on, a new run replaces your saved day, so the bottom of the screen asks and you hold the key down ' +
-          'for about a second and a half until the bar beside the button fills. Let go early, or press {ESC}, and nothing happens.',
+          'press is enough. From day 2 on, a new run replaces your saved day, so a box asks and you hold the key down ' +
+          'for about a second and a half until its bar fills. Let go early, or press {ESC}, and nothing happens.',
       },
       {
         head: 'KEYS THAT WORK EVERYWHERE',
