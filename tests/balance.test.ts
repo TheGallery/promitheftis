@@ -31,8 +31,15 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     const blind = summarise(runs(kind, 'blind'), FROM).profit;
     const careful = summarise(runs(kind, 'careful'), FROM).profit;
     expect(careful).toBeGreaterThan(0);
-    // At least 15% more on the small morning, a good deal more on the big.
-    expect(blind).toBeLessThanOrEqual(careful * (kind === 'small' ? 0.85 : 0.7));
+    // Thinking is worth at least a quarter more than pressing buttons, on either morning.
+    expect(blind).toBeLessThanOrEqual(careful * 0.8);
+  });
+
+  it('keeps blind play calm: it still makes money and most clients are pleased, only less than for a careful player', () => {
+    const blind = summarise(runs(kind, 'blind'), FROM);
+    expect(blind.profit).toBeGreaterThan(0);
+    expect(blind.pleased).toBeGreaterThan(0.5);
+    expect(blind.minCash).toBeGreaterThan(0);
   });
 
   it('leaves a careful day in profit', () => {
@@ -58,7 +65,7 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
   });
 
   it('makes rooms matter: stock spoils for the player who never looks at the bars, and not for the one who does', () => {
-    expect(summarise(runs(kind, 'blind'), FROM).spoiled).toBeGreaterThan(10);
+    expect(summarise(runs(kind, 'blind'), FROM).spoiled).toBeGreaterThan(5);
     expect(summarise(runs(kind, 'careful'), FROM).spoiled).toBeLessThan(1);
   });
 

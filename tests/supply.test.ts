@@ -99,6 +99,17 @@ describe('the supplier order', () => {
     s.rows.forEach((row, r) => expect(s.amount(r)).toBe(Math.max(0, row.usual - row.onHand)));
   });
 
+  it('does not fill a room far past its space: when the usual amounts would not fit, every row in it is cut by the same share', () => {
+    const m = smallMorning();
+    const grown = { ...m, usual: Object.fromEntries(Object.entries(m.usual).map(([id, n]) => [id, n * 4])) };
+    const s = new Supply(grown, {});
+    s.fillAll();
+    for (const kept of KEPT_ORDER) expect(s.roomSpace(kept).pct).toBeLessThanOrEqual(115);
+    const cut = s.rows.map((_, r) => s.amount(r) / s.gap(r)).filter((share) => share < 1);
+    expect(cut.length).toBeGreaterThan(0);
+    expect(Math.max(...cut) - Math.min(...cut)).toBeLessThan(0.1);
+  });
+
   it('leaves a row that already has an amount alone when filling it', () => {
     const s = supply();
     s.set(0, 7);

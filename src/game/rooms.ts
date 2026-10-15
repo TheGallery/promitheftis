@@ -4,7 +4,7 @@ import type { Kept } from './types';
 export const ROOM_CAPACITY: Record<Kept, number> = { freezer: 340, fridge: 600, dry: 920 };
 
 /** How much each store room holds when the run begins as the small morning: a smaller business has smaller rooms. */
-export const SMALL_ROOM_CAPACITY: Record<Kept, number> = { freezer: 120, fridge: 150, dry: 300 };
+export const SMALL_ROOM_CAPACITY: Record<Kept, number> = { freezer: 210, fridge: 270, dry: 540 };
 
 /** How much space a bigger room gains, in space units. */
 export const ROOM_GROWTH: Record<Kept, number> = { freezer: 100, fridge: 150, dry: 200 };

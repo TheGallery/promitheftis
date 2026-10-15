@@ -59,12 +59,12 @@ describe('room space', () => {
     expect(supply.roomSpace('freezer')).toMatchObject({ overBy: 0, overPct: 0 });
   });
 
-  it('fills the small morning\'s rooms to about two thirds when everything is ordered up to the usual amounts', () => {
+  it('leaves the small morning\'s rooms about two fifths full when everything is ordered up to the usual amounts', () => {
     const small = new Supply(smallMorning(), {});
     small.fillAll();
     for (const kept of KEPT_ORDER) {
-      expect(small.roomSpace(kept).pct).toBeGreaterThanOrEqual(60);
-      expect(small.roomSpace(kept).pct).toBeLessThanOrEqual(70);
+      expect(small.roomSpace(kept).pct).toBeGreaterThanOrEqual(35);
+      expect(small.roomSpace(kept).pct).toBeLessThanOrEqual(50);
     }
   });
 
@@ -112,11 +112,11 @@ describe('what a room can hold', () => {
 
   it('shows on the supply rows which items spoil and how many, and the room total', () => {
     const supply = new Supply(smallMorning(), { chips: 10, peas: 5 });
-    supply.set(supply.rows.findIndex((r) => r.item.id === 'chips'), 50);
+    supply.set(supply.rows.findIndex((r) => r.item.id === 'chips'), 60);
     supply.set(supply.rows.findIndex((r) => r.item.id === 'peas'), 10);
-    // 120 space = 40 units: the 15 in store stay, 25 of the 50 chips fit, and all the peas ordered are turned away.
-    expect(supply.spoilage('freezer')).toEqual(new Map([['chips', 25], ['peas', 10]]));
-    expect(supply.roomSpace('freezer').spoils).toBe(35);
+    // 210 space = 70 units: the 15 in store stay, 55 of the 60 chips fit, and all the peas ordered are turned away.
+    expect(supply.spoilage('freezer')).toEqual(new Map([['chips', 5], ['peas', 10]]));
+    expect(supply.roomSpace('freezer').spoils).toBe(15);
     expect(supply.roomSpace('fridge').spoils).toBe(0);
     supply.set(supply.rows.findIndex((r) => r.item.id === 'chips'), 5);
     expect(supply.spoilage('freezer').size).toBe(0);

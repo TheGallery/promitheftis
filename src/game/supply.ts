@@ -58,6 +58,9 @@ export function callNotes(calls: readonly Call[], answers: ReadonlyMap<number, n
  * Tomorrow's order to the supplier: an amount for every item, grouped by where
  * it is kept. Rows are numbered in the order they are listed on the screen.
  */
+/** A fills a room to this much of its space, a little over, so the warning is still there to be read. */
+const FILL_ALL_TO = 1.15;
+
 export class Supply {
   readonly rows: SupplyRow[];
   readonly notes: Map<string, CallNote[]>;
@@ -150,8 +153,28 @@ export class Supply {
     return this.set(r, this.gap(r));
   }
 
+  /**
+   * Fills every row at zero up to its gap, but no further than its room can hold: where the gaps together would not
+   * fit, each is cut by the same share. A row with an amount is left as it is, and takes its space first.
+   */
   fillAll(): void {
-    for (let r = 0; r < this.count; r++) this.fillRow(r);
+    const rooms = new Set(this.rows.map((row) => row.kept));
+    for (const kept of rooms) {
+      const empty: number[] = [];
+      let free = this.capacity[kept] * FILL_ALL_TO;
+      let need = 0;
+      this.rows.forEach((row, r) => {
+        if (row.kept !== kept) return;
+        const space = spaceOf(row.item.id);
+        free -= (row.onHand + this.amount(r)) * space;
+        if (this.amount(r) === 0) {
+          empty.push(r);
+          need += this.gap(r) * space;
+        }
+      });
+      const share = need > free ? Math.max(0, free) / need : 1;
+      for (const r of empty) this.set(r, Math.floor(this.gap(r) * share));
+    }
   }
 
   /** How many units of each item in a room will spoil tomorrow because the room has no space for them. */

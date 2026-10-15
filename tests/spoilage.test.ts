@@ -14,12 +14,12 @@ const small = () => runFromMorning(smallMorning());
 
 describe('a room that is full overnight', () => {
   it('keeps what fits and loses the rest of the delivery, which is paid for all the same', () => {
-    // The small freezer holds 120 space: 40 units of chips or peas.
-    const next = nextDay(small(), outcome({ left: { chips: 10 }, ordered: { chips: 50, peas: 10 } }));
-    expect(next.stock.chips).toBe(40);
+    // The small freezer holds 210 space: 70 units of chips or peas.
+    const next = nextDay(small(), outcome({ left: { chips: 10 }, ordered: { chips: 70, peas: 10 } }));
+    expect(next.stock.chips).toBe(70);
     expect(next.stock.peas).toBe(0);
-    expect(next.spoiled).toEqual([{ item: 'chips', units: 20 }, { item: 'peas', units: 10 }]);
-    expect(next.delivery).toEqual({ items: 2, units: 60 });
+    expect(next.spoiled).toEqual([{ item: 'chips', units: 10 }, { item: 'peas', units: 10 }]);
+    expect(next.delivery).toEqual({ items: 2, units: 80 });
   });
 
   it('spoils nothing when everything fits, and the other rooms are left alone', () => {
@@ -30,11 +30,11 @@ describe('a room that is full overnight', () => {
   });
 
   it('uses the room as it was when the delivery came: a bigger room bought tonight helps from the day after', () => {
-    const grown = nextDay(small(), outcome({ ordered: { chips: 50 }, growth: { kind: 'room', room: 'freezer' } }));
-    expect(grown.stock.chips).toBe(40);
+    const grown = nextDay(small(), outcome({ ordered: { chips: 80 }, growth: { kind: 'room', room: 'freezer' } }));
+    expect(grown.stock.chips).toBe(70);
     expect(grown.capacity.freezer).toBe(SMALL_ROOM_CAPACITY.freezer + ROOM_GROWTH.freezer);
-    const again = nextDay(grown, outcome({ ordered: { chips: 50 } }));
-    expect(again.stock.chips).toBe(50);
+    const again = nextDay(grown, outcome({ ordered: { chips: 80 } }));
+    expect(again.stock.chips).toBe(80);
     expect(again.spoiled).toEqual([]);
   });
 
@@ -101,7 +101,7 @@ describe('the room offered at the end of the day', () => {
 
 describe('a saved run with rooms that spoil', () => {
   it('keeps what spoiled and what the notes announced', () => {
-    const run = nextDay(small(), outcome({ ordered: { chips: 50 }, ahead: [{ client: "Rosa's", event: 'halfterm' }] }));
+    const run = nextDay(small(), outcome({ ordered: { chips: 90 }, ahead: [{ client: "Rosa's", event: 'halfterm' }] }));
     expect(run.spoiled.length).toBeGreaterThan(0);
     expect(decodeRun(encodeRun(run, 5))).toEqual({ run, daySeed: 5 });
   });
@@ -121,8 +121,8 @@ describe('a saved run with rooms that spoil', () => {
 });
 
 describe('the first morning', () => {
-  it('has rooms that fill to about two thirds for the small morning and about three quarters for the big', () => {
-    for (const [load, low, high] of [[smallMorning, 55, 70], [bigMorning, 62, 85]] as const) {
+  it('has rooms that fill to about two fifths for the small morning and about three quarters for the big', () => {
+    for (const [load, low, high] of [[smallMorning, 35, 50], [bigMorning, 62, 85]] as const) {
       const m = load();
       for (const kept of ['freezer', 'fridge', 'dry'] as const) {
         const used = m.items.filter((i) => i.kept === kept).reduce((sum, i) => sum + (m.usual[i.id] ?? 0) * spaceOf(i.id), 0);
