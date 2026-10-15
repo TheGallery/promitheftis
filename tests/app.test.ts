@@ -273,7 +273,10 @@ describe('sounds', () => {
     expect(app.roadOver).toBe(true);
     expect(heard(' ')).toEqual([['confirm']]);
     expect(app.screen).toBe('result');
-    expect(heard('ArrowUp', 'ArrowDown', 'q', 'r')).toEqual([[], ['move'], [], ['confirm']]);
+    expect(heard('ArrowUp', 'ArrowDown', 'q')).toEqual([[], ['move'], []]);
+    expect(heard('r')).toEqual([[]]);
+    hold(app, 'r');
+    expect(app.screen).toBe('messages');
   });
 
   it('plays nothing when the sounds are off: the effects decide, the app still asks', () => {
@@ -480,7 +483,7 @@ describe('a whole small morning', () => {
     leaveRoad(press, app);
     expect(app.screen).toBe('result');
     expect(header()).toContain(' PROMITHEFTIS · ');
-    press('r');
+    hold(app, 'r');
     expect(app.screen).toBe('messages');
     expect(header()).toContain(' PROMITHEFTIS · ');
     press(' ');
@@ -502,7 +505,7 @@ describe('a whole small morning', () => {
     expect(text).toContain('TRUCK SHEETS');
     expect(text).toContain('LOADING');
     expect(text).toContain('STORE ROOM');
-    expect(text).toContain('Saltmarket, Docks');
+    expect(text).toContain('SLT DCK');
     press('Enter');
     text = expectFullScreen(app).join('\n');
     expect(text).toContain('TRUCK 1 · ROUTE');
@@ -771,7 +774,7 @@ describe('a whole small morning', () => {
     hold(app, ' ');
     leaveRoad(press, app);
     expect(app.callLines.length).toBeGreaterThan(0);
-    press('r');
+    hold(app, 'r');
     expect(app.calls).toEqual([]);
     expect(app.answers.size).toBe(0);
   });
@@ -814,7 +817,7 @@ describe('a whole small morning', () => {
     press(' ');
     hold(app, ' ');
     leaveRoad(press, app);
-    press('r');
+    hold(app, 'r');
     expect(app.screen).toBe('messages');
     expect(app.desk.unfinishedCount()).toBe(7);
   });

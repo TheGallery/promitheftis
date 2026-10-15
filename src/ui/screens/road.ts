@@ -32,9 +32,14 @@ function logLine(e: RoadEvent): Line {
   }
 }
 
+/** The answered call: who, what about and what was answered, with the client and topic shortened so the answer always shows. */
 function answeredLine(app: App, c: Call): Line {
   const record = c.options[app.answers.get(c.id) ?? 0]?.record ?? '';
-  return cat(s(` ${formatTime(c.at)} `, 'd'), s('Call', 'b'), s(` · ${clip(c.client, 22)}, ${clip(c.topic, 26)} · ${record}`, 'acc'));
+  // " HH:MM Call · " and ", " and " · " are 14 + 2 + 3 columns.
+  const room = Math.max(0, LOG_W - 19 - [...record].length);
+  const topic = clip(c.topic, Math.min(26, Math.max(10, room - 12)));
+  const client = clip(c.client, Math.max(8, room - [...topic].length));
+  return cat(s(` ${formatTime(c.at)} `, 'd'), s('Call', 'b'), s(` · ${client}, ${topic} · ${record}`, 'acc'));
 }
 
 /** The box for the call that is ringing: who, what they say, and the answers to pick from. */

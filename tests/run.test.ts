@@ -564,7 +564,8 @@ describe('the next morning in the game', () => {
     const orders = JSON.stringify(app.morning.orders);
     const stock = { ...app.morning.stock };
     playToSupply(app, press);
-    press('Escape', 'r');
+    press('Escape');
+    hold(app, 'r');
     expect(app.screen).toBe('messages');
     expect(app.morning.day).toBe(2);
     expect(JSON.stringify(app.morning.orders)).toBe(orders);
@@ -603,26 +604,28 @@ describe('the next morning in the game', () => {
   it('starts the fixed first morning again with R on day 1, as before', () => {
     const { app, press } = toDay();
     press('r');
+    expect(app.screen).toBe('day');
+    hold(app, 'r');
     expect(app.morning).toEqual(smallMorning());
     expect(app.run.day).toBe(1);
   });
 
   it('offers both fixed mornings on later days, and the other one on the first', () => {
     const first = toDay();
-    expect(screen(first.app).at(-1)).toContain('big morning');
-    expect(screen(first.app).at(-1)).not.toContain('small morning');
+    expect(screen(first.app).at(-1)).toContain('hold: big');
+    expect(screen(first.app).at(-1)).not.toContain('hold: small');
     const { app, press } = toNextMorning('1');
-    expect(screen(app).at(-1)).toContain('big / small');
+    expect(screen(app).at(-1)).toContain('hold: big / small morning');
     playToSupply(app, press);
     press('Escape');
     expect(app.screen).toBe('result');
-    expect(screen(app).at(-1)).toContain('big / small');
+    expect(screen(app).at(-1)).toContain('hold: big/small');
     press(' ', 'a');
     hold(app, ' ');
     expect(app.screen).toBe('day');
-    expect(screen(app).at(-1)).toContain('big / small');
+    expect(screen(app).at(-1)).toContain('hold: big/small');
     press(' ');
-    expect(screen(app).at(-1)).toContain('big / small');
+    expect(screen(app).at(-1)).toContain('hold: big/small');
   });
 
   it('shows every screen of day 2 in 120 columns by 30 rows, in both colour schemes', () => {

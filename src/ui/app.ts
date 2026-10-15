@@ -153,8 +153,13 @@ export class App {
   growthSel = 0;
   /** What was chosen to grow, or null until it is confirmed. The next morning puts it to work. */
   growth: Growth | null = null;
-  /** The restaurant that asks to join, picked at random when the order is placed so it stays the same while the day is on show. */
+  /** The restaurant that asks to join, picked when the order is placed so it stays the same while the day is on show. */
   private newClient: NewClient | null = null;
+  /**
+   * What chance decides in the day: which restaurant asks to join (a number from 0 up to but not including 1) and the seed
+   * of the next morning. They are drawn once when a day begins, so playing that day again offers and brings the same.
+   */
+  private luck = { client: 0, seed: 0 };
 
   constructor(
     private readonly effects: Effects,
@@ -164,6 +169,7 @@ export class App {
     this.morning = loadMorning(morningId);
     this.run = runFromMorning(this.morning);
     this.desk = new Desk(this.morning);
+    this.drawLuck();
     this.openSettings();
     this.openRun();
   }
@@ -224,7 +230,7 @@ export class App {
     if (repeat && key0 === this.spentKey) return true;
     if (!repeat) this.spentKey = null;
     const asked = this.ask;
-    if (asked && key0 === this.holdKey) {
+    if (asked && !this.helpOpen && key0 === this.holdKey) {
       // The key the box asks to be held: the first press starts the fill, the keyboard repeating it changes nothing.
       if (!repeat && this.holdSince == null) {
         this.holdSince = this.effects.now();
@@ -232,15 +238,17 @@ export class App {
       }
       return true;
     }
+    if (this.helpOpen || (key0 === 'h' && !repeat)) {
+      // How to play only pauses a step waiting for its key: the box is still there, empty, when it closes.
+      this.holdSince = null;
+      const used = this.helpKey(key, repeat);
+      this.changed();
+      return used;
+    }
     this.cancelHold();
     if (asked && key === 'Escape') {
       this.changed();
       return true;
-    }
-    if (this.helpOpen || (key0 === 'h' && !repeat)) {
-      const used = this.helpKey(key, repeat);
-      this.changed();
-      return used;
     }
     // A held SPACE or ENTER never goes on by itself, and SPACE just after the screen changed is a double tap.
     if (repeat && (key === ' ' || key === 'Enter')) return true;
@@ -264,8 +272,9 @@ export class App {
 
   /**
    * How to play: H opens it from any screen and H or ESC closes it, back at exactly the screen and state it was
-   * opened from. While it is open no key reaches the game under it, the road's clock waits, and the message that was
-   * showing is kept for when it closes. The page turns with the arrows and PgUp / PgDn.
+   * opened from, with a step still waiting for its key (the hold box, empty). While it is open no key reaches the
+   * game under it, the road's clock waits, and the message that was showing is kept for when it closes. The page
+   * turns with the arrows and PgUp / PgDn.
    */
   private helpKey(key: string, repeat: boolean): boolean {
     const key0 = key.toLowerCase();
@@ -460,11 +469,12 @@ export class App {
   }
 
   /**
-   * B or S during play. From day 2 on the new run would replace the saved one, so the key has to be held down
-   * until the box fills (see `tick`); on day 1 there is little to lose and it starts at once.
+   * B or S during play. A new run drops the day in play and, from day 2 on, replaces the saved one, so the key has to be
+   * held down until the box fills (see `tick`). Only on the overnight messages of day 1, with nothing played yet, it
+   * starts at once.
    */
   private newRun(id: 'small' | 'big'): boolean {
-    if (this.run.day > 1) {
+    if (this.run.day > 1 || this.screen !== 'messages') {
       this.askHold({ action: 'newRun', morning: id }, id === 'big' ? 'b' : 's');
       return true;
     }
@@ -571,22 +581,27 @@ export class App {
     this.saveRun();
   }
 
-  /** Plays the current day again from its overnight messages: the same orders, the same stock. */
+  /** Plays the current day again from its overnight messages: the same orders, the same stock, the same chances. */
   restartDay(): void {
-    this.startDay(this.morningOf(this.run, this.daySeed));
+    this.startDay(this.morningOf(this.run, this.daySeed), false);
+  }
+
+  private drawLuck(): void {
+    this.luck = { client: this.effects.random(), seed: Math.floor(this.effects.random() * 4294967296) };
   }
 
   /** The next morning: the stock left plus the supplier's delivery, the growth at work, and a made-up day of orders. */
   private nextMorning(day: DaySummary, supply: Supply): void {
     const left = stockAfterDeliveries(this.desk);
     this.run = nextDay(this.run, outcomeOf(left, supply, day, this.calls, this.answers, this.growth));
-    this.daySeed = Math.floor(this.effects.random() * 4294967296);
+    this.daySeed = this.luck.seed;
     this.startDay(generateDay(this.run, mulberry32(this.daySeed)));
     this.saveRun();
   }
 
-  /** Puts a day's morning on the desk and clears everything the last day left on the screens. */
-  private startDay(morning: Morning): void {
+  /** Puts a day's morning on the desk and clears everything the last day left on the screens; a new day draws its chances. */
+  private startDay(morning: Morning, fresh = true): void {
+    if (fresh) this.drawLuck();
     this.morning = morning;
     this.desk = new Desk(this.morning);
     this.screen = 'messages';
@@ -699,6 +714,8 @@ export class App {
   private typeDigit(digit: string | null): void {
     const o = this.orderSel;
     const l = this.lineSel;
+    // Nothing typed on a line that is not decided yet: there is nothing to take off.
+    if (digit === null && this.typed === '' && this.desk.given(o, l) == null) return;
     const before = [this.typed, this.desk.given(o, l)];
     if (digit === null) this.typed = this.typed.slice(0, -1);
     else if (this.typed.length < MAX_DIGITS) this.typed += digit;
@@ -848,6 +865,9 @@ export class App {
         this.startPrint();
         return true;
       case 'Escape':
+        // Leaving the sheets ends a print that is still going: its last line says nothing on the desk.
+        this.printJob++;
+        this.printing = null;
         this.screen = 'desk';
         this.sound('sheetClose');
         return true;
@@ -1020,8 +1040,7 @@ export class App {
         break;
       case 'r':
       case 'R':
-        this.restartDay();
-        this.sound('confirm');
+        this.askHold({ action: 'again' }, 'r');
         return true;
       case ' ':
         this.openSupply();
@@ -1137,7 +1156,7 @@ export class App {
     this.growthOpen = false;
     this.growthSel = 0;
     this.growth = null;
-    this.newClient = newClientFor(this.run.clients.map((c) => c.name), () => this.effects.random());
+    this.newClient = newClientFor(this.run.clients.map((c) => c.name), () => this.luck.client);
     this.screen = 'day';
     this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');
@@ -1172,7 +1191,7 @@ export class App {
     return this.result ? morningMoney(this.result, (item) => this.desk.item(item).kept) : { takenIn: 0, trucks: 0 };
   }
 
-  /** R plays this day again once it has been held, B and S start a new run from a fixed morning (from day 2 on, once the key has been held): all of them start over and drop the order and the growth choice. */
+  /** R plays this day again once it has been held, B and S start a new run from a fixed morning once the key has been held: all of them start over and drop the order and the growth choice. */
   private restartKey(key: string): boolean {
     switch (key) {
       case 'r':

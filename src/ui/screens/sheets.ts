@@ -46,7 +46,7 @@ function truckRows(app: App): { rows: Line[]; selectedRow: number } {
         const units = d.unitsGiven(o);
         rows.push(
           s(
-            `       ${n + 1}  ${clip(order.client, 20).padEnd(20)}${place(order.place).name.padEnd(10)}${(plural(units, 'item')).padStart(9)}`,
+            `       ${n + 1}  ${clip(order.client, 19).padEnd(20)}${place(order.place).name.padEnd(11)}${(plural(units, 'item')).padStart(9)}`,
             used ? '' : 'd',
           ),
         );

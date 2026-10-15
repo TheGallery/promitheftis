@@ -294,9 +294,13 @@ describe('how to play', () => {
     press('b');
     expect(app.newRunAsk).toBe('big');
     press('h');
-    expect(app.newRunAsk).toBeNull();
-    app.tick();
+    expect(app.helpOpen).toBe(true);
+    expect(app.newRunAsk).toBe('big');
+    press('h');
+    expect(app.helpOpen).toBe(false);
+    expect(app.newRunAsk).toBe('big');
     press('Escape');
+    expect(app.newRunAsk).toBeNull();
     expect(app.screen).toBe('start');
     expect(store.data.get(RUN_KEY)).toBe(saved);
   });

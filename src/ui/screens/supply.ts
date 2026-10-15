@@ -8,7 +8,7 @@ import type { App } from '../app';
 import { cat, header, keyBar, layout, rule, s, width, wrapText, type Line } from '../grid';
 import { clockLine, moneySeg } from './common';
 
-const NAME_W = 20;
+const NAME_W = 19;
 /** Where the panel on the right starts: the room bars and the money, with the call notes below them. */
 const PANEL_AT = 60;
 const PANEL_W = 120 - PANEL_AT;
@@ -25,7 +25,7 @@ const SHADES = [
 ] as const;
 
 function titles(): Line {
-  return s(` ${'ITEM'.padEnd(NAME_W)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(7)}${'PRICE'.padStart(7)}${'ORDER'.padStart(8)}${'COST'.padStart(8)}`, 'd');
+  return s(`  ${'ITEM'.padEnd(NAME_W)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(7)}${'PRICE'.padStart(7)}${'ORDER'.padStart(8)}${'COST'.padStart(8)}`, 'd');
 }
 
 function legend(): Line {
@@ -149,7 +149,7 @@ function rows(app: App, supply: Supply): Line[] {
     const base = done && !current ? 'd' : '';
     const hl = (cls: string) => (current ? `${cls} hl`.trim() : cls);
     out.push(cat(
-      s(current ? '▶' : done ? '✓' : ' ', hl(base)),
+      s(current ? '▶ ' : done ? '✓ ' : '  ', hl(base)),
       s(row.item.name.padEnd(NAME_W), hl(noted ? 'w' : base)),
       s(rest, hl(base)),
       orderCell(app, supply, r),

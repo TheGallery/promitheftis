@@ -72,7 +72,7 @@ export function pad(line: Line, w: number): Line {
     return cut(line, w);
   }
   // A highlighted row stays highlighted to the end of its column.
-  const fill = line[line.length - 1]?.[1] === 'hl' ? 'hl' : '';
+  const fill = line[line.length - 1]?.[1].split(' ').includes('hl') ? 'hl' : '';
   return n === w ? line : [...line, [' '.repeat(w - n), fill]];
 }
 

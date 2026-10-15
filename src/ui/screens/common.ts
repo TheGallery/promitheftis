@@ -24,12 +24,12 @@ export function clockLine(day: number, minute: number, trucksWaiting = false, ca
 }
 
 /**
- * B and S start a new run from a fixed morning. On the first day only the morning
- * that is not being played is offered; from the second day on, both are.
+ * B and S start a new run from a fixed morning, and drop the day in play, so their keys are held down. On the first
+ * day only the morning that is not being played is offered; from the second day on, both are.
  */
 export function otherMornings(app: App): ReadonlyArray<readonly [string, string]> {
-  if (app.morning.day > 1) return [['B S', 'big / small']];
-  return app.morning.id === 'small' ? [['B', 'big morning']] : [['S', 'small morning']];
+  if (app.morning.day > 1) return [['B S', 'hold: big/small']];
+  return app.morning.id === 'small' ? [['B', 'hold: big']] : [['S', 'hold: small']];
 }
 
 /**

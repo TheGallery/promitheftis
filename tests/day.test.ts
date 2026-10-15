@@ -221,9 +221,12 @@ describe('the end-of-day screen', () => {
     expect(a.app.day).toBeNull();
     const b = toDay();
     b.press('b');
+    expect(b.app.screen).toBe('day');
+    expect(b.app.morning.id).toBe('small');
+    hold(b.app, 'b');
     expect(b.app.screen).toBe('messages');
     expect(b.app.morning.id).toBe('big');
-    b.press('s');
+    hold(b.app, 's');
     expect(b.app.morning.id).toBe('small');
     const c = toDay(0, 'big');
     hold(c.app, 'R');
@@ -235,7 +238,7 @@ describe('the end-of-day screen', () => {
   it('lists the keys that work, and only those', () => {
     const { app } = toDay();
     const bar = screen(app)[ROWS - 1]!;
-    for (const word of ['clients', 'what to grow', 'play again', 'big morning', 'colours', 'sound']) expect(bar).toContain(word);
+    for (const word of ['clients', 'what to grow', 'hold: replay', 'hold: big', 'colours', 'sound']) expect(bar).toContain(word);
     expect(bar).not.toContain('ESC');
   });
 
