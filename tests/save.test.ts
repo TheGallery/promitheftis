@@ -3,9 +3,10 @@ import { bigMorning, smallMorning } from '../src/game/morning';
 import { nextDay, runFromMorning, type RunState } from '../src/game/run';
 import { decodeRun, decodeSettings, encodeRun, encodeSettings, SAVE_VERSION } from '../src/game/save';
 import { App, HOLD_MS, RUN_KEY, SETTINGS_KEY, type Effects } from '../src/ui/app';
+import { BAR_CELLS } from '../src/ui/screens/hold';
 import { screenLines } from '../src/ui/view';
 import { browserStore, memoryStore, type Store } from '../src/ui/store';
-import { fakeEffects, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
+import { fakeEffects, hold, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
 const RANDOM = () => 0.37;
 const SEED = Math.floor(0.37 * 4294967296);
@@ -200,7 +201,7 @@ describe('a run saved in the browser', () => {
   it('does not save a choice that is still open: the saved day is the one that began', () => {
     const store = memoryStore();
     const { app, press } = toDay(0, 'small', ['a'], [], RANDOM, store);
-    press('Enter', '1', 'Enter');
+    press(' ', '1', 'Enter');
     expect(app.growth).not.toBeNull();
     expect(savedRun(store)?.run.day).toBe(1);
   });
@@ -236,15 +237,19 @@ describe('a run saved in the browser', () => {
     const store = memoryStore();
     const first = toNextMorning('1', 'small', 0, RANDOM, store);
     playToSupply(first.app, first.press);
-    first.press('a', 'F9', 'Enter', '2', 'Enter', 'Enter');
+    first.press('a');
+    hold(first.app, ' ');
+    first.press(' ', '2', 'Enter');
+    hold(first.app, ' ');
     expect(first.app.run.day).toBe(3);
     const { app, press } = appOn(store, () => 0.01);
     press('c');
     expect(app.run.day).toBe(3);
     expect(app.morning).toEqual(first.app.morning);
     playToSupply(app, press);
-    press('a', 'F9');
-    press('r');
+    press('a');
+    hold(app, ' ');
+    hold(app, 'r');
     expect(app.run.day).toBe(3);
     expect(app.morning).toEqual(first.app.morning);
   });
@@ -262,7 +267,7 @@ describe('a run saved in the browser', () => {
     const store = memoryStore();
     toNextMorning('3', 'big', 0, RANDOM, store);
     const { app, press } = appOn(store);
-    expect(screen(app).at(-1)).toContain('ENTER go');
+    expect(screen(app).at(-1)).toContain('SPACE continue');
     press('ArrowDown');
     expect(screen(app).join('\n')).toContain('▶ 2  New run: the small morning');
     press('ArrowDown', 'ArrowDown', 'ArrowDown');
@@ -287,7 +292,8 @@ describe('a run saved in the browser', () => {
     toNextMorning('1', 'small', 0, RANDOM, store);
     const { app } = appOn(store);
     expect(app.press({ key: 'x' })).toBe(false);
-    expect(app.press({ key: ' ' })).toBe(false);
+    expect(app.press({ key: '4' })).toBe(false);
+    expect(app.press({ key: 'F9' })).toBe(false);
     expect(app.screen).toBe('start');
   });
 });
@@ -312,7 +318,7 @@ describe('B and S replace the save', () => {
     holdNewRun(app, 'b');
     expect(app.run.day).toBe(1);
     expect(savedRun(store)?.run.kind).toBe('big');
-    press(' ', 'F10', 'F10');
+    press(' ', ' ');
     press('Escape');
     expect(savedRun(store)?.run.day).toBe(1);
   });
@@ -331,6 +337,8 @@ describe('B and S replace the save', () => {
     const { app, press } = toDay(0, 'small', ['a'], [], RANDOM, store);
     const text = store.data.get(RUN_KEY);
     press('r');
+    expect(app.screen).toBe('day');
+    hold(app, 'r');
     expect(app.screen).toBe('messages');
     expect(store.data.get(RUN_KEY)).toBe(text);
   });
@@ -364,20 +372,27 @@ function laterDay() {
     clock.t += ms;
     app.tick();
   };
+  /** Holds a key down until the hold box is full, then lets go. */
+  const held = (key: string) => {
+    press(key);
+    wait(HOLD_MS);
+    app.release(key);
+  };
   const text = store.data.get(RUN_KEY);
   cues.length = 0;
-  return { app, press, store, text, wait, cues };
+  return { app, press, store, text, wait, held, cues };
 }
 
-/** How many cells of the hold-to-start bar are filled on the screen. */
+/** How many cells of the hold bar are filled on the screen. */
 function filled(app: App): number {
-  return [...barOf(app).filter(([, cls]) => cls === 'bf').map(([text]) => text).join('')].length;
+  return [...barOf(app).filter(([, cls]) => cls.split(' ').includes('bf')).map(([text]) => text).join('')].length;
 }
 
-/** The segments of the bar on the line with the button: █ in the accent colour, ░ dimmed. */
+/** The segments of the bar in the hold box: █ in the accent colour, ░ dimmed. */
 function barOf(app: App) {
-  const line = screenLines(app).find((l) => l.map(([text]) => text).join('').includes('HOLD'));
-  return (line ?? []).filter(([text]) => /^[█░]+$/.test(text));
+  const isBar = ([text, cls]: readonly [string, string]) => /^[█░]+$/.test(text) && cls.split(' ').includes('box');
+  const line = screenLines(app).find((l) => l.some(isBar));
+  return (line ?? []).filter(isBar);
 }
 
 describe('B and S have to be held down from day 2 on', () => {
@@ -390,8 +405,9 @@ describe('B and S have to be held down from day 2 on', () => {
       expect(app.holding).toBe(true);
       expect(cues).toEqual([]);
       const lines = screen(app).join('\n');
-      expect(lines).toContain(`Start a new run? It replaces your saved day 2. [ HOLD ${name} TO START A NEW RUN ]`);
-      expect(lines).toContain('ESC keeps playing');
+      expect(lines).toContain(`HOLD ${name} TO START A NEW RUN`);
+      expect(lines).toContain('replaces your saved day 2');
+      expect(lines).toContain('press ESC, to keep your run');
       wait(HOLD_MS - 1);
       expect(app.run.day).toBe(2);
       expect(store.data.get(RUN_KEY)).toBe(text);
@@ -412,18 +428,18 @@ describe('B and S have to be held down from day 2 on', () => {
     app.press({ key: 'b' });
     expect(filled(app)).toBe(0);
     wait(HOLD_MS / 2);
-    expect(filled(app)).toBe(8);
+    expect(filled(app)).toBe(BAR_CELLS / 2);
     wait(HOLD_MS / 4);
-    expect(filled(app)).toBe(12);
+    expect(filled(app)).toBe(Math.round(BAR_CELLS * 0.75));
     expect(barOf(app).map(([text]) => text[0])).toEqual(['█', '░']);
-    expect(barOf(app).map(([, cls]) => cls)).toEqual(['bf', 'be']);
+    expect(barOf(app).map(([, cls]) => cls)).toEqual(['bf box', 'be box']);
   });
 
   it('letting go early empties the bar, starts nothing and leaves the save alone', () => {
     const { app, store, text, wait } = laterDay();
     app.press({ key: 'b' });
     wait(HOLD_MS - 200);
-    expect(filled(app)).toBeGreaterThan(10);
+    expect(filled(app)).toBeGreaterThan(BAR_CELLS / 2);
     app.release('b');
     expect(app.holding).toBe(false);
     expect(app.holdProgress).toBe(0);
@@ -432,6 +448,7 @@ describe('B and S have to be held down from day 2 on', () => {
     expect(app.run.day).toBe(2);
     expect(store.data.get(RUN_KEY)).toBe(text);
     expect(screen(app).join('\n')).toContain('HOLD B TO START A NEW RUN');
+    expect(screen(app).join('\n')).toContain('Press and hold B until the bar is full.');
   });
 
   it('after letting go early the key can be held again, and the fill starts over', () => {
@@ -494,7 +511,7 @@ describe('B and S have to be held down from day 2 on', () => {
     app.press({ key: 'b', repeat: true });
     app.press({ key: 'B', repeat: true });
     expect(app.holding).toBe(true);
-    expect(filled(app)).toBe(8);
+    expect(filled(app)).toBe(BAR_CELLS / 2);
     wait(HOLD_MS / 2);
     expect(app.run.day).toBe(1);
   });
@@ -535,21 +552,24 @@ describe('B and S have to be held down from day 2 on', () => {
   });
 
   it('works on the result, the end of the day and the growth choice, in 120 columns, over the status line', () => {
-    const { app, press, store, text, wait } = laterDay();
-    playToSupply(app, press);
+    const { app, press, store, text, wait, held } = laterDay();
+    playToSupply(app, press, 0, held);
     press('Escape');
     expect(app.screen).toBe('result');
     for (const where of ['result', 'day', 'growth'] as const) {
-      if (where === 'day') press('Enter', 'a', 'F9');
-      if (where === 'growth') press('Enter');
+      if (where === 'day') {
+        press(' ', 'a');
+        held(' ');
+      }
+      if (where === 'growth') press(' ');
       app.press({ key: 's' });
       wait(HOLD_MS / 2);
       expect(app.screen).toBe(where === 'growth' ? 'day' : where);
       expect(app.growthOpen).toBe(where === 'growth');
       expect(app.run.day).toBe(2);
       expect(store.data.get(RUN_KEY)).toBe(text);
-      expect(screen(app).join('\n')).toContain('Start a new run? It replaces your saved day 2. [ HOLD S TO START A NEW RUN ]');
-      expect(filled(app)).toBe(8);
+      expect(screen(app).join('\n')).toContain('HOLD S TO START A NEW RUN');
+      expect(filled(app)).toBe(BAR_CELLS / 2);
       app.release('s');
       press('x');
     }
@@ -561,9 +581,11 @@ describe('B and S have to be held down from day 2 on', () => {
   });
 
   it('ESC on the growth choice only cancels the question, and the choice stays open', () => {
-    const { app, press } = laterDay();
-    playToSupply(app, press);
-    press('a', 'F9', 'Enter', 's', 'Escape');
+    const { app, press, held } = laterDay();
+    playToSupply(app, press, 0, held);
+    press('a');
+    held(' ');
+    press(' ', 's', 'Escape');
     expect(app.newRunAsk).toBeNull();
     expect(app.growthOpen).toBe(true);
   });
@@ -605,7 +627,7 @@ describe('a new run on the opening screen has to be held down', () => {
       app.press({ key });
       expect(app.screen).toBe('start');
       expect(app.holding).toBe(true);
-      expect(screen(app).join('\n')).toContain(`It replaces your saved day 2. [ HOLD ${name} TO START A NEW RUN ]`);
+      expect(screen(app).join('\n')).toContain(`HOLD ${name} TO START A NEW RUN`);
       wait(HOLD_MS - 1);
       expect(app.screen).toBe('start');
       expect(store.data.get(RUN_KEY)).toBe(text);
@@ -622,7 +644,7 @@ describe('a new run on the opening screen has to be held down', () => {
     const { app, wait } = welcome();
     app.press({ key: 'ArrowDown' });
     app.press({ key: 'Enter' });
-    expect(screen(app).join('\n')).toContain('[ HOLD ENTER TO START A NEW RUN ]');
+    expect(screen(app).join('\n')).toContain('HOLD ENTER TO START A NEW RUN');
     wait(HOLD_MS);
     expect(app.run.kind).toBe('small');
     expect(app.screen).toBe('messages');
@@ -654,8 +676,8 @@ describe('a new run on the opening screen has to be held down', () => {
     expect(store.data.get(RUN_KEY)).toBe(text);
   });
 
-  it('continue is a single press, by ENTER or by C', () => {
-    for (const [keys, sel] of [[['Enter'], 0], [['c'], 1]] as const) {
+  it('continue is a single press, by ENTER, SPACE or C, whichever line is highlighted', () => {
+    for (const [keys, sel] of [[['Enter'], 0], [['c'], 1], [[' '], 2]] as const) {
       const { app } = welcome();
       app.startSel = sel;
       keys.forEach((key) => app.press({ key }));
@@ -792,7 +814,11 @@ describe('when nothing can be saved', () => {
     expect(app.status).toBe('');
     const press = (...keys: string[]) => keys.forEach((key) => app.press({ key }));
     playToSupply(app, press);
-    press('a', 'F9', 'Enter', '1', 'Enter', 'Enter', 'F2', 'F4');
+    press('a');
+    hold(app, ' ');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
+    press('F2', 'F4');
     expect(app.run.day).toBe(2);
     expect(app.blue).toBe(true);
     expect(app.screen).toBe('messages');

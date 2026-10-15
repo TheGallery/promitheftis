@@ -4,7 +4,7 @@ import { formatMoney } from '../../game/money';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, header, keyBar, layout, rule, s, wrapText, type Line } from '../grid';
-import { clockLine, moneySeg, newRunPrompt, otherMornings } from './common';
+import { clockLine, moneySeg, otherMornings } from './common';
 import { roomLine } from './day';
 
 /** Room for text after the 7-column indent of an option's details. */
@@ -74,14 +74,12 @@ export function growthScreen(app: App): Line[] {
       ];
   const body: Line[] = [...intro, [], ...optionRows(app, options), ...todayRows(app)];
   const keys = chosen
-    ? ([['ENTER', 'next morning'], ['U', 'change choice'], ['ESC', 'back']] as const)
+    ? ([['SPACE', 'hold: next morning'], ['U', 'change choice'], ['ESC', 'back']] as const)
     : ([['↑↓ 1-3', 'pick one'], ['ENTER', 'choose it'], ['ESC', 'back']] as const);
-  const status =
-    newRunPrompt(app) ??
-    (app.status
-      ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
-      : chosen
-        ? s(` Chosen: ${chosen.title}. It takes effect tomorrow. ENTER starts the next morning, U changes the choice.`, 'acc')
-        : []);
+  const status = app.status
+    ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
+    : chosen
+      ? s(` Chosen: ${chosen.title}. It takes effect tomorrow. Hold SPACE to start the next morning, U changes the choice.`, 'acc')
+      : [];
   return layout(top, body, [rule(), status, keyBar([...keys, ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

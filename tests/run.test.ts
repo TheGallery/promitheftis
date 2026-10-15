@@ -9,7 +9,7 @@ import { NEW_CLIENTS } from '../src/game/growth';
 import { stockAfterDeliveries } from '../src/game/supply';
 import type { Morning } from '../src/game/types';
 import { App } from '../src/ui/app';
-import { fakeEffects, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
+import { fakeEffects, hold, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
 const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, earned: 0, ...over });
 const smallRun = (): RunState => runFromMorning(smallMorning());
@@ -354,9 +354,9 @@ describe('a made-up day', () => {
 });
 
 describe('the next morning in the game', () => {
-  it('needs the growth choice first: ENTER on the day only opens it', () => {
+  it('needs the growth choice first: SPACE on the day only opens it', () => {
     const { app, press } = toDay();
-    press('Enter');
+    press(' ');
     expect(app.morning.day).toBe(1);
     press('Enter');
     expect(app.growth).not.toBeNull();
@@ -380,7 +380,10 @@ describe('the next morning in the game', () => {
   it('goes on to a third day with the date still moving', () => {
     const { app, press } = toNextMorning('1');
     playToSupply(app, press);
-    press('a', 'F9', 'Enter', '1', 'Enter', 'Enter');
+    press('a');
+    hold(app, ' ');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     expect(app.morning.day).toBe(3);
     expect(screen(app).join('\n')).toContain('THU 16 MAR');
     expect(app.morning.trucks).toHaveLength(4);
@@ -392,17 +395,19 @@ describe('the next morning in the game', () => {
     const ordered = new Map(app.supply!.ordered().map((o) => [o.item.id, o.amount]));
     const units = app.supply!.total();
     expect(ordered.size).toBeGreaterThan(0);
-    press('Enter', '1', 'Enter', 'Enter');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     for (const item of app.morning.items) expect(app.morning.stock[item.id]).toBe((left[item.id] ?? 0) + (ordered.get(item.id) ?? 0));
     expect(app.run.stock).toEqual(app.morning.stock);
     expect(app.run.delivery.units).toBe(units);
   });
 
   it('has only what was left when nothing was ordered of an item', () => {
-    const { app, press } = toDay(0, 'small', ['1', 'ArrowDown', 'F9']);
+    const { app, press } = toDay(0, 'small', ['1', 'ArrowDown']);
     const left = stockAfterDeliveries(app.desk);
     expect(app.supply!.ordered().map((o) => o.item.id)).toEqual(['chips']);
-    press('Enter', '1', 'Enter', 'Enter');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     expect(app.morning.stock.pork).toBe(left.pork);
     expect(app.morning.stock.chips).toBe((left.chips ?? 0) + 1);
   });
@@ -433,7 +438,7 @@ describe('the next morning in the game', () => {
     press(' ');
     screen(app);
     expect(screen(app).join('\n')).toMatch(/10 /);
-    press('F10', 'F10');
+    press(' ');
     expect(app.screen).toBe('sheets');
     press('+');
     screen(app);
@@ -444,19 +449,21 @@ describe('the next morning in the game', () => {
     playToSupply(app, press);
     expect(app.result!.trucks).toHaveLength(10);
     screen(app);
-    press('a', 'F9');
+    press('a');
+    hold(app, ' ');
     expect(app.screen).toBe('day');
     expect(app.day!.trucks).toHaveLength(10);
     screen(app);
-    press('Enter');
+    press(' ');
     screen(app);
-    press('Enter', 'Enter');
+    press('Enter');
+    hold(app, ' ');
     expect(app.morning.day).toBe(3);
     expect(app.morning.trucks).toHaveLength(11);
     screen(app);
     press(' ');
     screen(app);
-    press('F10', 'F10');
+    press(' ');
     screen(app);
     expect(app.screen).toBe('sheets');
   });
@@ -464,7 +471,8 @@ describe('the next morning in the game', () => {
   it('shows the bigger room on the supplier screen', () => {
     const { app, press } = toDay(0, 'small', ['9', '9', '9'], [], undefined, undefined, 99999);
     const room = app.growthOptions[1]!.growth as { kind: 'room'; room: 'freezer' | 'fridge' | 'dry' };
-    press('Enter', '2', 'Enter', 'Enter');
+    press(' ', '2', 'Enter');
+    hold(app, ' ');
     expect(app.morning.capacity[room.room]).toBe(ROOM_CAPACITY[room.room] + ROOM_GROWTH[room.room]);
     playToSupply(app, press);
     expect(app.screen).toBe('supply');
@@ -481,7 +489,8 @@ describe('the next morning in the game', () => {
   it('has the new client send an order, and listed among the messages', () => {
     const { app, press } = toDay(0, 'small', ['a'], [], () => 0);
     const client = (app.growthOptions[2]!.growth as { kind: 'client'; client: { name: string } }).client;
-    press('Enter', '3', 'Enter', 'Enter');
+    press(' ', '3', 'Enter');
+    hold(app, ' ');
     expect(app.morning.orders).toHaveLength(8);
     expect(app.morning.orders.map((o) => o.client)).toContain(client.name);
     expect(screen(app).join('\n')).toContain('day 2: 2 trucks, 8 orders');
@@ -493,7 +502,8 @@ describe('the next morning in the game', () => {
   it('brings a promise made on the phone onto the client\'s next order', () => {
     const { app, press } = toDay(0);
     const promises = app.calls.filter((c) => c.item && c.options[0]?.addsToOrder).length;
-    press('Enter', '1', 'Enter', 'Enter');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     expect(promises).toBeGreaterThan(0);
     expect(app.run.promises).toHaveLength(promises);
     for (const p of app.run.promises) {
@@ -506,7 +516,8 @@ describe('the next morning in the game', () => {
 
   it('brings nothing over when every call was answered "not today"', () => {
     const { app, press } = toDay(1);
-    press('Enter', '1', 'Enter', 'Enter');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     expect(app.run.promises).toEqual([]);
     expect(app.morning.orders.some((o) => o.note?.includes('As promised'))).toBe(false);
   });
@@ -514,7 +525,8 @@ describe('the next morning in the game', () => {
   it('keeps how each client felt, and lets it change tomorrow\'s order', () => {
     const { app, press } = toDay(1);
     const moods = Object.fromEntries(app.day!.orders.map((o) => [o.client, o.mood]));
-    press('Enter', '1', 'Enter', 'Enter');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     expect(app.run.moods).toEqual(moods);
     for (const o of app.morning.orders) {
       if (moods[o.client] === 'let down') expect(o.note).toMatch(/counting on you/);
@@ -567,7 +579,9 @@ describe('the next morning in the game', () => {
     const { app, press } = toNextMorning('1', 'small', 0, () => (draws++ ? 0.7 : 0.1));
     const orders = JSON.stringify(app.morning.orders);
     playToSupply(app, press);
-    press('a', 'F9', 'r');
+    press('a');
+    hold(app, ' ');
+    hold(app, 'r');
     expect(JSON.stringify(app.morning.orders)).toBe(orders);
     expect(app.screen).toBe('messages');
   });
@@ -603,10 +617,11 @@ describe('the next morning in the game', () => {
     press('Escape');
     expect(app.screen).toBe('result');
     expect(screen(app).at(-1)).toContain('big / small');
-    press('Enter', 'a', 'F9');
+    press(' ', 'a');
+    hold(app, ' ');
     expect(app.screen).toBe('day');
     expect(screen(app).at(-1)).toContain('big / small');
-    press('Enter');
+    press(' ');
     expect(screen(app).at(-1)).toContain('big / small');
   });
 
@@ -628,18 +643,18 @@ describe('the next morning in the game', () => {
       for (let l = 0; l < app.desk.order(o).lines.length; l++) press('Enter');
       for (let i = 0; i < 3 && !app.desk.isFinished(o); i++) press('ArrowUp', 'ArrowUp', 'ArrowUp', ...Array((n + i) % 3).fill('ArrowDown'), 'Enter');
     }
-    press('F10', 'F10');
+    press(' ');
     look();
-    press('F9');
+    hold(app, ' ');
     look();
     for (let n = 0; n < 60 && !app.roadOver; n++) press(app.roadCall ? 'Enter' : ' ');
-    press('Enter');
+    press(' ');
     look();
-    press('Enter', 'a');
+    press(' ', 'a');
     look();
-    press('F9');
+    hold(app, ' ');
     look();
-    press('Enter');
+    press(' ');
     look();
     expect(seen).toEqual(['messages', 'desk', 'sheets', 'road', 'result', 'supply', 'day', 'day']);
   });

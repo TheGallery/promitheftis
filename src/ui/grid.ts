@@ -144,6 +144,32 @@ export function fitScreen(lines: Line[]): Line[] {
   return out;
 }
 
+/** The part of a line from column `from` up to column `to`. */
+function slice(line: Line, from: number, to: number): Line {
+  const out: Line = [];
+  let at = 0;
+  for (const [text, cls] of line) {
+    const chars = [...text];
+    const a = Math.max(from, at);
+    const b = Math.min(to, at + chars.length);
+    if (a < b) out.push([chars.slice(a - at, b - at).join(''), cls]);
+    at += chars.length;
+    if (at >= to) break;
+  }
+  return out;
+}
+
+/** Puts `box` (every line the same width) over a screen, its top left corner at row `top`, column `left`. */
+export function overlay(screen: Line[], box: Line[], top: number, left: number): Line[] {
+  const w = box.length ? width(box[0] as Line) : 0;
+  return screen.map((row, r) => {
+    const over = box[r - top];
+    if (!over) return row;
+    const full = pad(row, COLS);
+    return [...slice(full, 0, left), ...over, ...slice(full, left + w, COLS)];
+  });
+}
+
 export function plain(lines: Line[]): string[] {
   return lines.map((l) => l.map(([t]) => t).join(''));
 }

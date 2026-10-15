@@ -8,7 +8,7 @@ import type { OrderResult } from '../src/game/results';
 import { buildDay } from '../src/game/day';
 import { moodPoints } from '../src/game/moods';
 import { App } from '../src/ui/app';
-import { fakeEffects, holdNewRun, playToSupply, screen, summary, toNextMorning } from './helpers';
+import { fakeEffects, hold, holdNewRun, playToSupply, screen, summary, toNextMorning } from './helpers';
 
 const full: ClientDay = { percent: 100, late: false, lacked: [] };
 const short = (percent: number, ...lacked: Array<[string, number, number]>): ClientDay => ({
@@ -279,7 +279,10 @@ describe('on the screens', () => {
   it('marks short two days running with two marks after a second short day', () => {
     const { app, press } = dayTwo();
     playToSupply(app, press);
-    press('a', 'F9', 'Enter', '1', 'Enter', 'Enter');
+    press('a');
+    hold(app, ' ');
+    press(' ', '1', 'Enter');
+    hold(app, ' ');
     const twice = app.morning.orders.filter((o) => shortCount(app.run.history[o.client]) === 2).map((o) => o.client);
     for (const client of twice) expect(shortMarker(app.run.history[client])).toBe('!!');
     expect(app.run.day).toBe(3);
@@ -291,7 +294,9 @@ describe('on the screens', () => {
     const history = JSON.stringify(app.run.history);
     const orders = JSON.stringify(app.morning.orders);
     playToSupply(app, press);
-    press('a', 'F9', 'r');
+    press('a');
+    hold(app, ' ');
+    hold(app, 'r');
     expect(app.screen).toBe('messages');
     expect(JSON.stringify(app.run.history)).toBe(history);
     expect(JSON.stringify(app.morning.orders)).toBe(orders);
@@ -324,7 +329,8 @@ describe('on the screens', () => {
   it('is the same in the day-end view: the mood reasons say short yesterday as well', () => {
     const { app, press } = dayTwo();
     playToSupply(app, press);
-    press('a', 'F9');
+    press('a');
+    hold(app, ' ');
     const orders = app.day!.orders.filter((o) => shortYesterday(app.run.history[o.client]) && o.percent < 100);
     for (const o of orders) expect(o.reasons.join(' ')).toContain('short yesterday as well');
   });

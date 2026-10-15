@@ -1,13 +1,12 @@
 import { dateLabel } from '../../game/clock';
 import { plural } from '../format';
 import type { App, StartChoice } from '../app';
-import { newRunPrompt } from './common';
 import { header, keyBar, layout, rule, s, cat, type Line } from '../grid';
 
 const CHOICES: ReadonlyArray<{ choice: StartChoice; title: string; text: string }> = [
   { choice: 'continue', title: 'Continue', text: '' },
-  { choice: 'small', title: 'New run: the small morning', text: '2 trucks, 7 orders. Replaces the saved run.' },
-  { choice: 'big', title: 'New run: the big morning', text: '9 trucks, 38 orders. Replaces the saved run.' },
+  { choice: 'small', title: 'New run: the small morning', text: '2 trucks, 7 orders. Replaces the saved run; the key is held down to start it.' },
+  { choice: 'big', title: 'New run: the big morning', text: '9 trucks, 38 orders. Replaces the saved run; the key is held down to start it.' },
 ];
 
 export function startScreen(app: App): Line[] {
@@ -28,7 +27,7 @@ export function startScreen(app: App): Line[] {
     [],
     ...rows,
   ];
-  const status = newRunPrompt(app) ?? (app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : []);
-  const keys = keyBar([['↑↓', 'pick one'], ['ENTER', 'go (hold: new run)'], ['C', 'continue'], ['S', 'small morning'], ['B', 'big morning'], ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']]);
+  const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : [];
+  const keys = keyBar([['SPACE', 'continue'], ['↑↓ 1-3', 'pick one'], ['ENTER', 'choose'], ['S', 'small morning'], ['B', 'big morning'], ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']]);
   return layout(top, body, [rule(), status, keys]);
 }

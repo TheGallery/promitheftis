@@ -7,7 +7,7 @@ import { KEPT_LABEL } from '../../game/supply';
 import { plural } from '../format';
 import type { App } from '../app';
 import { cat, clip, cols, header, keyBar, layout, rule, s, scrollRows, wrapText, type Line } from '../grid';
-import { clockLine, newRunPrompt, otherMornings } from './common';
+import { clockLine, otherMornings } from './common';
 
 const LEFT_W = 58;
 const RIGHT_W = 61;
@@ -169,12 +169,10 @@ export function dayScreen(app: App): Line[] {
     for (let i = 0; i < Math.max(left.length, right.length); i++) body.push(cols([left[i] ?? [], right[i] ?? []], [LEFT_W, RIGHT_W]));
   }
   const pleased = day?.orders.filter((o) => o.mood === 'pleased').length ?? 0;
-  const status =
-    newRunPrompt(app) ??
-    (app.status
-      ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
-      : day
-        ? s(` ${pleased} of ${plural(day.orders.length, 'client')} pleased. ENTER to choose what to grow.`, 'd')
-        : []);
-  return layout(top, body, [rule(), status, keyBar([['↑↓', 'look through the clients'], ['ENTER', 'what to grow'], ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
+  const status = app.status
+    ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
+    : day
+      ? s(` ${pleased} of ${plural(day.orders.length, 'client')} pleased. SPACE to choose what to grow.`, 'd')
+      : [];
+  return layout(top, body, [rule(), status, keyBar([['SPACE', 'what to grow'], ['↑↓ PgUp PgDn', 'clients'], ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

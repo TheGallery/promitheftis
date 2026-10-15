@@ -111,7 +111,7 @@ export function roadScreen(app: App): Line[] {
   const keys: [string, string][] = ringing
     ? [['↑↓', 'choose an answer'], ['ENTER', 'answer the call']]
     : over
-      ? [['ENTER', 'see how it went']]
-      : [['SPACE', 'skip ahead'], ['ENTER', 'skip ahead']];
+      ? [['SPACE', 'see how it went']]
+      : [['SPACE', 'skip ahead']];
   return layout(top, body, [rule(), status, keyBar([...keys, ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

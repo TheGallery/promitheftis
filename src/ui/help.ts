@@ -19,9 +19,13 @@ export const HELP_PAGES: readonly HelpPage[] = [
     blocks: [
       {
         text:
-          'You run a small wholesaler that supplies restaurants. Each morning you hand out the overnight orders against the stock you have and ' +
-          'put each order on a truck before the trucks leave at 07:00. There is no game over: if stock runs short, some clients simply get less, and a ' +
-          'truck sent to places far apart gets back later.',
+          'You run a small restaurant wholesaler. Each morning you hand out overnight orders from your stock and put each on a truck ' +
+          'before 07:00. Short stock means less for some clients, and far-apart stops mean a late truck.',
+      },
+      {
+        head: 'THE KEYS',
+        text:
+          '{SPACE} goes on. {ENTER} picks. {ESC} goes back. Hold {SPACE} when you cannot take the step back.',
       },
       {
         head: 'OVERNIGHT MESSAGES',
@@ -32,22 +36,21 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'THE ORDER DESK',
         text:
-          'Three panes: ORDERS, LINES and TRUCKS, and {TAB} moves between them. On a line, {ENTER} gives what was asked, or as much as there is; ' +
-          'type a number or use {←→} to give a different amount. After the last line pick a truck with {↑↓} and {ENTER}, and the desk moves ' +
-          'to the next order. HEADS UP names the items that today\'s orders ask more of than you have, so you can hold some back.',
+          'Three panes: ORDERS, LINES and TRUCKS; {TAB} moves between them. On a line, {ENTER} gives what was asked, or as much as there is; ' +
+          'type a number or use {←→} for a different amount. After the last line pick a truck with {↑↓} and {ENTER}. HEADS UP names the ' +
+          'items that today\'s orders ask more of than you have, so you can hold some back.',
       },
       {
         head: 'TRUCKS AND THE MAP',
         text:
-          'Orders for the same place belong on the same truck. Places that touch on the map, corners included, can share a truck. A truck sent ' +
-          'to places far apart gets back late; that is the only penalty. The clock moves a minute for each truck you pick and each order you ' +
-          'finish, not in real time.',
+          'Orders for the same place belong on the same truck, and places that touch on the map, corners included, can share one. A truck sent ' +
+          'to places far apart gets back late; that is the only penalty. The clock moves a minute for each truck you pick and order you finish.',
       },
       {
         head: 'TRUCK SHEETS',
         text:
-          '{F10} shows each truck\'s orders and route: {ENTER} opens one, {P} prints the sheets, {ESC} goes back to the desk and {F9} sends ' +
-          'the trucks out.',
+          '{SPACE} on the desk shows each truck\'s orders and route: {ENTER} opens one, {P} prints the sheets and {ESC} goes back to the desk. ' +
+          'Hold {SPACE} to send the trucks out; the box warns of any order still to hand out.',
       },
     ],
   },
@@ -58,7 +61,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'ON THE ROAD',
         text:
           'The clock runs on from 07:00 and a log fills in as each truck leaves, delivers (with a gentle note when a client got less) and comes ' +
-          'back. {SPACE} or {ENTER} skips ahead; it stops at each call.',
+          'back. {SPACE} skips ahead; it stops at each call, and once every truck is home it goes on to the result.',
       },
       {
         head: 'PHONE CALLS',
@@ -70,8 +73,8 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'THE RESULT',
         text:
-          'Once every truck is home and every call is answered, {ENTER} shows how it went: when each truck got back, how much of each order ' +
-          'was delivered, who got less, and your answers on the phone. {R} plays the day again from its overnight messages.',
+          'Once every truck is home and every call is answered, {SPACE} shows how it went: when each truck got back, how much of each order ' +
+          'was delivered, who got less, and your answers on the phone. {R} plays the day again from its overnight messages; {SPACE} goes on to the supplier order.',
       },
       {
         head: 'THE SUPPLIER ORDER',
@@ -83,7 +86,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         text:
           'Each room has a bar showing how full it will be tomorrow: █ the stock now, ▓ what is ordered and ░ the space left. A room that would ' +
-          'be over full turns amber, but the order can still go. {F9} places the order and ends the day; {ESC} goes back to the result.',
+          'be over full turns amber, but the order can still go. Hold {SPACE} to place the order and end the day; {ESC} goes back to the result.',
       },
     ],
   },
@@ -113,9 +116,9 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'WHAT TO GROW',
         text:
-          '{ENTER} on the end of the day opens one last choice: another truck, a bigger room (the fullest one tomorrow) or a new client. Pick ' +
+          '{SPACE} on the end of the day opens one last choice: another truck, a bigger room (the fullest one tomorrow) or a new client. Pick ' +
           'with {↑↓} or {1}-{3}, and {ENTER} chooses it. A truck or a bigger room cost money, with the price shown; one you cannot afford ' +
-          'cannot be picked. A new client is free. {U} takes the choice back, with the money. {ENTER} again starts the next morning, and ' +
+          'cannot be picked. A new client is free. {U} takes the choice back, with the money. Hold {SPACE} to start the next morning, and ' +
           'from then on the choice is final.',
       },
     ],
@@ -125,7 +128,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
     blocks: [
       {
         text:
-          'The game is a run of days. After the growth choice, {ENTER} goes on to the next morning, at the overnight messages again, a day on. ' +
+          'The game is a run of days. After the growth choice, holding {SPACE} goes on to the next morning, at the overnight messages again, a day on. ' +
           'What carries over: the stock in each room, the trucks, how big each room is, the clients and how each one felt, and what you ' +
           'promised on the phone.',
       },
@@ -147,7 +150,8 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'PLAYING A DAY AGAIN',
         text:
-          '{R} plays the current day again from its overnight messages, with the same orders and the same stock. It leaves the saved run alone.',
+          '{R} plays the current day again from its overnight messages, with the same orders and the same stock. It leaves the saved run alone. ' +
+          'On the end of the day, where it would drop your order, you hold {R} like the other steps.',
       },
     ],
   },
@@ -165,7 +169,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'CARRYING ON',
         text:
-          'When a run from day 2 or later is saved, the first screen (WELCOME BACK) offers {C} to continue, or a new run. A saved run still on ' +
+          'When a run from day 2 or later is saved, the first screen (WELCOME BACK) offers {SPACE} to continue, or a new run ({↑↓} or {1}-{3} pick a line, {ENTER} chooses it). A saved run still on ' +
           'day 1 has nothing to lose, so the page opens straight at its overnight messages.',
       },
       {

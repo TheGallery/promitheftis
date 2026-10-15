@@ -6,7 +6,7 @@ import { plain } from '../src/ui/grid';
 import { helpLines, HELP_ROOM } from '../src/ui/screens/help';
 import { screenLines } from '../src/ui/view';
 import { memoryStore, type Store } from '../src/ui/store';
-import { fakeEffects, playToSupply, screen, toDay, toNextMorning } from './helpers';
+import { fakeEffects, hold, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
 /** An app whose road ticks wait for the test to run them, with the sounds it makes. */
 function newApp(store: Store = memoryStore()) {
@@ -62,7 +62,7 @@ const SCREENS: ReadonlyArray<[string, () => { app: App; press: (...keys: string[
     'the truck sheets',
     () => {
       const x = newApp();
-      x.press(' ', 'F10', 'F10', 'Enter');
+      x.press(' ', ' ', 'Enter');
       return x;
     },
   ],
@@ -234,7 +234,9 @@ describe('how to play', () => {
     press(' ', '4', 'Tab');
     press('h');
     const before = snapshot(app);
-    press('ArrowDown', 'ArrowUp', 'Tab', 'Enter', '7', 'Backspace', ' ', 'F10', 'F9', 'r', 'R', 'b', 's', 'B', 'S', 'p', 'u', 'a', 'x');
+    press('ArrowDown', 'ArrowUp', 'Tab', 'Enter', '7', 'Backspace', ' ', ' ');
+    hold(app, ' ');
+    press('r', 'R', 'b', 's', 'B', 'S', 'p', 'u', 'a', 'x');
     expect(snapshot(app)).toEqual(before);
     expect(screen(app).join('\n')).toContain('HOW TO PLAY');
     press('Escape');
@@ -242,16 +244,15 @@ describe('how to play', () => {
     expect(app.screen).toBe('desk');
   });
 
-  it('leaves the message that was showing, and a pending F10, for when it closes', () => {
+  it('leaves the message that was showing for when it closes', () => {
     const { app, press } = newApp();
-    press(' ', 'F10');
+    press(' ', ' ');
     expect(app.status).toContain('not handed out');
     const shown = screen(app).join('\n');
     press('h');
     expect(screen(app).join('\n')).not.toContain('not handed out');
     press('Escape');
     expect(screen(app).join('\n')).toBe(shown);
-    press('F10');
     expect(app.screen).toBe('sheets');
   });
 
@@ -322,7 +323,8 @@ describe('how to play on the road', () => {
       for (let l = 0; l < app.desk.order(o).lines.length; l++) press('Enter');
       for (let i = 0; i < count && !app.desk.isFinished(o); i++) press(...Array(count).fill('ArrowUp'), ...Array((n + i) % count).fill('ArrowDown'), 'Enter');
     }
-    press('F10', 'F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     expect(app.screen).toBe('road');
     expect(x.ticks).toHaveLength(1);
     return x;

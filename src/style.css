@@ -28,6 +28,7 @@ body[data-theme='green'] {
   --focus-bg: #6fd69a;
   --focus-fg: #0e1512;
   --bar-bg: #1b2c24;
+  --box-bg: #1b2c24;
   --key-bg: #6fd69a;
   --key-fg: #0e1512;
 }
@@ -48,6 +49,7 @@ body[data-theme='blue'] {
   --focus-bg: #00a3a3;
   --focus-fg: #000000;
   --bar-bg: #162280;
+  --box-bg: #0b1460;
   --key-bg: #00a3a3;
   --key-fg: #000000;
 }
@@ -109,3 +111,5 @@ body[data-theme='blue'] #screen .hl.w { color: #3d2200; font-weight: 700; }
 #screen .focus { background: var(--focus-bg); color: var(--focus-fg); font-weight: 700; }
 #screen .k { background: var(--key-bg); color: var(--key-fg); }
 #screen .kbar { background: var(--bar-bg); color: var(--fg); }
+/* The hold box over a screen: its own background, so it stands out from the text under it. */
+#screen .box { background: var(--box-bg); }

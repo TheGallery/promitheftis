@@ -85,21 +85,26 @@ export function toDay(
       for (let i = 0; i < 9 && !app.desk.isFinished(o); i++) press(...Array(9).fill('ArrowUp'), ...Array((n + i) % 9).fill('ArrowDown'), 'Enter');
     }
   }
-  press('F10', 'F9');
+  press(' ');
+  hold(app, ' ');
   for (let n = 0; n < 30 && !app.roadOver; n++) {
     if (app.roadCall) press(...Array(answer).fill('ArrowDown'), 'Enter');
     else press(' ');
   }
-  press('Enter', 'Enter', ...typed, 'F9');
+  press(' ', ' ', ...typed);
+  hold(app, ' ');
   return { app, press };
 }
 
-/** Holds B or S down for a new run until the button is full, then lets go: what the player does to start over from a later day. */
-export function holdNewRun(app: App, key: string) {
+/** Holds a key down until the hold box is full, then lets go: what the player does for a step that cannot be taken back. */
+export function hold(app: App, key: string) {
   app.press({ key });
   for (let n = 0; n < 5 && app.holding; n++) app.tick();
   app.release(key);
 }
+
+/** Holds B or S down for a new run until the box is full, then lets go: what the player does to start over from a later day. */
+export const holdNewRun = hold;
 
 export function screen(app: App): string[] {
   const lines = plain(screenLines(app));
@@ -114,20 +119,26 @@ export function screen(app: App): string[] {
  * is given as asked, each order goes on the first truck from `first` with room, and every call is
  * answered with the option at `answer`.
  */
-export function playToSupply(app: App, press: (...keys: string[]) => void, answer = 0) {
+export function playToSupply(
+  app: App,
+  press: (...keys: string[]) => void,
+  answer = 0,
+  held: (key: string) => void = (key) => hold(app, key),
+) {
   const count = app.morning.trucks.length;
-  press(' ');
+  if (app.screen === 'messages') press(' ');
   for (let n = 0; n < app.desk.orderCount; n++) {
     const o = app.orderSel;
     for (let l = 0; l < app.desk.order(o).lines.length; l++) press('Enter');
     for (let i = 0; i < count && !app.desk.isFinished(o); i++) press(...Array(count).fill('ArrowUp'), ...Array((n + i) % count).fill('ArrowDown'), 'Enter');
   }
-  press('F10', 'F10', 'F9');
+  press(' ');
+  held(' ');
   for (let n = 0; n < 60 && !app.roadOver; n++) {
     if (app.roadCall) press(...Array(answer).fill('ArrowDown'), 'Enter');
     else press(' ');
   }
-  press('Enter', 'Enter');
+  press(' ', ' ');
 }
 
 /** Plays the day to its end and the growth choice, then on to the next morning. `growth` is the number of the option to choose. */
@@ -140,6 +151,7 @@ export function toNextMorning(
   cash?: number,
 ) {
   const day = toDay(answer, morning, ['a'], [], random, store, cash);
-  day.press('Enter', growth, 'Enter', 'Enter');
+  day.press(' ', growth, 'Enter');
+  hold(day.app, ' ');
   return day;
 }

@@ -9,11 +9,16 @@ import { roadScreen } from './screens/road';
 import { resultScreen } from './screens/result';
 import { sheetsScreen } from './screens/sheets';
 import { startScreen } from './screens/start';
+import { withHoldBox } from './screens/hold';
 import { supplyScreen } from './screens/supply';
 
-/** The lines of whichever screen the app is on. */
+/** The lines of whichever screen the app is on, with the hold box over it while a step waits for its key to be held. */
 export function screenLines(app: App): Line[] {
   if (app.helpOpen) return helpScreen(app);
+  return withHoldBox(app, screenOf(app));
+}
+
+function screenOf(app: App): Line[] {
   switch (app.screen) {
     case 'start':
       return startScreen(app);
