@@ -57,6 +57,21 @@ export interface Short {
   came: number;
 }
 
+/** A client who will ring this morning for extra of one item, by a time: the rush order, announced overnight. */
+export interface Rush {
+  client: string;
+  /** Position of the client's own order among the day's orders. */
+  orderIndex: number;
+  item: string;
+  qty: number;
+  /** When the phone rings, in minutes since midnight. */
+  at: number;
+  /** The time the client wants it by, in minutes since midnight. */
+  before: number;
+  /** Which of the reasons the client gives for ringing. */
+  why: number;
+}
+
 export interface Crew {
   names: string[];
   trucks: number[];
@@ -87,4 +102,6 @@ export interface Morning {
   callSalt?: number;
   /** The items the supplier delivered less of overnight than was ordered; the stock already holds only what came. */
   short?: Short[];
+  /** The rush order that comes in by phone while the trucks are out; most mornings have none. */
+  rush?: Rush;
 }

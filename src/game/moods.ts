@@ -17,6 +17,8 @@ export interface MoodFacts {
   shortBefore?: boolean;
   /** What became of what the client was promised on the phone the day before: kept when it came in full. */
   promise?: 'kept' | 'broken' | null;
+  /** How the client's rush order went, if they rang for one: sent on time, sent late (which lets them down), or turned down. */
+  rush?: 'on time' | 'late' | 'declined' | null;
 }
 
 /** Below this share delivered, a client is let down by the delivery alone; at 100 they are not. */
@@ -26,15 +28,17 @@ const HALF = 50;
  * Points of disappointment, never below zero: 1 for less than everything, 2 for less than half, 1 for
  * coming after the time asked, 1 more for being told "nothing more today" about a short delivery,
  * 1 less for being promised the rest tomorrow, 1 more for being short again after being short the
- * day before, and 1 more for a promise from the day before that did not come in full. No points is
+ * day before, 1 more for a promise from the day before that did not come in full, and 1 more for a rush order that was sent
+ * late or turned down. No points is
  * pleased, one a bit let down, more let down. A full delivery on time is pleased whatever came before.
  */
-export function moodPoints({ percent, late, shortCall, shortBefore, promise }: MoodFacts): number {
+export function moodPoints({ percent, late, shortCall, shortBefore, promise, rush }: MoodFacts): number {
   const delivery = percent >= 100 ? 0 : percent >= HALF ? 1 : 2;
   const call = shortCall === 'refused' ? 1 : shortCall === 'promised' ? -1 : 0;
   const again = shortBefore && percent < 100 ? 1 : 0;
   const broken = promise === 'broken' ? 1 : 0;
-  return Math.max(0, delivery + (late ? 1 : 0) + call + again + broken);
+  const rushed = rush === 'late' || rush === 'declined' ? 1 : 0;
+  return Math.max(0, delivery + (late ? 1 : 0) + call + again + broken + rushed);
 }
 
 export function moodOf(facts: MoodFacts): Mood {
@@ -55,6 +59,9 @@ export function moodReasons(facts: MoodFacts, noTruck = false): string[] {
   if (facts.shortBefore && facts.percent < 100) out.push('was short yesterday as well');
   if (facts.promise === 'kept') out.push('got what was promised on the phone');
   if (facts.promise === 'broken') out.push('was promised on the phone, and the promise was broken');
+  if (facts.rush === 'on time') out.push('got the rush order on time');
+  if (facts.rush === 'late') out.push('got the rush order late');
+  if (facts.rush === 'declined') out.push('was turned down for a rush order');
   return out;
 }
 
@@ -70,6 +77,13 @@ export function promiseOutcome(order: OrderResult, promised: readonly Promised[]
   return broken ? 'broken' : 'kept';
 }
 
+/** How the client's rush order went, from the call and the answer; null when they did not ring for one. */
+export function rushOutcome(client: string, calls: readonly Call[], answers: ReadonlyMap<number, number>): MoodFacts['rush'] {
+  const call = calls.find((c) => c.kind === 'rush' && c.client === client && answers.has(c.id));
+  const trip = call?.options[answers.get(call.id) as number]?.rush;
+  return call == null ? null : trip == null ? 'declined' : trip.late ? 'late' : 'on time';
+}
+
 /** The facts for one order: its delivery, the answer to the call about it going short, if any, the client's recent days and what they were promised. */
 export function moodFacts(
   order: OrderResult,
@@ -82,7 +96,8 @@ export function moodFacts(
   const choice = call ? answers.get(call.id) : undefined;
   const shortCall = call == null || choice == null ? null : call.options[choice]?.addsToOrder ? 'promised' : 'refused';
   const promise = promiseOutcome(order, promised);
-  return { percent: order.percent, late: order.lateForAsk, shortCall, shortBefore: shortYesterday(recent), ...(promise ? { promise } : {}) };
+  const rush = rushOutcome(order.client, calls, answers);
+  return { percent: order.percent, late: order.lateForAsk, shortCall, shortBefore: shortYesterday(recent), ...(promise ? { promise } : {}), ...(rush ? { rush } : {}) };
 }
 
 /** How a client's mood the day before changes today's order: the share of the usual quantities it asks for, and a note. */

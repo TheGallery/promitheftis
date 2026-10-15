@@ -1,9 +1,12 @@
 import { formatTime } from './clock';
 import type { Desk } from './desk';
 import { plainName } from './headsup';
+import { formatMoney } from './money';
 import type { MorningResult, OrderResult } from './results';
 import type { Road } from './road';
+import { offered, RUSH_LOAD_MINUTES, RUSH_REASONS, rushTopic, rushTrips, type RushTrip } from './rush';
 import { stockAfterDeliveries } from './supply';
+import type { Rush } from './types';
 
 /** Calls that come in during the small morning; the big morning has a few more. */
 const SMALL_KINDS: readonly CallKind[] = ['short', 'time', 'forgot'];
@@ -21,7 +24,7 @@ const FIRST_RING_AFTER = 10;
 const FORGOT_QTY_MIN = 2;
 const FORGOT_QTY_SPAN = 4;
 
-export type CallKind = 'short' | 'time' | 'forgot';
+export type CallKind = 'short' | 'time' | 'forgot' | 'rush';
 
 export interface CallOption {
   /** What the player says. */
@@ -30,6 +33,8 @@ export interface CallOption {
   record: string;
   /** True when the answer promises the item on tomorrow's order: a promise, checked when tomorrow's trucks are loaded. */
   addsToOrder?: boolean;
+  /** The truck this answer sends with a rush order, with when it gets there and what it pays and costs. */
+  rush?: RushTrip;
 }
 
 export interface Call {
@@ -101,6 +106,9 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
     if (call) calls.push(withStock(desk, call, left));
   }
 
+  const rush = desk.morning.rush;
+  if (rush) calls.push(withStock(desk, rushCall(desk, result, rush, left, rushRing(rush, road)), left));
+
   // A truck that unloads at the depot is back soon after: the last ring is before the end of the log.
   for (const call of calls) call.at = Math.min(call.at, road.end - 1);
   calls.sort((a, b) => a.at - b.at);
@@ -110,6 +118,9 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
     const after = calls[i + 1] as Omit<Call, 'id'>;
     if (call.at >= after.at) call.at = after.at - 1;
   }
+  // The rush is answered by trucks sent when it rings, so it is worked out for the minute it really rings.
+  const ring = calls.find((c) => c.kind === 'rush');
+  if (rush && ring) Object.assign(ring, withStock(desk, rushCall(desk, result, rush, left, ring.at), left));
   return calls.map((c, id) => ({ ...c, id }));
 }
 
@@ -198,4 +209,40 @@ function timeCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | un
       { label: `It will be with you before ${formatTime(promised)}`, record: `told before ${formatTime(promised)}` },
     ],
   };
+}
+
+/** When the rush rings: when its client rings, but not before the trucks are well on their way. */
+function rushRing(rush: Rush, road: Road): number {
+  return Math.max(rush.at, road.departAt + FIRST_RING_AFTER);
+}
+
+/** The client's ask for extra, answered by sending a truck that is still out or in the yard (never the one at the garage), or by saying no. Without the stock there is only no. */
+function rushCall(desk: Desk, result: MorningResult, rush: Rush, left: Record<string, number>, at: number): Omit<Call, 'id'> {
+  const order = desk.order(rush.orderIndex);
+  const name = plainName(desk.item(rush.item).name);
+  const trips = (left[rush.item] ?? 0) >= rush.qty ? offered(rushTrips(desk.morning.trucks.filter((t) => !desk.inGarage(t.id)), result, rush, order.place, at)) : [];
+  const options: CallOption[] = trips.map((t) => ({ label: tripLabel(t), record: tripRecord(t), rush: t }));
+  options.push(trips.length > 0 ? { label: 'Sorry, not today', record: 'turned down' } : { label: 'Sorry, we have none to spare', record: 'none to spare' });
+  return {
+    kind: 'rush',
+    at,
+    orderIndex: rush.orderIndex,
+    client: rush.client,
+    contact: order.contact,
+    topic: rushTopic(rush, desk.item(rush.item).name),
+    item: rush.item,
+    qty: rush.qty,
+    say: `${RUSH_REASONS[rush.why] ?? RUSH_REASONS[0]}! Could you bring ${rush.qty} ${name} before ${formatTime(rush.before)}? We will pay extra.`,
+    options,
+  };
+}
+
+/** What a truck on the phone would do: where it is, when it gets there, and what it pays and costs. */
+function tripLabel(t: RushTrip): string {
+  const where = t.wentOut ? `back ${formatTime(t.leaveAt - RUSH_LOAD_MINUTES)}` : 'in the yard';
+  return `Truck ${t.truckId} ${t.driver}, ${where}: there ${formatTime(t.arriveAt)}, ${t.late ? 'late, pays half' : 'in time'} · pays ${formatMoney(t.paid)}, costs ${formatMoney(t.cost)}`;
+}
+
+function tripRecord(t: RushTrip): string {
+  return `truck ${t.truckId}, ${formatTime(t.arriveAt)}${t.late ? ' late' : ''}, paid ${formatMoney(t.paid)}`;
 }

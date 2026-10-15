@@ -28,6 +28,13 @@ function logLine(e: RoadEvent): Line {
       const what = e.lines.map((l) => `${l.name} ${l.given} of ${l.asked}`).join(', ');
       return s(`       a little short: ${clip(what, 54)}`, 'w');
     }
+    case 'rush':
+      return cat(
+        s(` ${when}`, 'd'),
+        s(`Truck ${e.truckId}`, 'b'),
+        s(` · rush for ${clip(e.client, 24)}, ${place(e.place).name} · `),
+        s(plural(e.units, 'item'), 'acc'),
+      );
     case 'back':
       return cat(s(` ${when}`, 'd'), s(`Truck ${e.truckId}`, 'b'), s(' · back at the depot', 'acc'));
   }
@@ -47,6 +54,12 @@ function answeredLine(app: App, c: Call): Line {
 function stockLines(app: App, c: Call): Line[] {
   if (c.item == null || c.inStore == null || c.usualOrder == null) return [];
   const name = plainName(app.desk.item(c.item).name);
+  if (c.kind === 'rush') {
+    const enough = c.inStore >= (c.qty ?? 0);
+    return wrapText(`In store after today's deliveries: ${c.inStore} ${name}. They want ${c.qty}.${enough ? '' : ' Not enough to send.'}`, LOG_W - 4)
+      .slice(0, 2)
+      .map((row) => s(`   ${row}`, 'd'));
+  }
   const promised = app.calls
     .filter((o) => o.id !== c.id && o.item === c.item && o.qty != null && app.answers.has(o.id) && o.options[app.answers.get(o.id) ?? 0]?.addsToOrder)
     .reduce((sum, o) => sum + (o.qty ?? 0), 0);

@@ -3,6 +3,7 @@ import type { History } from './history';
 import { moodFacts, moodOf, moodReasons, type Mood } from './moods';
 import { dayMoney, orderPay, STARTING_CASH, tripCosts, type DayMoney, type Trip, type Units } from './money';
 import type { MorningResult, OrderResult } from './results';
+import { sentFor, withRush } from './rush';
 import type { Promised } from './run';
 import { KEPT_ORDER, type Supply } from './supply';
 import type { RoomSpace } from './rooms';
@@ -77,8 +78,8 @@ export function payOf(order: OrderResult, kept: (item: string) => Kept): { paid:
 export function morningMoney(result: MorningResult, kept: (item: string) => Kept): { takenIn: number; lateCut: number; trucks: number } {
   const pays = result.orders.map((o) => payOf(o, kept));
   return {
-    takenIn: pays.reduce((sum, p) => sum + p.paid, 0),
-    lateCut: pays.reduce((sum, p) => sum + p.cut, 0),
+    takenIn: pays.reduce((sum, p) => sum + p.paid, 0) + (result.rush?.paid ?? 0),
+    lateCut: pays.reduce((sum, p) => sum + p.cut, 0) + (result.rush?.cut ?? 0),
     trucks: tripCosts(tripsOf(result)).reduce((sum, t) => sum + t.cost, 0),
   };
 }
@@ -90,7 +91,7 @@ export function tripsOf(result: MorningResult): Trip[] {
 
 /** Everything the end-of-day screen says, worked out once the supplier order is placed. */
 export function buildDay(
-  result: MorningResult,
+  sent: MorningResult,
   calls: readonly Call[],
   answers: ReadonlyMap<number, number>,
   supply: Supply,
@@ -98,6 +99,8 @@ export function buildDay(
   cash = STARTING_CASH,
   promised: readonly Promised[] = [],
 ): DaySummary {
+  // The rush order's truck is on the result already when the call was answered on the road; if not, it is put on here.
+  const result = withRush(sent, sentFor(calls, answers));
   const keptOf = new Map(supply.rows.map((row) => [row.item.id, row.kept]));
   const kept = (item: string): Kept => keptOf.get(item) ?? 'dry';
   const orders = result.orders.map((o): DayOrder => {
@@ -130,6 +133,6 @@ export function buildDay(
     units: supply.total(),
     rooms,
     overFull: rooms.filter((r) => r.space.overBy > 0),
-    money: dayMoney(cash, unitsOf(result.orders, kept), ordered, tripsOf(result), orders.reduce((sum, o) => sum + o.cut, 0)),
+    money: dayMoney(cash, unitsOf(result.orders, kept), ordered, tripsOf(result), orders.reduce((sum, o) => sum + o.cut, 0), result.rush),
   };
 }

@@ -13,6 +13,7 @@ import { buildResult, type MorningResult } from '../game/results';
 import { nextDay, outcomeOf, runFromMorning, type RunState } from '../game/run';
 import { decodeRun, decodeSettings, encodeRun, encodeSettings, type SavedRun } from '../game/save';
 import { buildRoad, ROAD_STEP_MINUTES, ROAD_TICK_MS, type Road } from '../game/road';
+import { addRush, withRush } from '../game/rush';
 import { callNotes, stockAfterDeliveries, Supply } from '../game/supply';
 import type { Morning } from '../game/types';
 import type { CueArg, Moment } from './cues';
@@ -595,11 +596,17 @@ export class App {
 
   /** The next morning: the stock left plus the supplier's delivery, the growth at work, and a made-up day of orders. */
   private nextMorning(day: DaySummary, supply: Supply): void {
-    const left = stockAfterDeliveries(this.desk);
+    const left = this.leftToday();
     this.run = nextDay(this.run, outcomeOf(left, supply, day, this.calls, this.answers, this.growth), this.luck.seed);
     this.daySeed = this.luck.seed;
     this.startDay(generateDay(this.run, mulberry32(this.daySeed)));
     this.saveRun();
+  }
+
+  /** What is left of each item once the trucks have gone and any rush order has been sent. */
+  private leftToday(): Record<string, number> {
+    const rush = this.result?.rush;
+    return stockAfterDeliveries(this.desk, rush ? { item: rush.item, qty: rush.qty } : undefined);
   }
 
   /** Puts a day's morning on the desk and clears everything the last day left on the screens; a new day draws its chances. */
@@ -994,6 +1001,12 @@ export class App {
       }
       if (key === 'Enter') {
         this.answers.set(call.id, this.callSel);
+        // A rush order sends a truck out again: the road and the result carry its trip from here on.
+        const trip = call.options[this.callSel]?.rush;
+        if (trip && this.road && this.result) {
+          this.result = withRush(this.result, trip);
+          this.road = addRush(this.road, trip);
+        }
         this.callSel = 0;
         this.sound('confirm');
         this.noteRing();
@@ -1067,7 +1080,7 @@ export class App {
   /** Opens the 13:00 order to the supplier; coming back to it keeps what was filled in. */
   private openSupply(): void {
     if (!this.supply) {
-      this.supply = new Supply(this.morning, stockAfterDeliveries(this.desk), callNotes(this.calls, this.answers));
+      this.supply = new Supply(this.morning, this.leftToday(), callNotes(this.calls, this.answers));
       this.supplySel = 0;
     }
     this.supplyTyped = '';

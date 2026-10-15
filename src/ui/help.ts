@@ -72,6 +72,13 @@ export const HELP_PAGES: readonly HelpPage[] = [
           'and is checked: broken, it lets them down more than a sorry.',
       },
       {
+        head: 'RUSH ORDERS',
+        text:
+          'Some mornings an overnight note warns that a client may ring for extra of one item by a time; HEADS UP repeats it. Keep that much back, ' +
+          'and a truck free if you can. The call lists a truck that is home or still out: when it gets there, what it pays (a rush pays double) and what ' +
+          'the trip costs. Late pays half, and late or a no lets the client down. With nothing spare, you can only say no.',
+      },
+      {
         head: 'THE RESULT',
         text:
           'Once every truck is home and every call is answered, {SPACE} shows how it went: when each truck got back, how much of each order ' +

@@ -7,6 +7,7 @@ import { plainName } from './headsup';
 import { arrivalTime, generateLines, ITEM_LIST } from './morning';
 import { moodEffect } from './moods';
 import { below, pick, type Random } from './random';
+import { rushFor, rushNote } from './rush';
 import { shortNotes } from './shortfall';
 import { KEPT_ORDER } from './supply';
 import type { RunClient, RunState } from './run';
@@ -249,6 +250,9 @@ export function generateDay(run: RunState, random: Random): Morning {
   // Drawn last, so that a truck at the garage moves nothing else that chance decides.
   const breakdown = breakdownFor(run, random, SUPPLIER_FIRST, SUPPLIER_LAST);
   if (breakdown) messages.push({ ...breakdown.note, at: breakdown.at });
+  // The rush order is drawn after that, so it moves nothing either.
+  const rush = rushFor(run, orders, random);
+  if (rush) messages.push(rushNote(rush, run.crews[0]?.names[0] ?? 'Joe'));
   messages.sort((a, b) => a.at - b.at);
 
   return {
@@ -268,5 +272,6 @@ export function generateDay(run: RunState, random: Random): Morning {
     callSalt,
     ...(run.short.length > 0 ? { short: run.short.map((s) => ({ ...s })) } : {}),
     ...(breakdown ? { garage: breakdown.garage } : {}),
+    ...(rush ? { rush } : {}),
   };
 }

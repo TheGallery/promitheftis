@@ -16,6 +16,8 @@ interface Prices {
   truckPerTruck: number;
   truckPerClient: number;
   roomPerClient: number;
+  /** What a rush order pays, as a multiple of the usual price of what is asked for. */
+  rushPremium: number;
 }
 
 /**
@@ -59,6 +61,7 @@ export const PRICES: Prices = {
    * grow it, so that it takes about the same number of good days whichever morning the run began with.
    */
   roomPerClient: 75,
+  rushPremium: 2,
 };
 
 /** The share of an order's price a client pays when the truck reached them after the time they asked for. */
@@ -145,6 +148,18 @@ export function orderPay(delivered: readonly Units[], late: boolean): { paid: nu
   return { paid, cut: full - paid };
 }
 
+/** What a rush order pays: the usual price of the units times the rush premium, and half of that when the truck came after the time asked for. */
+export function rushPay(item: string, units: number, late: boolean): { paid: number; cut: number } {
+  const full = units * clientPrice(item) * PRICES.rushPremium;
+  const paid = late ? Math.round(full * LATE_PAYS) : full;
+  return { paid, cut: full - paid };
+}
+
+/** What a rush trip costs on top of the day's trucks: the road, and a driver too when the truck had stayed in the yard until then. */
+export function rushTripCost(squares: number, wentOut: boolean): number {
+  return wentOut ? squares * PRICES.truckPerSquare : truckCost(squares);
+}
+
 /** What the supplier order costs. */
 export function supplierCost(ordered: readonly Units[]): number {
   return sum(ordered, supplierPrice);
@@ -169,17 +184,25 @@ export function tripCosts(trips: readonly Trip[]): TripCost[] {
 
 /**
  * The money of one day: what came in, what went out, and where that leaves the cash. `lateCut` is what the orders that
- * came after the time asked paid less, and is taken off what the units that arrived are worth.
+ * came after the time asked paid less, and is taken off what the units that arrived are worth. `rush` is what a rush order
+ * paid and, of its full price, what coming late took off.
  */
-export function dayMoney(before: number, delivered: readonly Units[], ordered: readonly Units[], trips: readonly Trip[], lateCut = 0): DayMoney {
-  const income = takenIn(delivered) - lateCut;
+export function dayMoney(
+  before: number,
+  delivered: readonly Units[],
+  ordered: readonly Units[],
+  trips: readonly Trip[],
+  lateCut = 0,
+  rush: { paid: number; cut: number } = { paid: 0, cut: 0 },
+): DayMoney {
+  const income = takenIn(delivered) - lateCut + rush.paid;
   const supplier = supplierCost(ordered);
   const truckTrips = tripCosts(trips);
   const trucks = truckTrips.reduce((total, t) => total + t.cost, 0);
   const total = income - supplier - trucks;
   return {
     takenIn: income,
-    lateCut,
+    lateCut: lateCut + rush.cut,
     supplier,
     supplierRooms: supplierRooms(ordered),
     trucksOut: truckTrips.length,

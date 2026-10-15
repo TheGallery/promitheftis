@@ -1,5 +1,6 @@
 import type { Desk } from './desk';
 import type { PlaceId } from './places';
+import type { RushTrip } from './rush';
 
 export interface TruckResult {
   truckId: number;
@@ -55,6 +56,8 @@ export interface MorningResult {
   gotLess: OrderResult[];
   inFull: number;
   lastBack: number | null;
+  /** The truck that took the rush order, once the client rang and it was taken; the trucks above already count its trip. */
+  rush?: RushTrip;
 }
 
 /**

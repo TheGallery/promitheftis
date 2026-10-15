@@ -234,10 +234,18 @@ function trucksPane(app: App): Line[] {
   return out;
 }
 
+/** The rush order that may ring this morning, as one phrase of the heads-up; empty when none is expected. */
+function rushPhrase(app: App): string {
+  const rush = app.morning.rush;
+  if (!rush) return '';
+  return `${rush.client} may ring for ${rush.qty} ${plainName(app.desk.item(rush.item).name)}`;
+}
+
 function headsUp(app: App): Line {
   const label = s(' HEADS UP  ', 'w b');
   const items = shortItems(app.morning);
-  if (items.length === 0) return cat(label, s('nothing is short today', 'acc'));
+  const rush = rushPhrase(app);
+  if (items.length === 0) return rush ? cat(label, s('nothing is short today · ', 'acc'), s(rush, 'w')) : cat(label, s('nothing is short today', 'acc'));
   let text = '';
   let shown = 0;
   for (const it of items) {
@@ -248,7 +256,8 @@ function headsUp(app: App): Line {
     shown++;
   }
   if (shown < items.length) text += ` · +${items.length - shown} more`;
-  return cat(label, s(text, 'w'));
+  const room = 120 - 11 - text.length - 3;
+  return cat(label, s(rush && rush.length <= room ? `${text} · ${rush}` : text, 'w'));
 }
 
 export function deskScreen(app: App): Line[] {
