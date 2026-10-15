@@ -145,11 +145,11 @@ function namesIn(id: PlaceId): string[] {
 }
 
 /** A name no client has, for when every name in a place is taken: the name with a number on the end, still short enough to show whole. */
-function numbered(name: string, taken: readonly string[]): string {
+function numbered(name: string, taken: ReadonlySet<string>): string {
   for (let n = 2; ; n++) {
     const suffix = ` ${n}`;
     const candidate = `${[...name].slice(0, NAME_WIDTH - suffix.length).join('').trimEnd()}${suffix}`;
-    if (!taken.includes(candidate)) return candidate;
+    if (!taken.has(candidate)) return candidate;
   }
 }
 
@@ -163,7 +163,8 @@ export function newClientFor(taken: readonly string[], random: Random): NewClien
   const shape = kind.make(random);
   const names = namesIn(at);
   const start = below(random, names.length);
-  const name = names.map((_, step) => names[(start + step) % names.length] as string).find((n) => !taken.includes(n)) ?? numbered(names[start] as string, taken);
+  const used = new Set(taken);
+  const name = names.map((_, step) => names[(start + step) % names.length] as string).find((n) => !used.has(n)) ?? numbered(names[start] as string, used);
   return { name, place: at, contact: pick(random, CONTACTS), shape };
 }
 
