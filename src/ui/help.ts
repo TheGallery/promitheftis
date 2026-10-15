@@ -44,7 +44,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'TRUCKS AND THE MAP',
         text:
           'Orders for the same place belong on the same truck, and places that touch on the map, corners included, can share one. A truck sent ' +
-          'to places far apart gets back late; that is the only penalty. The clock moves a minute for each truck you pick and order you finish.',
+          'to places far apart gets back late and costs more to run. The clock moves a minute for each truck you pick and order you finish.',
       },
       {
         head: 'TRUCK SHEETS',
@@ -76,17 +76,31 @@ export const HELP_PAGES: readonly HelpPage[] = [
           'Once every truck is home and every call is answered, {SPACE} shows how it went: when each truck got back, how much of each order ' +
           'was delivered, who got less, and your answers on the phone. Hold {R} to play the day again from its overnight messages; {SPACE} goes on to the supplier order.',
       },
+    ],
+  },
+  {
+    name: 'SUPPLIER ORDER',
+    blocks: [
       {
         head: 'THE SUPPLIER ORDER',
         text:
           'At 13:00 you order stock for tomorrow. Every item is grouped by where it is kept (freezer, fridge, dry store), with what is on hand, ' +
-          'the usual daily amount and what you order. Type a number or use {←→}; {ENTER} confirms a row and moves on; {U} fills a row up to the ' +
-          'usual amount and {A} fills every row.',
+          'the usual daily amount, what clients asked for today and what you order. Type a number or use {←→}; {ENTER} confirms a row and moves on; {U} fills a row up to the ' +
+          'usual amount and {A} fills every row. Hold {SPACE} to place the order and end the day; {ESC} goes back to the result.',
       },
       {
+        head: 'DEMAND SWINGS',
         text:
-          'Each room has a bar showing how full it will be tomorrow: █ the stock now, ▓ what is ordered and ░ the space left. A room that would ' +
-          'be over full turns amber, but the order can still go. Hold {SPACE} to place the order and end the day; {ESC} goes back to the result.',
+          'Clients ask for about the usual amount, give or take, so {A} is a good start and not the whole answer. A note on an order is a hint ' +
+          'for tomorrow: a wedding or a quiz night means that client will ask for more of some items, and "keep it simple" means less. An ' +
+          'arrow beside what was asked says the notes expect tomorrow to be busier (↑) or quieter (↓) for that item; select the row to see who said so.',
+      },
+      {
+        head: 'THE STORE ROOMS',
+        text:
+          'Each room has a bar showing how full it will be tomorrow: █ the stock now, ▓ what is ordered and ░ the space left. A room holds only ' +
+          'so much. What does not fit spoils overnight, and is paid for all the same: the bar turns amber and says how many units will spoil, ' +
+          'and the store room tells you in the morning. A bigger room is one of the things you can grow.',
       },
     ],
   },
@@ -111,13 +125,13 @@ export const HELP_PAGES: readonly HelpPage[] = [
         text:
           'One number: the cash in the bank, £1,000 to start, at the top of every screen and amber below zero; nothing stops play when ' +
           'it is. Restaurants pay for what arrives, item by item, and being late costs nothing. Each item has its own supplier price, and ' +
-          'the supplier order shows what the order costs and the cash left after it. A truck costs a driver plus the squares it drives. ' +
+          'the supplier order shows what the order costs and the cash left after it. A truck costs a driver plus the squares it drives, so putting orders for the same place on the same truck saves money. ' +
           'The end of the day breaks it all down; what a client paid shows under their name.',
       },
       {
         head: 'WHAT TO GROW',
         text:
-          '{SPACE} on the end of the day opens one last choice: another truck, a bigger room (the fullest one tomorrow) or a new client. Pick ' +
+          '{SPACE} on the end of the day opens one last choice: another truck, a bigger room (the tightest one tomorrow) or a new client. Pick ' +
           'with {↑↓} or {1}-{3}, and {ENTER} chooses it. A truck or a bigger room cost money, with the price shown; one you cannot afford ' +
           'cannot be picked. A new client is free. {U} takes the choice back, with the money. Hold {SPACE} to start the next morning, and ' +
           'from then on the choice is final.',
@@ -136,7 +150,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'WHAT YOU FIND',
         text:
-          'The supplier order is in the store rooms, on top of what was left; an item you did not order is as low as you left it. The first ' +
+          'The supplier order is in the store rooms, on top of what was left, as much as each room holds; an item you did not order is as low as you left it. The first ' +
           'day is a fixed morning; from day 2 on the orders, notes and calls are made up, different every day. A promise on the phone is on the ' +
           'client\'s order ("As promised: 4 frozen peas"). The growth choice is at work: the new truck, the bigger room, the new client.',
       },
@@ -196,16 +210,17 @@ export const HELP_PAGES: readonly HelpPage[] = [
 export function helpPageFor(screen: Screen): number {
   switch (screen) {
     case 'start':
-      return 4;
+      return 5;
     case 'messages':
     case 'desk':
     case 'sheets':
       return 0;
     case 'road':
     case 'result':
-    case 'supply':
       return 1;
-    case 'day':
+    case 'supply':
       return 2;
+    case 'day':
+      return 3;
   }
 }

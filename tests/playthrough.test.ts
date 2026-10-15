@@ -32,12 +32,21 @@ describe('a bot plays many days', () => {
       for (let i = 0; i < 6 && app.holding; i++) { clock.t += 400; app.press({ key, repeat: true }); app.tick(); }
       app.release(key);
     };
+    let stuck = 0;
     for (let guard = 0; app.run.day <= 8 && guard < 5000; guard++) {
       switch (app.screen) {
         case 'messages': P(' '); break;
         case 'desk': {
-          if (app.desk.unfinishedCount() === 0) { P(' '); break; }
-          if (app.pane === 'trucks') { if (/too full/.test(app.status)) P('ArrowDown'); P('Enter'); break; }
+          // An order no truck can take is left, and the trucks go without it.
+          if (app.desk.unfinishedCount() === 0 || stuck > 40) { stuck = 0; P(' '); break; }
+          if (app.pane === 'trucks') {
+            if (/too full/.test(app.status)) {
+              stuck++;
+              if (app.truckSel === app.morning.trucks.length - 1) for (let i = 0; i < app.truckSel; i++) P('ArrowUp');
+              else P('ArrowDown');
+            } else stuck = 0;
+            P('Enter'); break;
+          }
           P('Enter'); break;
         }
         case 'sheets': HOLD(' '); break;

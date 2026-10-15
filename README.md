@@ -8,9 +8,11 @@ A calm, keyboard-only browser game about running a small restaurant-supply busin
 
 **[Play it in your browser](https://thegallery.github.io/promitheftis/)**, no download needed.
 
-Each morning you hand out the overnight orders against the stock on hand and put them on trucks before they leave at 07:00. There is no failure screen: if stock runs short, some clients simply get less, and a truck sent to places far apart gets back later. Then you order stock for tomorrow, look back at the day, choose one thing to grow, and the next morning begins. The game explains itself: press **H** on any screen for how to play.
+Each morning you hand out the overnight orders against the stock on hand and put them on trucks before they leave at 07:00. There is no failure screen: if stock runs short, some clients simply get less, and a truck sent to places far apart gets back later and costs more. Then you order stock for tomorrow, which means reading the notes on the orders and the bars of the store rooms, since what a room cannot hold spoils. You look back at the day, choose one thing to grow, and the next morning begins. The game explains itself: press **H** on any screen for how to play.
 
 ![The order desk: cash in the bank at the top, a list of orders, the lines of the current order, two trucks and the nine squares of the island](docs/screens/order-desk.png)
+
+![The supplier order: what is on hand, the usual amount and what clients asked for, a bar for each room with the units that will spoil, and what the notes say about tomorrow](docs/screens/supplier-order.png)
 
 ![The end of the day: how each client's order went, the trucks with what each cost, calls, money and tomorrow's order](docs/screens/end-of-day.png)
 

@@ -53,8 +53,7 @@ export function announcedBy(orders: readonly Pick<Order, 'client' | 'note'>[]): 
  */
 const STRENGTH = 0.4;
 /** Events together never move an item by more than this share of its usual amount, up or down. */
-const MOST_UP = 0.3;
-const MOST_DOWN = 0.3;
+const MOST = 0.3;
 
 /** The units one event adds to (or, if quiet, takes from) one item's total when the business has `clients` clients. */
 export function swingUnits(event: DemandEvent, usual: number, clients: number): number {
@@ -80,7 +79,7 @@ export function swings(
   for (const s of all) totals.set(s.item, (totals.get(s.item) ?? 0) + s.units);
   return all.map((s) => {
     const total = totals.get(s.item) as number;
-    const limit = (usual[s.item] ?? 0) * (total > 0 ? MOST_UP : MOST_DOWN);
+    const limit = (usual[s.item] ?? 0) * MOST;
     return { ...s, units: Math.abs(total) > limit && limit > 0 ? Math.round((s.units * limit) / Math.abs(total)) : s.units };
   });
 }

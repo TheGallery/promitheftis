@@ -133,13 +133,13 @@ describe('the end-of-day screen', () => {
     const fits = toDay(0, 'small', ['3']).app;
     const text = screen(fits).join('\n');
     for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) expect(text).toMatch(new RegExp(`${room} +\\d+% full tomorrow`));
-    expect(text).not.toContain('over by');
+    expect(text).not.toContain('will spoil');
 
     const over = toDay(0, 'small', ['9', '9', '9']).app;
     const lines = screen(over);
-    expect(lines.filter((l) => l.includes('over by'))).toHaveLength(1);
-    const amber = screenLines(over).find((l) => l.some(([t]) => t.includes('over by')))!;
-    expect(amber.filter(([t]) => t.includes('over by')).every(([, cls]) => cls === 'w')).toBe(true);
+    expect(lines.filter((l) => l.includes('will spoil'))).toHaveLength(1);
+    const amber = screenLines(over).find((l) => l.some(([t]) => t.includes('will spoil')))!;
+    expect(amber.filter(([t]) => t.includes('will spoil')).every(([, cls]) => cls === 'w')).toBe(true);
   });
 
   it('shows the selected client\'s story and moves with the arrow keys', () => {

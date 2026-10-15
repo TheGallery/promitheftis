@@ -1,5 +1,5 @@
-import type { RoomSpace } from '../game/rooms';
 import { place, type PlaceId } from '../game/places';
+import type { RoomSpace } from '../game/rooms';
 
 /**
  * The places a truck goes to, in `w` columns: the name of a single place, and for two or more their
