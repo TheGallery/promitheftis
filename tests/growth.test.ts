@@ -282,7 +282,7 @@ describe('changing the choice before the next morning', () => {
     expect(cues).toEqual([]);
     expect(screen(app).join('\n')).not.toContain('change choice');
     press('Enter');
-    expect(screen(app).join('\n')).toContain('U change choice');
+    expect(screen(app).join('\n')).toContain('U change');
     press('u');
     expect(cues).toEqual(['finish', 'confirm']);
   });
@@ -337,10 +337,10 @@ describe('the new client in the game', () => {
     expect(offered(again).client).toEqual(NEW_CLIENTS.at(-1));
   });
 
-  it('draws no random number for anything else in the game', () => {
+  it('draws no random number for anything else in the game: the new client and the next day only', () => {
     let draws = 0;
     toDay(0, 'big', ['a'], [], () => (draws++, 0));
-    expect(draws).toBe(1);
+    expect(draws).toBe(2);
   });
 });
 
@@ -385,7 +385,7 @@ describe('the growth screen', () => {
     const { app, press } = toDay();
     press(' ');
     const pending = screen(app);
-    for (const word of ['pick one', 'choose it', 'back', 'play again', 'big morning', 'colours', 'sound']) expect(pending[ROWS - 1]).toContain(word);
+    for (const word of ['pick one', 'choose it', 'back', 'hold: replay', 'hold: big', 'colours', 'sound']) expect(pending[ROWS - 1]).toContain(word);
     press('3', 'Enter');
     const lines = screen(app);
     const text = lines.join('\n');

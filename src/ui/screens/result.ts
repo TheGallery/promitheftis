@@ -72,7 +72,7 @@ function rightColumn(app: App): Line[] {
     const sel = i === app.resultSel;
     const truck = o.truckId == null ? '-' : String(o.truckId);
     return cat(
-      s(`${sel ? '▶' : ' '}${clip(o.client, 22).padEnd(23)}${place(o.place).name.padEnd(10)}${truck.padStart(2)} `, sel ? 'hl' : ''),
+      s(`${sel ? '▶ ' : '  '}${clip(o.client, 21).padEnd(22)}${place(o.place).name.padEnd(10)}${truck.padStart(2)} `, sel ? 'hl' : ''),
       bar(o.percent, 8),
       s(` ${String(o.percent).padStart(3)}%`, o.percent < 100 ? 'w' : ''),
     );
@@ -96,7 +96,7 @@ function rightColumn(app: App): Line[] {
   const room = 24 - 2 - detail.length;
   return [
     cat(s(' ORDERS', 'b'), s(`   ${app.resultSel + 1} of ${r.orders.length}`, 'd')),
-    s(` ${'CLIENT'.padEnd(23)}${'PLACE'.padEnd(10)}${'TRK'.padStart(2)}  ${'DELIVERED'}`, 'd'),
+    s(`  ${'CLIENT'.padEnd(22)}${'PLACE'.padEnd(10)}${'TRK'.padStart(2)}  ${'DELIVERED'}`, 'd'),
     ...scrollRows(rows, app.resultSel, room),
     ...Array.from({ length: Math.max(0, room - Math.min(rows.length, room)) }, () => [] as Line),
     ...detail,
@@ -124,6 +124,6 @@ export function resultScreen(app: App): Line[] {
           s(` · restaurants paid ${formatMoney(money.takenIn)}, trucks cost ${formatMoney(money.trucks)}`, 'd'),
         )
       : [];
-  const footer = [rule(), summary, keyBar([['SPACE', 'supplier order'], ['↑↓ PgUp PgDn', 'orders'], ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];
+  const footer = [rule(), summary, keyBar([['SPACE', 'supplier order'], ['↑↓ PgUp PgDn', 'orders'], ['R', 'hold: replay'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }

@@ -23,7 +23,7 @@ function words(app: App): Words | null {
     case 'newRun':
       return {
         title: `HOLD ${key} TO START A NEW RUN`,
-        warn: `Replaces your saved day ${app.saved?.run.day ?? app.run.day}.`,
+        warn: app.saved || app.run.day > 1 ? `Replaces your saved day ${app.saved?.run.day ?? app.run.day}.` : 'Drops the day you are playing.',
       };
     case 'send': {
       const left = app.desk.unfinishedCount();
@@ -74,17 +74,23 @@ export function holdBox(app: App): Line[] | null {
     [],
     [[' '.repeat(MARGIN), ''], ...filled],
     [],
-    centred('Let go or ESC to cancel', app.holding ? 'acc' : 'd'),
+    centred('ESC to cancel', app.holding ? 'acc' : 'd'),
     ...(w.warn ? [[], ...para(w.warn, 'w')] : []),
     [],
   ];
   return [[['═'.repeat(INNER), 'acc box']], ...rows.map(onBox), [['═'.repeat(INNER), 'acc box']]];
 }
 
-/** The screen with the hold box over it, when a step is waiting for its key to be held. */
+/** The footer is the rule, the message line and the key bar. */
+const FOOTER_ROWS = 3;
+
+/**
+ * The screen with the hold box over it, when a step is waiting for its key to be held. It sits in the middle, except
+ * on the supplier order, where it goes just above the footer so the money lines stay in view.
+ */
 export function withHoldBox(app: App, screen: Line[]): Line[] {
   const box = holdBox(app);
   if (!box) return screen;
-  const top = Math.max(2, Math.floor((ROWS - box.length) / 2));
+  const top = app.screen === 'supply' ? ROWS - FOOTER_ROWS - box.length : Math.max(2, Math.floor((ROWS - box.length) / 2));
   return overlay(screen, box, top, Math.floor((COLS - width(box[0] as Line)) / 2));
 }

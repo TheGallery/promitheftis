@@ -1,6 +1,7 @@
 import './style.css';
 import { App } from './ui/app';
 import { Sounds } from './ui/audio';
+import { gameKey } from './ui/keys';
 import { browserStore } from './ui/store';
 import { screenHtml } from './ui/view';
 
@@ -44,11 +45,11 @@ window.addEventListener('keydown', (e) => {
   if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
   // Reloading and developer tools stay available; every other key belongs to the game.
   if (e.key === 'F5' || e.key === 'F11' || e.key === 'F12') return;
-  const used = app.press({ key: e.key, shift: e.shiftKey, repeat: e.repeat });
+  const used = app.press({ key: gameKey(e), shift: e.shiftKey, repeat: e.repeat });
   if (used || e.key === 'Tab' || /^F\d+$/.test(e.key)) e.preventDefault();
 });
 
-window.addEventListener('keyup', (e) => app.release(e.key));
+window.addEventListener('keyup', (e) => app.release(gameKey(e)));
 window.addEventListener('blur', () => app.releaseAll());
 
 draw();

@@ -31,7 +31,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'OVERNIGHT MESSAGES',
         text:
           'Orders and notes came in overnight. Read through them with {↑↓}, then {SPACE} starts the morning. A {!} or {!!} beside a client means ' +
-          'they went short yesterday, or two days running; the lines below the list say what was short.',
+          'they went short lately, or two days running; the lines below the list say what was short.',
       },
       {
         head: 'THE ORDER DESK',
@@ -74,7 +74,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'THE RESULT',
         text:
           'Once every truck is home and every call is answered, {SPACE} shows how it went: when each truck got back, how much of each order ' +
-          'was delivered, who got less, and your answers on the phone. {R} plays the day again from its overnight messages; {SPACE} goes on to the supplier order.',
+          'was delivered, who got less, and your answers on the phone. Hold {R} to play the day again from its overnight messages; {SPACE} goes on to the supplier order.',
       },
       {
         head: 'THE SUPPLIER ORDER',
@@ -91,7 +91,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
     ],
   },
   {
-    name: "DAY'S END AND MONEY",
+    name: 'END OF THE DAY AND MONEY',
     blocks: [
       {
         head: 'THE END OF THE DAY',
@@ -151,8 +151,9 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'PLAYING A DAY AGAIN',
         text:
-          '{R} plays the current day again from its overnight messages, with the same orders and the same stock. It leaves the saved run alone. ' +
-          'On the end of the day and the growth choice, where it would drop your order, you hold {R} like the other steps.',
+          'Holding {R} plays the current day again from its overnight messages, with the same orders, the same stock, and the same new client ' +
+          'and next morning to come. It leaves the saved run alone. It drops what you did since the trucks left, so on the result, the end of the ' +
+          'day and the growth choice you hold {R} down like the other steps that cannot be taken back.',
       },
     ],
   },
@@ -176,9 +177,10 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'STARTING OVER',
         text:
-          '{B} starts a new run with the big morning (9 trucks, 38 orders) and {S} with the small one (2 trucks, 7 orders). On day 1 one ' +
-          'press is enough. From day 2 on, a new run replaces your saved day, so a box asks and you hold the key down ' +
-          'for about a second and a half until its bar fills. Let go early, or press {ESC}, and nothing happens.',
+          '{B} starts a new run with the big morning (9 trucks, 38 orders) and {S} with the small one (2 trucks, 7 orders). On the overnight ' +
+          'messages of day 1 one press is enough. Everywhere else a new run drops the day you are playing or replaces your saved day, so a box asks ' +
+          'and you hold the key down for about a second and a half until its bar fills. Let go early and the bar empties; press {ESC} to cancel, ' +
+          'and nothing happens.',
       },
       {
         head: 'KEYS THAT WORK EVERYWHERE',

@@ -67,7 +67,7 @@ export function messagesScreen(app: App): Line[] {
   body.push(rule(), ...detail(app));
   const other: Array<readonly [string, string]> =
     app.morning.day > 1
-      ? [['B S', 'big / small morning']]
+      ? [['B S', 'hold: big / small morning']]
       : app.morning.id === 'small' ? [['B', 'big morning (9 trucks, 38 orders)']] : [['S', 'small morning (2 trucks, 7 orders)']];
   const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : [];
   const footer = [rule(), status, keyBar([['SPACE', 'start the morning'], ['↑↓', 'message'], ...other, ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];

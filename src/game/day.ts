@@ -30,6 +30,10 @@ export interface DayTruck {
 export interface DayCall {
   /** Who rang, what about, and what was answered. */
   line: string;
+  client: string;
+  topic: string;
+  /** What was answered, as the result reads it. */
+  record: string;
   /** True when the answer promised something for tomorrow's order. */
   promised: boolean;
 }
@@ -101,7 +105,7 @@ export function buildDay(
     trucks,
     calls: answered.map((c) => {
       const choice = answers.get(c.id) as number;
-      return { line: callLine(c, choice), promised: !!c.options[choice]?.addsToOrder };
+      return { line: callLine(c, choice), client: c.client, topic: c.topic, record: c.options[choice]?.record ?? '', promised: !!c.options[choice]?.addsToOrder };
     }),
     ordered: supply.ordered(),
     units: supply.total(),

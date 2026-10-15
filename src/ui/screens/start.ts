@@ -28,6 +28,6 @@ export function startScreen(app: App): Line[] {
     ...rows,
   ];
   const status = app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : [];
-  const keys = keyBar([['SPACE', 'continue'], ['↑↓ 1-3', 'pick one'], ['ENTER', 'choose'], ['S', 'small morning'], ['B', 'big morning'], ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']]);
+  const keys = keyBar([['SPACE', 'continue'], ['↑↓ 1-3', 'pick one'], ['ENTER', 'choose'], ['S', 'hold: small'], ['B', 'hold: big'], ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']]);
   return layout(top, body, [rule(), status, keys]);
 }

@@ -74,8 +74,10 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
   const shorts = delivered
     .filter((o) => o.shortLines.length > 0)
     .sort((a, b) => a.percent - b.percent || a.orderIndex - b.orderIndex);
+  // A client rings about the time before the truck is there, and a client with a time asked for rings only when the truck
+  // will be there by it, so the call is never after the time asked and no answer is later than it.
   const times = delivered
-    .filter((o) => (o.arriveAt as number) - TIME_BEFORE >= road.departAt + FIRST_RING_AFTER)
+    .filter((o) => (o.arriveAt as number) - TIME_BEFORE >= road.departAt + FIRST_RING_AFTER && (o.before == null || (o.arriveAt as number) < o.before))
     .sort((a, b) => rankForTime(a) - rankForTime(b) || (b.arriveAt as number) - (a.arriveAt as number) || a.orderIndex - b.orderIndex);
   const rest = delivered.slice().sort((a, b) => a.orderIndex - b.orderIndex);
 
@@ -105,9 +107,9 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
   return calls.map((c, id) => ({ ...c, id }));
 }
 
-/** Clients who asked for a time, and got it late, are the ones most likely to ring about it. */
+/** Clients who asked for a time are the ones most likely to ring about it. */
 function rankForTime(o: OrderResult): number {
-  return o.lateForAsk ? 0 : o.before != null ? 1 : 2;
+  return o.before != null ? 0 : 1;
 }
 
 function contactOf(desk: Desk, o: OrderResult): string {
@@ -131,7 +133,7 @@ function shortCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | u
     qty,
     say:
       worst.given === 0
-        ? `The delivery came, thank you! But there was no ${item} in it, and we asked for ${worst.asked}. Is some coming?`
+        ? `The delivery came, thank you! But we got no ${item}, and we asked for ${worst.asked}. Is some coming?`
         : `The delivery came, thank you! But we only got ${worst.given} of the ${worst.asked} ${item}. Is some more coming?`,
     options: [
       { label: "Add the rest to tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
@@ -168,6 +170,8 @@ function forgotCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | 
 function timeCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | undefined {
   if (!o || o.arriveAt == null) return undefined;
   const ask = o.before != null ? ` We need it before ${formatTime(o.before)}.` : '';
+  // The time promised is the next quarter-hour, and never after the time the client asked for.
+  const promised = o.before != null ? Math.min(beforeTime(o.arriveAt), o.before) : beforeTime(o.arriveAt);
   return {
     kind: 'time',
     at: o.arriveAt - TIME_BEFORE,
@@ -178,7 +182,7 @@ function timeCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | un
     say: `Hello, just checking on our delivery.${ask} What time will the truck be here?`,
     options: [
       { label: `It's on its way, about ${formatTime(o.arriveAt)}`, record: `told about ${formatTime(o.arriveAt)}` },
-      { label: `It will be with you before ${formatTime(beforeTime(o.arriveAt))}`, record: `told before ${formatTime(beforeTime(o.arriveAt))}` },
+      { label: `It will be with you before ${formatTime(promised)}`, record: `told before ${formatTime(promised)}` },
     ],
   };
 }

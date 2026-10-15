@@ -321,7 +321,7 @@ describe('the hold box', () => {
     expect(app.ask?.action).toBe(step);
     const text = screen(app).join('\n');
     expect(text).toContain(title);
-    expect(text).toContain('Let go or ESC to cancel');
+    expect(text).toContain('ESC to cancel');
   });
 
   it('fits within its bounds for every hold, with and without the warning', () => {
@@ -344,7 +344,7 @@ describe('the hold box', () => {
       expect(box!.length, name).toBeGreaterThanOrEqual(rows - 4);
       for (const line of box!) expect(line.reduce((n, [text]) => n + [...text].length, 0), name).toBe(BOX_W);
       const text = plain(box!).join('\n');
-      expect(text, name).toContain('Let go or ESC to cancel');
+      expect(text, name).toContain('ESC to cancel');
     }
     expect(holdBox(warned.app)!.length).toBeGreaterThan(holdBox(boxes[3]![1])!.length);
   });
@@ -364,7 +364,7 @@ describe('the hold box', () => {
     const rows = () => plain(screenLines(t.app));
     const text = rows().join('\n');
     expect(text).toContain('HOLD SPACE TO SEND THE TRUCKS');
-    expect(text).toContain('Let go or ESC to cancel');
+    expect(text).toContain('ESC to cancel');
     expect(rows()).toHaveLength(30);
     for (const row of rows()) expect([...row]).toHaveLength(COLS);
     const cells = () => [...(rows().find((r) => r.includes('█') && r.startsWith(' '.repeat(20))) ?? '')].filter((c) => c === '█').length;
@@ -426,7 +426,7 @@ describe('the hold box', () => {
     const text = plain(screenLines(t.app)).join('\n');
     expect(text).toContain('HOLD S TO START A NEW RUN');
     expect(text).toContain('Replaces your saved day 2.');
-    expect(text).toContain('Let go or ESC to cancel');
+    expect(text).toContain('ESC to cancel');
     t.wait(HOLD_MS / 2);
     const cells = plain(screenLines(t.app)).find((r) => r.includes('█') && r.startsWith(' '.repeat(20))) ?? '';
     expect([...cells].filter((c) => c === '█').length).toBe(BAR_CELLS / 2);

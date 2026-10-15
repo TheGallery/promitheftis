@@ -1,3 +1,4 @@
+import { LAST_DAY } from './clock';
 import { HISTORY_DAYS, type ClientDay, type History } from './history';
 import { ITEM_LIST } from './morning';
 import { MOST_CASH, STARTING_CASH } from './money';
@@ -123,7 +124,7 @@ function mapped<T>(v: unknown, make: (x: unknown) => T | null): T[] | null {
 function runOf(v: unknown, version: number): RunState | null {
   if (!isObject(v)) return null;
   const { kind, day } = v;
-  if ((kind !== 'small' && kind !== 'big') || !isCount(day) || day < 1) return null;
+  if ((kind !== 'small' && kind !== 'big') || !isCount(day) || day < 1 || day > LAST_DAY) return null;
   const stock = recordOf(v.stock, isCount, isItem);
   const usual = recordOf(v.usual, isCount, isItem);
   const trucks = mapped(v.trucks, truckOf);

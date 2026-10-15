@@ -92,12 +92,12 @@ function linesPane(app: App): Line[] {
     [],
     cat(s(` ${clip(order.client.toUpperCase(), 28)}`, 'b'), s(` · ${place(order.place).name}`, 'acc')),
   ];
-  const who = order.note ? `${order.contact} · "${order.note}"` : order.contact;
+  const who = order.note ? `${order.contact}: "${order.note}"` : order.contact;
   for (const row of wrapText(who, 42).slice(0, 2)) out.push(s(` ${row}`, 'd'));
-  out.push([], s(` ${'ITEM'.padEnd(19)}${'ASKED'.padStart(6)}${'ON HAND'.padStart(9)}${'GIVE'.padStart(8)}`, 'd'));
+  out.push([], s(`  ${'ITEM'.padEnd(19)}${'ASKED'.padStart(5)}${'ON HAND'.padStart(9)}${'GIVE'.padStart(8)}`, 'd'));
   order.lines.forEach((line, l) => {
     const current = l === app.lineSel;
-    const base = `${current ? '▶' : ' '}${d.item(line.item).name.padEnd(19)}${String(line.asked).padStart(6)}${String(d.onHand(o, l)).padStart(9)}`;
+    const base = `${current ? '▶ ' : '  '}${d.item(line.item).name.padEnd(19)}${String(line.asked).padStart(5)}${String(d.onHand(o, l)).padStart(9)}`;
     out.push(cat(s(base, current ? 'hl' : ''), giveCell(app, l)));
   });
   out.push([], s(' type a number, or ←→ for one more / less', 'd'), [], s(' NOTES', 'd'));

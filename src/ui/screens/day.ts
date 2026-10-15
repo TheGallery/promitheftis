@@ -1,5 +1,5 @@
 import { DAY_END_MINUTE, formatTime } from '../../game/clock';
-import type { DayOrder, DayRoom, DaySummary } from '../../game/day';
+import type { DayCall, DayOrder, DayRoom, DaySummary } from '../../game/day';
 import { plainName } from '../../game/headsup';
 import { formatChange, formatMoney } from '../../game/money';
 import type { Mood } from '../../game/moods';
@@ -33,7 +33,7 @@ function orderRows(app: App, day: DaySummary): Line[] {
     const sel = i === app.daySel;
     const reached = o.arriveAt != null ? formatTime(o.arriveAt) : '—';
     return cat(
-      s(`${sel ? '▶' : ' '}${clip(o.client, 21).padEnd(22)}${`${o.percent}%`.padStart(4)}  ${reached.padStart(5)}  `, sel ? 'hl' : ''),
+      s(`${sel ? '▶ ' : '  '}${clip(o.client, 20).padEnd(21)}${`${o.percent}%`.padStart(4)}  ${reached.padStart(5)}  `, sel ? 'hl' : ''),
       s((o.lateForAsk ? 'late' : '').padEnd(6), sel ? 'w hl' : 'w'),
       s(o.mood, sel ? `${MOOD_CLASS[o.mood]} hl` : MOOD_CLASS[o.mood]),
     );
@@ -62,7 +62,7 @@ function leftColumn(app: App, day: DaySummary): Line[] {
   const rows = orderRows(app, day);
   return [
     cat(s(' HOW THE DAY WENT', 'b'), s(`   ${app.daySel + 1} of ${day.orders.length}`, 'd')),
-    s(` ${'CLIENT'.padEnd(22)}${'GOT'.padStart(4)} REACHED${' '.repeat(7)}MOOD`, 'd'),
+    s(`  ${'CLIENT'.padEnd(21)}${'GOT'.padStart(4)} REACHED${' '.repeat(7)}MOOD`, 'd'),
     ...scrollRows(rows, app.daySel, room),
     ...Array.from({ length: Math.max(0, room - rows.length) }, () => [] as Line),
     ...below,
@@ -88,7 +88,7 @@ function truckCell(t: DaySummary['trucks'][number], wide: boolean): Line {
     );
   }
   const back = t.backAt != null ? formatTime(t.backAt) : 'yard';
-  return cat(s(` ${String(t.truckId).padEnd(2)}${clip(t.driver, 6).padEnd(6)} ${back.padEnd(5)} `), s((t.lateTo.length > 0 ? late : '').padEnd(6), lateClass), s(` ${squares.padStart(2)} ${money.padStart(4)}`));
+  return cat(s(` ${String(t.truckId).padEnd(2)}${clip(t.driver, 5).padEnd(5)} ${back.padEnd(5)} `), s((t.lateTo.length > 0 ? late : '').padEnd(7), lateClass), s(` ${squares.padStart(2)} ${money.padStart(4)}`));
 }
 
 function trucksBlock(day: DaySummary): Line[] {
@@ -99,12 +99,21 @@ function trucksBlock(day: DaySummary): Line[] {
   return out;
 }
 
-/** The calls, each wrapped onto an indented second line if it needs one, or with `short` cut to a line each. */
+/** One call on a single line: when it is too long the topic and then the client are shortened, never the answer. */
+function oneLine(c: DayCall, w: number): string {
+  if ([...c.line].length <= w) return c.line;
+  const room = w - 6 - [...c.record].length;
+  const topic = clip(c.topic, Math.max(10, room - 8));
+  const client = clip(c.client, Math.max(6, room - [...topic].length));
+  return `${client} · ${topic} · ${c.record}`;
+}
+
+/** The calls, each wrapped onto an indented second line if it needs one, or with `short` kept to a line each. */
 function callsBlock(day: DaySummary, short = false): Line[] {
   const out: Line[] = [s(' PHONE CALLS', 'b')];
   if (day.calls.length === 0) return [...out, s(' Nobody rang.', 'd')];
   for (const c of day.calls) {
-    const rows = short ? [clip(c.line, RIGHT_W - 2)] : wrapHanging(c.line, RIGHT_W - 2);
+    const rows = short ? [oneLine(c, RIGHT_W - 2)] : wrapHanging(c.line, RIGHT_W - 2);
     out.push(...rows.map((r) => s(` ${r}`, c.promised ? 'acc' : '')));
   }
   return out;
@@ -161,14 +170,14 @@ function moneyCell(label: string, text: string, labelW: number, amountW: number,
  * and the trucks with the squares they drove (each truck's own cost is in the list of trucks). What was paid out is
  * a cost, not a loss, so only a day that ends below zero, and cash below zero, are in the warning colour.
  */
-export function moneyBlock({ money }: DaySummary): Line[] {
+export function moneyBlock({ money }: DaySummary, cash = money.cash): Line[] {
   const left = (label: string, amount: number): Line => moneyCell(` ${label}`, formatMoney(amount), 15, 9);
   const right = (label: string, text: string, warn: boolean, extra = ''): Line => cat(s('    '), moneyCell(label, text, 9, 10, extra, warn));
   const rooms = KEPT_ORDER.map((kept) => `${KEPT_LABEL[kept].toLowerCase()} ${formatMoney(money.supplierRooms[kept])}`).join(' · ');
   return [
     cat(s(' MONEY', 'b'), s('   what each client paid shows under their name', 'd')),
     cat(left('Taken in', money.takenIn), right('Today', formatChange(money.total), money.total < 0)),
-    cat(left('Supplier order', -money.supplier), right('Cash now', formatMoney(money.cash), money.cash < 0, 'b')),
+    cat(left('Supplier order', -money.supplier), right('Cash now', formatMoney(cash), cash < 0, 'b')),
     s(`   ${rooms}`, 'd'),
     cat(
       left(`Trucks (${money.trucksOut} out)`, -money.trucks),
@@ -177,9 +186,9 @@ export function moneyBlock({ money }: DaySummary): Line[] {
   ];
 }
 
-function rightColumn(day: DaySummary): Line[] {
+function rightColumn(day: DaySummary, cash: number): Line[] {
   const trucks = trucksBlock(day);
-  const money = moneyBlock(day);
+  const money = moneyBlock(day, cash);
   // What the three rooms and the headings leave of the column is for the list of what was ordered; when even one line of
   // it does not fit, the blank lines between the blocks go first, and then the calls are cut to a line each.
   const fixedWith = (c: Line[]) => trucks.length + c.length + money.length + 1 + day.rooms.length;
@@ -198,7 +207,7 @@ export function dayScreen(app: App): Line[] {
   const body: Line[] = [];
   if (day) {
     const left = leftColumn(app, day);
-    const right = rightColumn(day);
+    const right = rightColumn(day, app.cash);
     for (let i = 0; i < Math.max(left.length, right.length); i++) body.push(cols([left[i] ?? [], right[i] ?? []], [LEFT_W, RIGHT_W]));
   }
   const pleased = day?.orders.filter((o) => o.mood === 'pleased').length ?? 0;
@@ -207,5 +216,5 @@ export function dayScreen(app: App): Line[] {
     : day
       ? s(` ${pleased} of ${plural(day.orders.length, 'client')} pleased. SPACE to choose what to grow.`, 'd')
       : [];
-  return layout(top, body, [rule(), status, keyBar([['SPACE', 'what to grow'], ['↑↓ PgUp PgDn', 'clients'], ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([['SPACE', 'what to grow'], ['↑↓ PgUp PgDn', 'clients'], ['R', 'hold: replay'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

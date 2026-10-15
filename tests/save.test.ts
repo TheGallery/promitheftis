@@ -328,6 +328,8 @@ describe('B and S replace the save', () => {
     const { app, press } = toDay(0, 'big', ['a'], [], RANDOM, store);
     expect(app.screen).toBe('day');
     press('s');
+    expect(app.run.kind).toBe('big');
+    hold(app, 's');
     expect(app.run.kind).toBe('small');
     expect(savedRun(store)).toEqual({ run: runFromMorning(smallMorning()), daySeed: 0 });
   });
@@ -407,7 +409,7 @@ describe('B and S have to be held down from day 2 on', () => {
       const lines = screen(app).join('\n');
       expect(lines).toContain(`HOLD ${name} TO START A NEW RUN`);
       expect(lines).toContain('Replaces your saved day 2.');
-      expect(lines).toContain('Let go or ESC to cancel');
+      expect(lines).toContain('ESC to cancel');
       wait(HOLD_MS - 1);
       expect(app.run.day).toBe(2);
       expect(store.data.get(RUN_KEY)).toBe(text);
@@ -448,7 +450,7 @@ describe('B and S have to be held down from day 2 on', () => {
     expect(app.run.day).toBe(2);
     expect(store.data.get(RUN_KEY)).toBe(text);
     expect(screen(app).join('\n')).toContain('HOLD B TO START A NEW RUN');
-    expect(screen(app).join('\n')).toContain('Let go or ESC to cancel');
+    expect(screen(app).join('\n')).toContain('ESC to cancel');
   });
 
   it('after letting go early the key can be held again, and the fill starts over', () => {
@@ -599,8 +601,14 @@ describe('B and S have to be held down from day 2 on', () => {
     expect(savedRun(store)?.run.kind).toBe('big');
     const day = toDay(0, 'small', ['a'], [], RANDOM, memoryStore());
     day.press('b');
+    expect(day.app.run.kind).toBe('small');
+    expect(day.app.newRunAsk).toBe('big');
+    hold(day.app, 'b');
     expect(day.app.run.kind).toBe('big');
     expect(day.app.screen).toBe('messages');
+    day.press('s');
+    expect(day.app.run.kind).toBe('small');
+    expect(day.app.newRunAsk).toBeNull();
   });
 });
 
