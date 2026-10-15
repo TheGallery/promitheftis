@@ -35,6 +35,20 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     expect(blind).toBeLessThanOrEqual(careful * 0.8);
   });
 
+  it('asks for more times than it used to, and a late order costs money', () => {
+    const asked = later(kind, 'blind').reduce((sum, d) => sum + d.timed, 0) / later(kind, 'blind').reduce((sum, d) => sum + d.orders, 0);
+    expect(asked).toBeGreaterThan(0.25);
+    expect(summarise(runs(kind, 'blind'), FROM).lateCut).toBeGreaterThan(0);
+  });
+
+  it('pays a careful player for planning the routes against the times asked: nearly all in time, and few pounds lost to late orders', () => {
+    const blind = summarise(runs(kind, 'blind'), FROM);
+    const careful = summarise(runs(kind, 'careful'), FROM);
+    expect(careful.late / careful.timed).toBeLessThan(0.1);
+    expect(blind.late / blind.timed).toBeGreaterThan(0.2);
+    expect(careful.lateCut).toBeLessThan(blind.lateCut / 5);
+  });
+
   it('keeps blind play calm: it still makes money and most clients are pleased, only less than for a careful player', () => {
     const blind = summarise(runs(kind, 'blind'), FROM);
     expect(blind.profit).toBeGreaterThan(0);

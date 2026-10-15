@@ -44,7 +44,8 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'TRUCKS AND THE MAP',
         text:
           'Orders for the same place belong on the same truck, and places that touch on the map, corners included, can share one. A truck sent ' +
-          'to places far apart gets back late and costs more to run. The clock moves a minute for each truck you pick and order you finish.',
+          'to places far apart gets back late and costs more to run. The clock moves a minute for each truck you pick and order you finish. ' +
+          'A client who asked for a time pays half if late; ✗ marks them.',
       },
       {
         head: 'TRUCK SHEETS',
@@ -124,7 +125,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'MONEY',
         text:
           'One number: the cash in the bank, £1,000 to start, at the top of every screen and amber below zero; nothing stops play when ' +
-          'it is. Restaurants pay for what arrives, item by item, and being late costs nothing. Each item has its own supplier price, and ' +
+          'it is. Restaurants pay for what arrives, item by item; one that asked for a time and is reached after it pays half for that order. Each item has its own supplier price, and ' +
           'the supplier order shows what the order costs and the cash left after it. A truck costs a driver plus the squares it drives, so putting orders for the same place on the same truck saves money. ' +
           'The end of the day breaks it all down; what a client paid shows under their name.',
       },

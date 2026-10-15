@@ -264,9 +264,9 @@ describe('the truck sheets', () => {
     });
     expect(app.screen).toBe('sheets');
     press('+');
-    const rows = screen(app).filter((l) => l.includes('The Extraordinaril'));
+    const rows = screen(app).filter((l) => l.includes('The Extraordinar'));
     expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) expect(row).toMatch(/The Extraordinaril…\s+\S/);
+    for (const row of rows) expect(row).toMatch(/The Extraordinar…\s+\S/);
   });
 
   it('stop a print that is still going when ESC leaves them, so nothing is announced on the desk afterwards', () => {

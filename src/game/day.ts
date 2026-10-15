@@ -1,7 +1,7 @@
 import { callLine, type Call } from './calls';
 import type { History } from './history';
 import { moodFacts, moodOf, moodReasons, type Mood } from './moods';
-import { dayMoney, STARTING_CASH, takenIn, tripCosts, type DayMoney, type Trip, type Units } from './money';
+import { dayMoney, orderPay, STARTING_CASH, tripCosts, type DayMoney, type Trip, type Units } from './money';
 import type { MorningResult, OrderResult } from './results';
 import type { Promised } from './run';
 import { KEPT_ORDER, type Supply } from './supply';
@@ -12,8 +12,10 @@ export interface DayOrder extends OrderResult {
   mood: Mood;
   /** Why the client is in that mood. */
   reasons: string[];
-  /** What the client paid for what arrived. */
+  /** What the client paid for what arrived: half of the price when the truck came after the time they asked for. */
   paid: number;
+  /** What coming late took off what the client paid; nothing for an order on time. */
+  cut: number;
 }
 
 export interface DayTruck {
@@ -61,10 +63,17 @@ export function unitsOf(orders: readonly OrderResult[], kept: (item: string) => 
   return orders.flatMap((o) => o.delivered.map((d): Units => ({ item: d.item, kept: kept(d.item), units: d.units })));
 }
 
+/** What one order pays, and what coming late took off, from what was delivered on it. */
+export function payOf(order: OrderResult, kept: (item: string) => Kept): { paid: number; cut: number } {
+  return orderPay(unitsOf([order], kept), order.lateForAsk);
+}
+
 /** What the morning's deliveries brought in, and what the trucks that took them cost: the cash it adds to the bank is the difference. */
-export function morningMoney(result: MorningResult, kept: (item: string) => Kept): { takenIn: number; trucks: number } {
+export function morningMoney(result: MorningResult, kept: (item: string) => Kept): { takenIn: number; lateCut: number; trucks: number } {
+  const pays = result.orders.map((o) => payOf(o, kept));
   return {
-    takenIn: takenIn(unitsOf(result.orders, kept)),
+    takenIn: pays.reduce((sum, p) => sum + p.paid, 0),
+    lateCut: pays.reduce((sum, p) => sum + p.cut, 0),
     trucks: tripCosts(tripsOf(result)).reduce((sum, t) => sum + t.cost, 0),
   };
 }
@@ -88,7 +97,7 @@ export function buildDay(
   const kept = (item: string): Kept => keptOf.get(item) ?? 'dry';
   const orders = result.orders.map((o): DayOrder => {
     const facts = moodFacts(o, calls, answers, history[o.client], promised);
-    return { ...o, mood: moodOf(facts), reasons: moodReasons(facts, o.truckId == null), paid: takenIn(unitsOf([o], kept)) };
+    return { ...o, mood: moodOf(facts), reasons: moodReasons(facts, o.truckId == null), ...payOf(o, kept) };
   });
   const costs = new Map(tripCosts(tripsOf(result)).map((t) => [t.truckId, t.cost]));
   const trucks = result.trucks.map((t): DayTruck => ({
@@ -113,6 +122,6 @@ export function buildDay(
     units: supply.total(),
     rooms,
     overFull: rooms.filter((r) => r.space.overBy > 0),
-    money: dayMoney(cash, unitsOf(result.orders, kept), ordered, tripsOf(result)),
+    money: dayMoney(cash, unitsOf(result.orders, kept), ordered, tripsOf(result), orders.reduce((sum, o) => sum + o.cut, 0)),
   };
 }

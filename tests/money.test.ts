@@ -8,6 +8,8 @@ import {
   formatChange,
   formatMoney,
   growthPrice,
+  LATE_PAYS,
+  orderPay,
   PRICES,
   shortBy,
   STARTING_CASH,
@@ -111,6 +113,24 @@ describe('money in', () => {
     expect(takenIn([])).toBe(0);
   });
 
+  it('is half for an order that came after the time asked, rounded to the pound, and whole for one on time', () => {
+    const lines = [units('chips', 2), units('eggs', 3)];
+    const full = takenIn(lines);
+    expect(LATE_PAYS).toBe(0.5);
+    expect(orderPay(lines, false)).toEqual({ paid: full, cut: 0 });
+    expect(orderPay(lines, true)).toEqual({ paid: Math.round(full / 2), cut: full - Math.round(full / 2) });
+    expect(orderPay([units('eggs', 1)], true)).toEqual({ paid: 4, cut: 3 });
+    expect(orderPay([], true)).toEqual({ paid: 0, cut: 0 });
+  });
+
+  it('takes what late orders did not pay off the day, and says how much', () => {
+    const delivered = [units('chips', 10)];
+    const plain = dayMoney(1000, delivered, [], []);
+    const cut = dayMoney(1000, delivered, [], [], 60);
+    expect(plain.lateCut).toBe(0);
+    expect([cut.lateCut, cut.takenIn, cut.total, cut.cash]).toEqual([60, plain.takenIn - 60, plain.total - 60, plain.cash - 60]);
+  });
+
   it('is what the desk gave to the orders that went out on a truck, whatever each restaurant is', () => {
     const { d, day } = summary(0);
     let expected = 0;
@@ -143,13 +163,28 @@ describe('money in', () => {
     expect(left).toBeLessThan(all);
   });
 
-  it('is the same however late the trucks were', () => {
+  it('is the same however late the trucks were for clients who asked for no time', () => {
     const { result, calls, answers, supply, day } = summary(0);
     const late = {
       ...result,
-      orders: result.orders.map((o) => (o.arriveAt == null ? o : { ...o, arriveAt: 23 * 60, lateForAsk: true })),
+      orders: result.orders.map((o) => (o.arriveAt == null ? o : { ...o, before: null, arriveAt: 23 * 60, lateForAsk: false })),
     };
     expect(buildDay(late, calls, answers, supply).money).toEqual(day.money);
+  });
+
+  it('is half for an order that came after the time the client asked for, and nothing is taken off one that came on time', () => {
+    const { result, calls, answers, supply, day } = summary(0);
+    const lateOrder = result.orders.find((o) => o.arriveAt != null)!;
+    const late = {
+      ...result,
+      orders: result.orders.map((o) => (o === lateOrder ? { ...o, before: 7 * 60, arriveAt: 8 * 60, lateForAsk: true } : o)),
+    };
+    const money = buildDay(late, calls, answers, supply).money;
+    const full = day.orders.find((o) => o.client === lateOrder.client)!.paid;
+    expect(money.lateCut).toBe(full - Math.round(full / 2));
+    expect(money.takenIn).toBe(day.money.takenIn - money.lateCut);
+    expect(money.total).toBe(day.money.total - money.lateCut);
+    expect(day.money.lateCut).toBe(0);
   });
 
   it('is split by client: what each paid adds up to what was taken in, and nothing is paid for an order without a truck', () => {
@@ -682,7 +717,7 @@ describe('the cash and what is left of it on the supplier order', () => {
     const trucks = tripCosts(result.trucks.filter((t) => t.backAt != null)).reduce((sum, t) => sum + t.cost, 0);
     expect(app.run.cash).toBe(STARTING_CASH);
     expect(app.cash).toBe(STARTING_CASH + paid - trucks);
-    expect(app.morningMoney()).toEqual({ takenIn: paid, trucks });
+    expect(app.morningMoney()).toEqual({ takenIn: paid, lateCut: 0, trucks });
     // Placing the order takes only the order off it: the day's total is the same as the cash change.
     app.supply!.fillAll();
     const after = app.cash - app.supply!.totalCost();

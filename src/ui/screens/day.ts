@@ -49,7 +49,9 @@ function detail(app: App, o: DayOrder): Line[] {
   }
   const missing = o.truckId == null ? '' : o.shortLines.map((l) => `${plainName(app.desk.item(l.item).name)} ${l.given}/${l.asked}`).join(', ');
   if (missing) for (const row of wrapHanging(`Short: ${missing}`, LEFT_W - 2).slice(0, 2)) out.push(s(` ${row}`, 'w'));
-  out.push(s(o.truckId == null ? ' They paid nothing: no truck took the order.' : ` They paid ${formatMoney(o.paid)} for what arrived.`, o.truckId == null ? 'd' : ''));
+  if (o.truckId == null) out.push(s(' They paid nothing: no truck took the order.', 'd'));
+  else if (o.cut > 0) out.push(s(` They paid ${formatMoney(o.paid)}, half of ${formatMoney(o.paid + o.cut)}: the truck came late.`, 'w'));
+  else out.push(s(` They paid ${formatMoney(o.paid)} for what arrived.`));
   const why = `This client ${o.reasons.join(', ')}.`;
   for (const row of wrapHanging(why, LEFT_W - 2).slice(0, 2)) out.push(s(` ${row}`, 'd'));
   return out;
@@ -177,6 +179,7 @@ export function moneyBlock({ money }: DaySummary, cash = money.cash): Line[] {
   return [
     cat(s(' MONEY', 'b'), s('   what each client paid shows under their name', 'd')),
     cat(left('Taken in', money.takenIn), right('Today', formatChange(money.total), money.total < 0)),
+    ...(money.lateCut > 0 ? [s(` Late, paid half: ${formatMoney(money.lateCut)} less`, 'w')] : []),
     cat(left('Supplier order', -money.supplier), right('Cash now', formatMoney(cash), cash < 0, 'b')),
     s(`   ${rooms}`, 'd'),
     cat(

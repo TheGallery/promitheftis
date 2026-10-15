@@ -1187,8 +1187,8 @@ export class App {
   }
 
   /** What the restaurants paid for this morning's deliveries and what the trucks cost, once the trucks have gone. */
-  morningMoney(): { takenIn: number; trucks: number } {
-    return this.result ? morningMoney(this.result, (item) => this.desk.item(item).kept) : { takenIn: 0, trucks: 0 };
+  morningMoney(): { takenIn: number; lateCut: number; trucks: number } {
+    return this.result ? morningMoney(this.result, (item) => this.desk.item(item).kept) : { takenIn: 0, lateCut: 0, trucks: 0 };
   }
 
   /** R plays this day again once it has been held, B and S start a new run from a fixed morning once the key has been held: all of them start over and drop the order and the growth choice. */

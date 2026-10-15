@@ -1,4 +1,4 @@
-import { MINUTES_PER_ACTION, START_MINUTE } from './clock';
+import { DEPART_MINUTE, MINUTES_PER_ACTION, START_MINUTE } from './clock';
 import type { PlaceId } from './places';
 import { planRoute, type RoutePlan } from './routes';
 import type { Item, Morning, Order } from './types';
@@ -203,6 +203,31 @@ export class Desk {
   /** Orders with something to deliver on a truck: its stops. */
   stopsOf(truckId: number): number[] {
     return this.ordersOn(truckId).filter((o) => this.unitsGiven(o) > 0);
+  }
+
+  /**
+   * When the trucks will leave if every order still to do takes the minutes it needs: at 07:00, or later if the clock
+   * will have passed it by then. An order with a truck only needs finishing; one without also needs a truck.
+   */
+  projectedDeparture(): number {
+    let actions = 0;
+    for (let o = 0; o < this.orderCount; o++) if (!this.finished[o]) actions += (this.truckOf[o] == null ? 2 : 1);
+    return Math.max(DEPART_MINUTE, this.clock + actions * MINUTES_PER_ACTION);
+  }
+
+  /**
+   * When order `o` would be reached if it rode on `truckId` and the trucks left at `departAt`, the other orders on that
+   * truck being as they stand; null if the order would deliver nothing (it is finished with nothing given).
+   */
+  arrivalOn(o: number, truckId: number, departAt: number): number | null {
+    if (this.finished[o] && this.unitsGiven(o) === 0) return null;
+    const riders = this.ordersOn(truckId).filter((i) => i !== o && this.unitsGiven(i) > 0);
+    const stops = [...riders, o].sort((a, b) => a - b).map((i) => ({ orderId: i, place: this.order(i).place }));
+    for (const visit of planRoute(stops, departAt).visits) {
+      const stop = visit.stops.find((s) => s.orderId === o);
+      if (stop) return stop.arriveAt;
+    }
+    return null;
   }
 
   /** The drive for a truck leaving at `departAt`. */

@@ -13,8 +13,8 @@ import type { Kept, Message, Morning, Order, OrderLine } from './types';
 const NOTE_BUDGET = 58;
 /** The share of clients that add a note of their own to an order. */
 const NOTE_CHANCE = 0.3;
-/** The share of clients that ask for a time on a day they do not always ask. */
-const TIME_CHANCE = 0.12;
+/** The share of clients that ask for a time on a given day, apart from those that always ask for one. */
+const TIME_CHANCE = 0.3;
 /** Times a client may ask to be reached by, in minutes since midnight. */
 const ASKED_TIMES = [8 * 60, 9 * 60, 10 * 60, 11 * 60];
 /** Orders may fill this share of all the truck space together, so a careful player can load them. */

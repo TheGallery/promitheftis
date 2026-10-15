@@ -84,7 +84,7 @@ function rightColumn(app: App): Line[] {
     detail.push(cat(s(` ${clip(selected.client.toUpperCase(), 26)}`, 'b'), s(` · ${place(selected.place).name}${selected.truckId ? ` · truck ${selected.truckId}` : ''}`, 'd')));
     if (selected.arriveAt != null) {
       const asked = selected.before != null ? ` (asked: before ${formatTime(selected.before)})` : '';
-      detail.push(s(` Reached at ${formatTime(selected.arriveAt)}${asked}`, selected.lateForAsk ? 'w' : 'd'));
+      detail.push(s(` Reached at ${formatTime(selected.arriveAt)}${asked}${selected.lateForAsk ? ', late: pays half' : ''}`, selected.lateForAsk ? 'w' : 'd'));
     } else {
       detail.push(s(' Nothing was delivered.', 'w'));
     }

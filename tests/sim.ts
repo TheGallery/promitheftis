@@ -1,6 +1,7 @@
+import { DEPART_MINUTE, START_MINUTE } from '../src/game/clock';
 import { swings } from '../src/game/demand';
 import { shortYesterday } from '../src/game/history';
-import { clientPrice, growthPrice, supplierPrice, truckCost } from '../src/game/money';
+import { clientPrice, growthPrice, LATE_PAYS, supplierPrice, truckCost } from '../src/game/money';
 import { mulberry32 } from '../src/game/random';
 import { spaceOf } from '../src/game/rooms';
 import { promisesFrom } from '../src/game/run';
@@ -17,7 +18,8 @@ import { fakeEffects, hold } from './helpers';
  * - `blind` presses ENTER and SPACE everywhere: every line as asked, the truck the cursor is on (one step down when it
  *   is too full), the first answer to every call, and A on the supplier order.
  * - `careful` does the same work with its head: it shares a short item out so that as few clients as possible go short,
- *   puts each order on the truck that adds least to the road, orders what the notes say tomorrow will need and no more
+ *   plans the trucks against the times clients asked for (each order goes on the truck where it adds least to the road and
+ *   to what coming late takes off, and the plan is looked over again), orders what the notes say tomorrow will need and no more
  *   than the rooms hold or the bank can pay for, and buys a room when the rooms are costing it sales.
  *
  * Both choose what to grow by the same rule: a new client, unless the trucks were well loaded and a truck can be paid for.
@@ -40,6 +42,11 @@ export interface DayStat {
   pleased: number;
   /** Orders that got no truck. */
   stranded: number;
+  /** Orders that asked for a time, and of those the ones the truck reached too late. */
+  timed: number;
+  late: number;
+  /** What the late orders paid less than they would have on time. */
+  lateCut: number;
   /** Squares the trucks drove. */
   squares: number;
   /** Share of all the truck space that was loaded when the trucks left, 0 to 1. */
@@ -62,6 +69,8 @@ const RESERVE = 0.15;
 const ROOM_FULL = 0.9;
 /** A careful player orders this much more than the notes say, where the rooms have space, so a small surprise leaves nobody short. */
 const BUFFER = 0.1;
+/** A careful player looks over the plan this many times, moving an order to a better truck. */
+const ROUNDS = 2;
 
 export function playRun(kind: 'small' | 'big', policy: Policy, seed: number, days: number): DayStat[] {
   const random = mulberry32(seed * 7919 + 13);
@@ -117,6 +126,9 @@ function playDay(app: App, policy: Policy): DayStat {
     inFull: result.inFull,
     pleased: summary.orders.filter((o) => o.mood === 'pleased').length,
     stranded: result.orders.filter((o) => o.truckId == null).length,
+    timed: result.orders.filter((o) => o.before != null).length,
+    late: result.orders.filter((o) => o.lateForAsk).length,
+    lateCut: summary.money.lateCut,
     squares: summary.money.squares,
     load,
     spoiled,
@@ -194,18 +206,38 @@ function shareOut(app: App): number[][] {
 
 type Stop = { orderId: number; place: App['morning']['orders'][number]['place'] };
 
-/** Every order on the truck that adds least to what the trucks cost, the biggest orders first; then keyed in as a player would. */
+/**
+ * Every order on the truck that adds least to what the trucks cost and to what coming late takes off, the clients who
+ * asked for a time first and then the biggest orders; then keyed in as a player would. The trucks leave when the last
+ * order has been handed out, two minutes an order, which is when the plan is judged.
+ */
 function carefulDesk(app: App, press: Press): void {
   const { orders, trucks } = app.morning;
   const size = new Map(app.morning.items.map((i) => [i.id, i.size]));
   const gives = shareOut(app);
   const space = (o: number) => orders[o]!.lines.reduce((sum, l, li) => sum + gives[o]![li]! * (size.get(l.item) ?? 1), 0);
+  const worth = (o: number) => orders[o]!.lines.reduce((sum, l, li) => sum + gives[o]![li]! * clientPrice(l.item), 0);
+  const departAt = Math.max(DEPART_MINUTE, START_MINUTE + 2 * orders.length);
   const used = new Map(trucks.map((t) => [t.id, 0]));
   const stops = new Map(trucks.map((t) => [t.id, [] as Stop[]]));
   const squares = (id: number, extra?: Stop) => planRoute([...stops.get(id)!, ...(extra ? [extra] : [])], 0).squares;
+  /** What the clients on a truck who would be reached after the time they asked for stop paying. */
+  const lost = (id: number, extra?: Stop) => {
+    const all = [...stops.get(id)!, ...(extra ? [extra] : [])].sort((a, b) => a.orderId - b.orderId);
+    let total = 0;
+    for (const visit of planRoute(all, departAt).visits) {
+      for (const stop of visit.stops) {
+        const before = orders[stop.orderId]!.before;
+        if (before != null && stop.arriveAt > before) total += worth(stop.orderId) * (1 - LATE_PAYS);
+      }
+    }
+    return total;
+  };
   const plan = new Map<number, number>();
-  const sequence = orders.map((_, o) => o).sort((a, b) => space(b) - space(a) || a - b);
-  for (const o of sequence) {
+  const asked = (o: number) => orders[o]!.before ?? Infinity;
+  const sequence = orders.map((_, o) => o).sort((a, b) => asked(a) - asked(b) || space(b) - space(a) || a - b);
+  const stopOf = (o: number): Stop => ({ orderId: o, place: orders[o]!.place });
+  const put = (o: number) => {
     // An order too big for any truck is trimmed, the biggest line first, until the roomiest truck takes it.
     const roomiest = Math.max(...trucks.map((t) => t.capacity - used.get(t.id)!));
     const spaceOfLine = (li: number) => gives[o]![li]! * (size.get(orders[o]!.lines[li]!.item) ?? 1);
@@ -218,15 +250,27 @@ function carefulDesk(app: App, press: Press): void {
     for (const t of trucks) {
       const spare = t.capacity - used.get(t.id)! - own;
       if (spare < 0) continue;
-      const stop = { orderId: o, place: orders[o]!.place };
       const now = stops.get(t.id)!.length > 0 ? truckCost(squares(t.id)) : 0;
-      const cost = own === 0 ? 0 : truckCost(squares(t.id, stop)) - now;
+      const cost = own === 0 ? 0 : truckCost(squares(t.id, stopOf(o))) - now + lost(t.id, stopOf(o)) - lost(t.id);
       if (!best || cost < best.cost || (cost === best.cost && spare < best.spare)) best = { id: t.id, cost, spare };
     }
     const truck = best?.id ?? trucks[0]!.id;
     plan.set(o, truck);
     used.set(truck, used.get(truck)! + own);
-    if (own > 0) stops.get(truck)!.push({ orderId: o, place: orders[o]!.place });
+    if (own > 0) stops.get(truck)!.push(stopOf(o));
+  };
+  const take = (o: number) => {
+    const truck = plan.get(o)!;
+    used.set(truck, used.get(truck)! - space(o));
+    stops.set(truck, stops.get(truck)!.filter((x) => x.orderId !== o));
+  };
+  for (const o of sequence) put(o);
+  // A second look: each order is taken off its truck and put on the best one now that the others are placed.
+  for (let round = 0; round < ROUNDS; round++) {
+    for (const o of sequence) {
+      take(o);
+      put(o);
+    }
   }
   for (const o of sequence) {
     goToOrder(app, press, o);
@@ -332,6 +376,10 @@ export interface Summary {
   inFull: number;
   pleased: number;
   stranded: number;
+  /** Orders a day that asked for a time, and how many of those came late. */
+  timed: number;
+  late: number;
+  lateCut: number;
   squares: number;
   trucks: number;
   load: number;
@@ -355,6 +403,9 @@ export function summarise(runs: DayStat[][], from = 1): Summary {
     inFull: mean(all.map((d) => d.inFull / d.orders)),
     pleased: mean(all.map((d) => d.pleased / d.orders)),
     stranded: mean(all.map((d) => d.stranded)),
+    timed: mean(all.map((d) => d.timed)),
+    late: mean(all.map((d) => d.late)),
+    lateCut: mean(all.map((d) => d.lateCut)),
     squares: mean(all.map((d) => d.squares)),
     trucks: mean(all.map((d) => d.trucks)),
     load: mean(all.map((d) => d.load)),
