@@ -43,7 +43,7 @@ export const RUSH_REASONS: readonly string[] = [
 
 /**
  * Whether a client rings this morning for a rush order, and for what. On about one morning in four or five, one client of
- * the run asks for extra of a valuable item, by a time an hour or two after the ring. `random` is taken from the morning's
+ * the run asks for extra of a valuable item, by a time half an hour to an hour after the ring. `random` is taken from the morning's
  * own seed, so the same seed always gives the same rush.
  */
 export function rushFor(run: RunState, orders: readonly Order[], random: Random): Rush | undefined {
