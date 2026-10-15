@@ -14,6 +14,12 @@ import { App } from '../src/ui/app';
 import { memoryStore } from '../src/ui/store';
 import { fakeEffects, handOut, hold, playToSupply, screen, SMALL_TRUCKS, toNextMorning } from './helpers';
 
+const callText = (app: App) =>
+  screen(app)
+    .map((row) => [...row].slice(0, 80).join('').trim())
+    .filter(Boolean)
+    .join(' ');
+
 const facts = (over: Partial<MoodFacts> = {}): MoodFacts => ({ percent: 100, late: false, shortCall: null, ...over });
 
 function smallDay() {
@@ -69,8 +75,9 @@ describe('a call about an item shows the stock', () => {
       else {
         seen++;
         expect(text).toContain(`In stock: ${call.inStore} `);
-        expect(text).toContain(`The usual order brings ${call.usualOrder} more (${call.inStore! + call.usualOrder!} tomorrow).`);
-        expect(text).toContain(`Promising ${call.qty} adds ${call.qty} to tomorrow's orders.`);
+        const flowing = callText(app);
+        expect(flowing).toContain(`The usual order brings ${call.usualOrder} more, enough for the usual orders only.`);
+        expect(flowing).toContain(`To keep this promise, order ${call.qty} more than usual tomorrow.`);
       }
       press('Enter');
     }
@@ -83,7 +90,7 @@ describe('a call about an item shows the stock', () => {
     const ringing = app.roadCall!;
     app.calls = [...app.calls, { ...ringing, id: 99, qty: 3, client: 'Elsewhere' }];
     app.answers.set(99, 0);
-    expect(screen(app).join('\n')).toContain(`3 already promised for tomorrow; promising ${ringing.qty} more makes ${3 + ringing.qty!}.`);
+    expect(callText(app)).toContain(`3 already promised for tomorrow. To keep this promise too, order ${3 + ringing.qty!} more than usual tomorrow.`);
   });
 });
 

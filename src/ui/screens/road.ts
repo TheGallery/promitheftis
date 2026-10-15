@@ -50,14 +50,13 @@ function stockLines(app: App, c: Call): Line[] {
   const promised = app.calls
     .filter((o) => o.id !== c.id && o.item === c.item && o.qty != null && app.answers.has(o.id) && o.options[app.answers.get(o.id) ?? 0]?.addsToOrder)
     .reduce((sum, o) => sum + (o.qty ?? 0), 0);
-  const stock = `In stock: ${c.inStore} ${name}. The usual order brings ${c.usualOrder} more (${c.inStore + c.usualOrder} tomorrow).`;
-  const broken = 'A promise the shelf cannot cover is broken.';
+  const stock = `In stock: ${c.inStore} ${name}. The usual order brings ${c.usualOrder} more, enough for the usual orders only.`;
   const stake =
     c.qty == null
       ? ''
       : promised > 0
-        ? `${promised} already promised for tomorrow; promising ${c.qty} more makes ${promised + c.qty}. ${broken}`
-        : `Promising ${c.qty} adds ${c.qty} to tomorrow's orders. ${broken}`;
+        ? `${promised} already promised for tomorrow. To keep this promise too, order ${promised + c.qty} more than usual tomorrow.`
+        : `To keep this promise, order ${c.qty} more than usual tomorrow.`;
   return [stock, stake].filter(Boolean).flatMap((text) => wrapText(text, LOG_W - 4).slice(0, 2)).map((row) => s(`   ${row}`, 'd'));
 }
 

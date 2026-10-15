@@ -66,7 +66,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'PHONE CALLS',
         text:
-          'Now and then a client rings while the trucks are out. The call shows what is in stock. Pick an answer with {↑↓} and {ENTER}: ' +
+          'Now and then a client rings while the trucks are out. A call about an item shows what is in stock. Pick an answer with {↑↓} and {ENTER}: ' +
           'promise it for tomorrow, sorry not today, or the time the truck reaches them. A promise is on that client\'s order in the morning ' +
           'and is checked: broken, it lets them down more than a sorry.',
       },
