@@ -97,12 +97,13 @@ function costCell(supply: Supply, r: number, cls: string): Line {
   return s((cost > 0 ? formatMoney(cost) : '—').padStart(8), cls);
 }
 
-/** Who rang to have this item put on tomorrow's order, as lines for the panel. */
+/** Who was promised this item for tomorrow, and how many, as lines for the panel. */
 function noteLines(supply: Supply, itemId: string): Line[] {
-  const who = supply.notes.get(itemId)?.map((n) => n.client);
-  if (!who || who.length === 0) return [];
-  const names = who.length > 2 ? `${who.slice(0, 2).join(', ')} +${who.length - 2}` : who.join(', ');
-  const [first = '', ...rest] = wrapText(`${names} rang: add it to tomorrow's order`, PANEL_W - 4);
+  const notes = supply.notes.get(itemId);
+  if (!notes || notes.length === 0) return [];
+  const total = notes.reduce((sum, n) => sum + n.qty, 0);
+  const who = notes.map((n) => `${n.client} ${n.qty}`).join(', ');
+  const [first = '', ...rest] = wrapText(`${total} promised for tomorrow: ${who}`, PANEL_W - 4);
   return [s(` ← ${first}`, 'w'), ...rest.slice(0, 2).map((t) => s(`   ${t}`, 'w'))];
 }
 

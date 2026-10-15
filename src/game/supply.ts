@@ -18,9 +18,10 @@ export interface SupplyRow {
   usual: number;
 }
 
-/** A client who asked, on the phone, for an item to go on tomorrow's order. */
+/** A client who was promised, on the phone, a number of an item on tomorrow's order. */
 export interface CallNote {
   client: string;
+  qty: number;
 }
 
 /** What is left of each item once the trucks have gone: the stock, less what the delivering orders were given. */
@@ -35,14 +36,16 @@ export function stockAfterDeliveries(desk: Desk): Record<string, number> {
   return left;
 }
 
-/** The clients whose answered calls promised an item for tomorrow, by item. */
+/** The clients whose answered calls promised an item for tomorrow, by item, with how many each was promised. */
 export function callNotes(calls: readonly Call[], answers: ReadonlyMap<number, number>): Map<string, CallNote[]> {
   const notes = new Map<string, CallNote[]>();
   for (const call of calls) {
     const choice = answers.get(call.id);
     if (choice == null || !call.item || !call.options[choice]?.addsToOrder) continue;
     const list = notes.get(call.item) ?? [];
-    if (!list.some((n) => n.client === call.client)) list.push({ client: call.client });
+    const same = list.find((n) => n.client === call.client);
+    if (same) same.qty += call.qty ?? 0;
+    else list.push({ client: call.client, qty: call.qty ?? 0 });
     notes.set(call.item, list);
   }
   return notes;

@@ -3,6 +3,7 @@ import type { History } from './history';
 import { moodFacts, moodOf, moodReasons, type Mood } from './moods';
 import { dayMoney, STARTING_CASH, takenIn, tripCosts, type DayMoney, type Trip, type Units } from './money';
 import type { MorningResult, OrderResult } from './results';
+import type { Promised } from './run';
 import { KEPT_ORDER, type Supply } from './supply';
 import type { RoomSpace } from './rooms';
 import type { Item, Kept } from './types';
@@ -81,11 +82,12 @@ export function buildDay(
   supply: Supply,
   history: History = {},
   cash = STARTING_CASH,
+  promised: readonly Promised[] = [],
 ): DaySummary {
   const keptOf = new Map(supply.rows.map((row) => [row.item.id, row.kept]));
   const kept = (item: string): Kept => keptOf.get(item) ?? 'dry';
   const orders = result.orders.map((o): DayOrder => {
-    const facts = moodFacts(o, calls, answers, history[o.client]);
+    const facts = moodFacts(o, calls, answers, history[o.client], promised);
     return { ...o, mood: moodOf(facts), reasons: moodReasons(facts, o.truckId == null), paid: takenIn(unitsOf([o], kept)) };
   });
   const costs = new Map(tripCosts(tripsOf(result)).map((t) => [t.truckId, t.cost]));

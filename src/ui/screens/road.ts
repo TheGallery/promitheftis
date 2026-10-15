@@ -1,5 +1,6 @@
 import { formatTime } from '../../game/clock';
 import { happened, truckState, type Road, type RoadEvent } from '../../game/road';
+import { plainName } from '../../game/headsup';
 import { place } from '../../game/places';
 import { placesLabel, plural } from '../format';
 import type { App } from '../app';
@@ -42,6 +43,24 @@ function answeredLine(app: App, c: Call): Line {
   return cat(s(` ${formatTime(c.at)} `, 'd'), s('Call', 'b'), s(` · ${client}, ${topic} · ${record}`, 'acc'));
 }
 
+/** What the stock says about a call that is about an item: what is in the store, what the usual order brings and what is already promised. */
+function stockLines(app: App, c: Call): Line[] {
+  if (c.item == null || c.inStore == null || c.usualOrder == null) return [];
+  const name = plainName(app.desk.item(c.item).name);
+  const promised = app.calls
+    .filter((o) => o.id !== c.id && o.item === c.item && o.qty != null && app.answers.has(o.id) && o.options[app.answers.get(o.id) ?? 0]?.addsToOrder)
+    .reduce((sum, o) => sum + (o.qty ?? 0), 0);
+  const stock = `In stock: ${c.inStore} ${name}. The usual order brings ${c.usualOrder} more (${c.inStore + c.usualOrder} tomorrow).`;
+  const broken = 'A promise the shelf cannot cover is broken.';
+  const stake =
+    c.qty == null
+      ? ''
+      : promised > 0
+        ? `${promised} already promised for tomorrow; promising ${c.qty} more makes ${promised + c.qty}. ${broken}`
+        : `Promising ${c.qty} adds ${c.qty} to tomorrow's orders. ${broken}`;
+  return [stock, stake].filter(Boolean).flatMap((text) => wrapText(text, LOG_W - 4).slice(0, 2)).map((row) => s(`   ${row}`, 'd'));
+}
+
 /** The box for the call that is ringing: who, what they say, and the answers to pick from. */
 function callBox(app: App, c: Call): Line[] {
   const where = app.morning.orders[c.orderIndex]?.place;
@@ -49,6 +68,7 @@ function callBox(app: App, c: Call): Line[] {
     rule(LOG_W),
     cat(s(' INCOMING CALL', 'b'), s(` · ${clip(c.contact, 20)}, ${clip(c.client, 26)}${where ? `, ${place(where).name}` : ''}`)),
     ...wrapText(`"${c.say}"`, LOG_W - 4).slice(0, 3).map((row) => s(`   ${row}`)),
+    ...stockLines(app, c),
     [],
   ];
   c.options.forEach((o, i) => {
