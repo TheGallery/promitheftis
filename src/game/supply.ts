@@ -54,13 +54,13 @@ export function callNotes(calls: readonly Call[], answers: ReadonlyMap<number, n
   return notes;
 }
 
+/** A fills a room to this much of its space, a little over, so the warning is still there to be read. */
+const FILL_ALL_TO = 1.15;
+
 /**
  * Tomorrow's order to the supplier: an amount for every item, grouped by where
  * it is kept. Rows are numbered in the order they are listed on the screen.
  */
-/** A fills a room to this much of its space, a little over, so the warning is still there to be read. */
-const FILL_ALL_TO = 1.15;
-
 export class Supply {
   readonly rows: SupplyRow[];
   readonly notes: Map<string, CallNote[]>;
