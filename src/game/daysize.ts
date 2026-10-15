@@ -54,10 +54,10 @@ interface TownEvent {
 }
 
 const TOWN: readonly TownEvent[] = [
-  { id: 'match', places: null, news: (where, when) => `Match day at ${where} on ${when}: the pubs and grill will want more.` },
-  { id: 'regatta', places: ['docks', 'millford'], news: (_, when) => `Regatta at the Docks and Millford on ${when}: the fish bars and inns will want more.` },
-  { id: 'market', places: ['hollin', 'oakley', 'rushmere'], news: (_, when) => `Farmers' market in Hollin, Oakley and Rushmere on ${when}: the cafés will want more.` },
-  { id: 'fair', places: ['saltmarket'], news: (_, when) => `Street fair in Saltmarket on ${when}: every kitchen there will want more.` },
+  { id: 'match', places: null, news: (where, when) => `Match day at ${where} on ${when}: everyone there will want more.` },
+  { id: 'regatta', places: ['docks', 'millford'], news: (_, when) => `Regatta at the Docks and Millford on ${when}: everyone there will want more.` },
+  { id: 'market', places: ['hollin', 'oakley', 'rushmere'], news: (_, when) => `Farmers' market in Hollin, Oakley and Rushmere on ${when}: everyone there will want more.` },
+  { id: 'fair', places: ['saltmarket'], news: (_, when) => `Street fair in Saltmarket on ${when}: everyone there will want more.` },
 ];
 
 /** Why a client is closed for a day, as it follows "for". */

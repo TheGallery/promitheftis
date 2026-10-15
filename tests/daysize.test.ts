@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { dateLabel, weekdayName, weekdayOf } from '../src/game/clock';
+import { buildCalls } from '../src/game/calls';
+import { dateLabel, DEPART_MINUTE, weekdayName, weekdayOf } from '../src/game/clock';
+import { Desk } from '../src/game/desk';
 import { CLOSED_CHANCE, closedIn, isTownEvent, TOWN_CHANCE, tomorrowFor, weekFactor, weekLine, weekMark } from '../src/game/daysize';
 import { EVENTS, swings, type Announced } from '../src/game/demand';
 import { generateDay } from '../src/game/generate';
@@ -7,6 +9,9 @@ import { bigMorning, smallMorning } from '../src/game/morning';
 import { mulberry32 } from '../src/game/random';
 import { nextDay, runFromMorning, type DayOutcome, type RunState } from '../src/game/run';
 import { decodeRun, encodeRun, SAVE_VERSION } from '../src/game/save';
+import { buildResult } from '../src/game/results';
+import { buildRoad } from '../src/game/road';
+import { promisesFrom } from '../src/game/run';
 import { Supply } from '../src/game/supply';
 import type { Morning } from '../src/game/types';
 import { App, RUN_KEY } from '../src/ui/app';
@@ -132,6 +137,8 @@ describe('a town event', () => {
     expect(note).toBeDefined();
     if (!note || note.kind === 'order') throw new Error('not a note');
     expect(note.text).toContain('Saturday');
+    // Worded by area, since it moves every client there and not only one kind.
+    expect(note.text).toMatch(/: everyone there will want more\.$/);
     expect(note.at).toBeGreaterThanOrEqual(24 * 60 + 3 * 60);
     expect(note.at).toBeLessThanOrEqual(24 * 60 + 5 * 60 + 15);
     const times = morning.messages.map((m) => m.at);
@@ -334,6 +341,33 @@ describe('a client that is closed for the day', () => {
     expect(order.note).toContain('As promised: 4 pork');
     // A client that was open settles as it always did: what is said of its day replaces what was.
     expect(nextDay({ ...state, ahead: [] }, outcome).promises).toEqual([]);
+  });
+
+  it('is not promised tomorrow\'s order on the phone: the answer says it is closed tomorrow instead', () => {
+    const run = runOf(4);
+    const morning = generateDay(run, mulberry32(3));
+    const callsFor = (tomorrow: Announced[]) => {
+      const m: Morning = { ...morning, tomorrow };
+      const desk = new Desk(m);
+      m.orders.forEach((_, o) => {
+        desk.order(o).lines.forEach((_l, l) => desk.acceptLine(o, l));
+        desk.assignTruck(o, m.trucks[o % m.trucks.length]!.id);
+        desk.finishOrder(o);
+      });
+      const result = buildResult(desk, DEPART_MINUTE);
+      return buildCalls(desk, result, buildRoad(desk, result));
+    };
+    const open = callsFor([]);
+    const promising = open.find((c) => c.options.some((o) => o.addsToOrder))!;
+    expect(promising).toBeDefined();
+    const shut = callsFor([{ client: promising.client, event: 'closed' }]);
+    const same = shut.find((c) => c.id === promising.id)!;
+    expect(same.client).toBe(promising.client);
+    expect(same.options.some((o) => o.addsToOrder)).toBe(false);
+    expect(same.options.map((o) => o.label)).toContain('You are closed tomorrow, so not this time');
+    // Nobody is promised anything by answering the first option, and other clients are still offered the promise.
+    expect(promisesFrom(shut, new Map(shut.map((c) => [c.id, 0]))).map((p) => p.client)).not.toContain(promising.client);
+    expect(shut.filter((c) => c.client !== promising.client).every((c, i) => JSON.stringify(c.options) === JSON.stringify(open.filter((o) => o.client !== promising.client)[i]!.options))).toBe(true);
   });
 
   it('is on the supplier order, against every item, as less', () => {

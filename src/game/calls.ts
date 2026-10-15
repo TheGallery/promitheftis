@@ -1,4 +1,5 @@
 import { formatTime } from './clock';
+import { closedIn } from './daysize';
 import type { Desk } from './desk';
 import { plainName } from './headsup';
 import { formatMoney } from './money';
@@ -121,7 +122,13 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
   // The rush is answered by trucks sent when it rings, so it is worked out for the minute it really rings.
   const ring = calls.find((c) => c.kind === 'rush');
   if (rush && ring) Object.assign(ring, withStock(desk, rushCall(desk, result, rush, left, ring.at), left));
-  return calls.map((c, id) => ({ ...c, id }));
+  const closed = closedIn(desk.morning.tomorrow ?? []);
+  return calls.map((c, id) => ({ ...c, id, options: c.options.map((o) => (closed.has(c.client) ? notWhileClosed(o) : o)) }));
+}
+
+/** A promise for tomorrow's order to a client that has said it is closed tomorrow cannot be kept, so the answer says so instead. */
+function notWhileClosed(option: CallOption): CallOption {
+  return option.addsToOrder ? { label: 'You are closed tomorrow, so not this time', record: 'told not this time, closed tomorrow' } : option;
 }
 
 /** A call about an item, with what is left of it in the store and what the usual order for tomorrow would add. */

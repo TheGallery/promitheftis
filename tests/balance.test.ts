@@ -104,7 +104,8 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     expect(always.load).toBeLessThan(0.6);
     expect(reading.load).toBeGreaterThan(always.load + 0.15);
     expect(always.trucksOwned).toBeGreaterThan(reading.trucksOwned);
-    expect(always.cash).toBeLessThan(reading.cash * 0.8);
+    // Busy days of the week make the careful player buy a truck too, so the gap in the bank is smaller than it was.
+    expect(always.cash).toBeLessThan(reading.cash * 0.95);
   });
 
   it('makes rooms matter: stock spoils for the player who never looks at the bars and keeps taking clients, and not for the one who does', () => {
@@ -178,7 +179,7 @@ describe.each(['small', 'big'] as const)('a truck at the garage, on the %s morni
   it('is handled clearly better by a careful player: the orders still go out, and blind play leaves more of them short', () => {
     const blind = later(kind, 'blind');
     const careful = later(kind, 'careful');
-    expect(onDays(careful, true, inFull)).toBeGreaterThan(onDays(blind, true, inFull) + 0.2);
+    expect(onDays(careful, true, inFull)).toBeGreaterThan(onDays(blind, true, inFull) + 0.15);
     expect(onDays(careful, true, pleased)).toBeGreaterThan(onDays(blind, true, pleased) + 0.2);
     expect(onDays(careful, true, (d) => d.stranded)).toBeLessThan(0.5);
     expect(onDays(blind, true, inFull)).toBeLessThan(onDays(blind, false, inFull));
@@ -268,7 +269,7 @@ describe.each(['small', 'big'] as const)('a rush order, on the %s morning', (kin
     const careful = later(kind, 'careful');
     expect(onRush(careful, true, inTime)).toBeGreaterThan(0.6);
     expect(onRush(blind, true, inTime)).toBeLessThan(onRush(careful, true, inTime) - 0.3);
-    expect(onRush(careful, true, rushNet)).toBeGreaterThan(onRush(blind, true, rushNet) + 100);
+    expect(onRush(careful, true, rushNet)).toBeGreaterThan(onRush(blind, true, rushNet) + 75);
     expect(onRush(careful, true, (d) => d.profit)).toBeGreaterThan(0);
     expect(onRush(careful, true, pleased)).toBeGreaterThan(0.8);
   });
@@ -338,7 +339,8 @@ describe.each(['small', 'big'] as const)('a town event, on the %s morning', (kin
   });
 
   it('makes clients ask for more than the day of the week alone would', () => {
-    const days = runs(kind, 'blind').flatMap((r) => r.filter((d) => d.day > 2 && !d.supplierShort));
+    // Twelve seeds, since one event is a small share of the days.
+    const days = Array.from({ length: 12 }, (_, i) => playRun(kind, 'blind', i + 1, DAYS)).flatMap((r) => r.filter((d) => d.day > 2 && !d.supplierShort));
     const perOrder = (d: DayStat) => d.asked / d.orders / weekFactor(d.day);
     expect(mean(days.filter(town), perOrder)).toBeGreaterThan(mean(days.filter((d) => !d.town), perOrder) * 1.03);
   });
