@@ -1,4 +1,5 @@
 import type { CallKind } from './calls';
+import { itemWeight } from './clients';
 import { formatTime } from './clock';
 import { swings } from './demand';
 import { plainName } from './headsup';
@@ -18,7 +19,7 @@ const TIME_CHANCE = 0.12;
 /** Times a client may ask to be reached by, in minutes since midnight. */
 const ASKED_TIMES = [8 * 60, 9 * 60, 10 * 60, 11 * 60];
 /** Orders may fill this share of all the truck space together, so a careful player can load them. */
-const TRUCK_SHARE = 0.85;
+export const TRUCK_SHARE = 0.85;
 /** Each item's total for the day is its usual amount, give or take this share. */
 const JITTER = 0.05;
 
@@ -132,10 +133,10 @@ function shapeDemand(made: readonly Asking[], run: RunState, random: Random): vo
       chosen.lines.push({ item: item.id, asked: 1 });
     }
     const target = Math.max(1, Math.round((run.usual[item.id] ?? 0) * (1 + (random() * 2 - 1) * JITTER)));
-    const lines = made.flatMap((m) => m.lines.filter((l) => l.item === item.id));
+    const lines = made.flatMap((m) => m.lines.filter((l) => l.item === item.id).map((line) => ({ line, weight: line.asked * itemWeight(m.client, item.kept) })));
     if (lines.length === 0) continue;
-    const shares = apportion(target, lines.map((l) => l.asked));
-    lines.forEach((l, i) => (l.asked = Math.max(1, shares[i] as number)));
+    const shares = apportion(target, lines.map((l) => l.weight));
+    lines.forEach((l, i) => (l.line.asked = Math.max(1, shares[i] as number)));
   }
   for (const swing of swings(run.ahead, run.usual, clients)) {
     const m = made.find((x) => x.client.name === swing.client);

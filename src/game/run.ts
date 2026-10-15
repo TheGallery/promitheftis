@@ -1,5 +1,6 @@
 import type { DaySummary } from './day';
 import type { Call } from './calls';
+import { usualWith } from './clients';
 import type { Announced } from './demand';
 import { BIG_TRUCKS, ITEM_LIST } from './morning';
 import type { Growth } from './growth';
@@ -18,6 +19,10 @@ export interface RunClient {
   contact: string;
   /** A time the client always wants its order by, in minutes since midnight. */
   before?: number;
+  /** How big its orders are next to an ordinary client's; an ordinary client leaves it out. */
+  size?: number;
+  /** The store room most of its order comes from; a client with no favourite room leaves it out. */
+  heavy?: Kept;
 }
 
 /** Something a client was told, on the phone, would be on tomorrow's order. */
@@ -212,7 +217,7 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
     },
     spoiled,
     ahead: (outcome.ahead ?? []).map((a) => ({ ...a })),
-    cash: run.cash + outcome.earned - (outcome.growth ? growthPrice(outcome.growth, run.clients.length) : 0),
+    cash: run.cash + outcome.earned - (outcome.growth ? growthPrice(outcome.growth, run.clients.length, run.trucks.length) : 0),
   };
   grow(next, outcome.growth);
   return next;
@@ -228,9 +233,15 @@ function grow(state: RunState, growth: Growth | null): void {
     state.trucks.push(truck);
     state.crews.at(-1)?.trucks.push(truck.id);
   } else if (growth.kind === 'client' && !state.clients.some((c) => c.name === growth.client.name)) {
-    const { name, place, contact } = growth.client;
-    const before = state.clients.length;
-    if (before > 0) for (const [item, n] of Object.entries(state.usual)) state.usual[item] = n + Math.round(n / before);
-    state.clients.push({ name, place, contact });
+    const { name, place, contact, shape } = growth.client;
+    state.usual = usualWith(state.usual, state.clients, shape);
+    state.clients.push({
+      name,
+      place,
+      contact,
+      ...(shape.size !== 1 ? { size: shape.size } : {}),
+      ...(shape.before != null ? { before: shape.before } : {}),
+      ...(shape.heavy ? { heavy: shape.heavy } : {}),
+    });
   }
 }

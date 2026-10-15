@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { bigMorning, smallMorning } from '../src/game/morning';
-import { growthOptions, NEW_CLIENTS, newClientFor, tightestRoom, type NewClient } from '../src/game/growth';
-import { formatMoney } from '../src/game/money';
-import { PLACES } from '../src/game/places';
+import { newClientFor, randomFrom, type NewClient } from '../src/game/clients';
+import { fleetOf, growthOptions, tightestRoom } from '../src/game/growth';
+import { formatMoney, truckPrice } from '../src/game/money';
+import { smallMorning } from '../src/game/morning';
+import { runFromMorning } from '../src/game/run';
 import { plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 import { hold, screen, summary, toDay } from './helpers';
 
 const clientsOf = (m: { orders: Array<{ client: string }> }) => m.orders.map((o) => o.client);
-const CLIENT: NewClient = { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' };
+const CLIENT: NewClient = { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines', shape: { size: 1 } };
+const BUSINESS = runFromMorning(smallMorning());
 /** A random source that gives these numbers in turn, then the last one again. */
 const sequence = (...values: number[]) => {
   let i = 0;
@@ -43,17 +45,17 @@ describe('the tightest room', () => {
 describe('the three growth options', () => {
   it('lists another truck, a bigger room and a new client, in that order', () => {
     const { day } = summary(0, [], { chips: 40 });
-    const options = growthOptions(day, CLIENT, 7);
+    const options = growthOptions(day, CLIENT, BUSINESS);
     expect(options.map((o) => o.growth.kind)).toEqual(['truck', 'room', 'client']);
     expect(options[0]!.title).toBe('Another truck');
     for (const o of options) {
       expect(o.gain.length).toBeGreaterThan(0);
       expect(o.work.length).toBeGreaterThan(0);
+      expect(o.work).not.toMatch(/[$£€]|money|price|cost|profit/i);
     }
-    expect(options.map((o) => `${o.gain} ${o.work}`).join(' ')).not.toMatch(/[$£€]|money|price|cost|profit/i);
   });
 
-  it('names the tightest room in the option and records which one it is', () => {
+  it('names the tightest room in the option and records which one it is, with how full it is and what spoils', () => {
     const cases = [
       [{ chips: 40 }, 'freezer', 'A bigger freezer'],
       [{ pork: 300 }, 'fridge', 'A bigger fridge'],
@@ -61,71 +63,71 @@ describe('the three growth options', () => {
     ] as const;
     for (const [amounts, room, title] of cases) {
       const { day } = summary(0, [], amounts);
-      const option = growthOptions(day, CLIENT, 7)[1]!;
+      const option = growthOptions(day, CLIENT, BUSINESS)[1]!;
+      const tight = tightestRoom(day.rooms);
       expect(option.title).toBe(title);
       expect(option.growth).toEqual({ kind: 'room', room });
-      expect(option.gain).toContain(`${tightestRoom(day.rooms).space.pct}% full tomorrow`);
+      expect(option.gain.join(' ')).toContain(`${tight.space.pct}% full tomorrow`);
+      expect(option.gain.join(' ')).toContain(tight.space.spoils > 0 ? `${tight.space.spoils} unit` : 'nothing will spoil');
     }
   });
 
-  it('offers the restaurant it is given, with its square and contact', () => {
+  it('says how many units will spoil when the room is over full', () => {
+    const { day } = summary(0, [], { chips: 999 });
+    const tight = tightestRoom(day.rooms);
+    expect(tight.space.spoils).toBeGreaterThan(0);
+    expect(growthOptions(day, CLIENT, BUSINESS)[1]!.gain.join(' ')).toContain(`${tight.space.spoils} units will spoil`);
+  });
+
+  it('tells the truth about the trucks: how full they were, how many stayed in the yard, and what a truck is', () => {
+    const { day } = summary(0, ['Café Lumen']);
+    const fleet = fleetOf(day);
+    expect(fleet.trucks).toBe(2);
+    expect(fleet.out + fleet.yard).toBe(2);
+    const load = day.trucks.reduce((n, t) => n + t.load, 0);
+    expect(fleet.use).toBe(Math.round((load * 100) / fleet.space));
+    const gain = growthOptions(day, CLIENT, BUSINESS)[0]!.gain.join(' ');
+    expect(gain).toContain(`today they were ${fleet.use}% full`);
+    expect(gain).toContain('box van with room for 380');
+    expect(gain).not.toContain('More deliveries can go out on time');
+    expect(gain).toContain(`will cost ${formatMoney(truckPrice(BUSINESS.clients.length, BUSINESS.trucks.length + 1))}`);
+  });
+
+  it('counts a truck that never left the yard, and says so', () => {
+    const { day } = summary(0, ['Café Lumen']);
+    const idle = { ...day, trucks: day.trucks.map((t, i) => (i === 1 ? { ...t, backAt: null, load: 0, squares: 0, cost: 0 } : t)) };
+    expect(fleetOf(idle)).toMatchObject({ trucks: 2, out: 1, yard: 1 });
+    expect(growthOptions(idle, CLIENT, BUSINESS)[0]!.gain.join(' ')).toContain('1 stayed in the yard');
+    expect(growthOptions(day, CLIENT, BUSINESS)[0]!.gain.join(' ')).not.toContain('stayed in the yard');
+  });
+
+  it('offers the restaurant it is given, with its square, contact and what it is like', () => {
     const { day } = summary(0);
-    const option = growthOptions(day, CLIENT, 7)[2]!;
+    const option = growthOptions(day, CLIENT, BUSINESS)[2]!;
     expect(option.growth).toEqual({ kind: 'client', client: CLIENT });
     expect(option.title).toBe('A new client: The Salt Cellar');
-    expect(option.gain).toContain('The Salt Cellar in Saltmarket');
-    expect(option.gain).toContain('contact Ines');
-  });
-});
-
-describe('the new client', () => {
-  const pool = (taken: readonly string[]) => NEW_CLIENTS.filter((c) => !taken.includes(c.name));
-
-  it('has a pool of restaurants on the nine squares, none of them a client of either morning', () => {
-    const clients = [...clientsOf(smallMorning()), ...clientsOf(bigMorning())];
-    for (const c of NEW_CLIENTS) {
-      expect(clients).not.toContain(c.name);
-      expect(PLACES.map((p) => p.id)).toContain(c.place);
-      expect(c.contact.length).toBeGreaterThan(0);
-    }
-    expect(new Set(NEW_CLIENTS.map((c) => c.name)).size).toBe(NEW_CLIENTS.length);
+    const text = option.gain.join(' ');
+    expect(text).toContain('Ordinary orders, Saltmarket: at the depot');
+    expect(text).toContain('Contact Ines');
   });
 
-  it('has at least one restaurant on every one of the nine squares', () => {
-    for (const p of PLACES) {
-      expect(NEW_CLIENTS.map((c) => c.place)).toContain(p.id);
-    }
-    expect(PLACES).toHaveLength(9);
+  it('shows the shape of a big client far away, one that is always early, and one that is heavy on a room', () => {
+    const { day } = summary(0);
+    const big: NewClient = { name: 'Rushmere Grill', place: 'rushmere', contact: 'Callum', shape: { size: 2, before: 9 * 60 } };
+    expect(growthOptions(day, big, BUSINESS)[2]!.gain.join(' ')).toContain('Big orders, Rushmere: far from the depot; always before 09:00');
+    const heavy: NewClient = { name: 'Fenwick Deli', place: 'fenwick', contact: 'Alf', shape: { size: 1, heavy: 'freezer' } };
+    expect(growthOptions(day, heavy, BUSINESS)[2]!.gain.join(' ')).toContain('Ordinary orders, Fenwick: close to the depot; mostly freezer stock');
+    const small: NewClient = { name: 'The Bell', place: 'docks', contact: 'Ivor', shape: { size: 0.5 } };
+    expect(growthOptions(day, small, BUSINESS)[2]!.gain.join(' ')).toContain('Small orders, Docks: close to the depot');
   });
 
-  it('is picked with the random number it is given: the first at 0, the last just under 1', () => {
-    const taken = clientsOf(smallMorning());
-    expect(newClientFor(taken, () => 0)).toEqual(NEW_CLIENTS[0]);
-    expect(newClientFor(taken, () => 0.999999)).toEqual(NEW_CLIENTS.at(-1));
-    expect(newClientFor(taken, () => 0.5)).toEqual(NEW_CLIENTS[Math.floor(NEW_CLIENTS.length / 2)]);
-  });
-
-  it('can be any of the pool, so it differs from game to game', () => {
-    const seen = new Set(NEW_CLIENTS.map((_, i) => newClientFor([], () => (i + 0.5) / NEW_CLIENTS.length).name));
-    expect(seen.size).toBe(NEW_CLIENTS.length);
-  });
-
-  it('is never one that is a client already, whatever the random number', () => {
-    const taken = [NEW_CLIENTS[0]!.name, NEW_CLIENTS[3]!.name];
-    for (let i = 0; i < 20; i++) {
-      const c = newClientFor(taken, () => i / 20);
-      expect(taken).not.toContain(c.name);
-      expect(pool(taken)).toContain(c);
-    }
-  });
-
-  it('keeps to the pool when a random source gives a number outside 0 to 1', () => {
-    expect(NEW_CLIENTS).toContain(newClientFor([], () => 1));
-    expect(NEW_CLIENTS).toContain(newClientFor([], () => -0.5));
-  });
-
-  it('still names someone when every candidate is a client already', () => {
-    expect(newClientFor(NEW_CLIENTS.map((c) => c.name), () => 0.3).name).not.toBe('');
+  it('says what a big client brings and what the road to it costs', () => {
+    const { day } = summary(0);
+    const far: NewClient = { name: 'Rushmere Grill', place: 'rushmere', contact: 'Callum', shape: { size: 2 } };
+    const near: NewClient = { name: 'Hollin Deli', place: 'hollin', contact: 'Maud', shape: { size: 0.5 } };
+    expect(growthOptions(day, far, BUSINESS)[2]!.gain.join(' ')).toContain('up to £48 on the road');
+    expect(growthOptions(day, near, BUSINESS)[2]!.gain.join(' ')).toContain('up to £24 on the road');
+    expect(growthOptions(day, CLIENT, BUSINESS)[2]!.gain.join(' ')).not.toContain('on the road');
   });
 });
 
@@ -309,11 +311,12 @@ describe('changing the choice before the next morning', () => {
 describe('the new client in the game', () => {
   const offered = (app: { growthOptions: Array<{ growth: { kind: string } }> }) => app.growthOptions[2]!.growth as { kind: 'client'; client: NewClient };
 
-  it('is picked with the random source the app was given, and is not one of the morning\'s clients', () => {
+  it('is made up with the random source the app was given, and is not one of the morning\'s clients', () => {
     const first = toDay(0, 'small', ['a'], [], () => 0).app;
     const last = toDay(0, 'small', ['a'], [], () => 0.999).app;
-    expect(offered(first).client).toEqual(NEW_CLIENTS[0]);
-    expect(offered(last).client).toEqual(NEW_CLIENTS.at(-1));
+    expect(offered(first).client).toEqual(newClientFor(clientsOf(first.morning), randomFrom(0)));
+    expect(offered(last).client).toEqual(newClientFor(clientsOf(last.morning), randomFrom(0.999)));
+    expect(offered(first).client).not.toEqual(offered(last).client);
     for (const app of [first, last]) expect(clientsOf(app.morning)).not.toContain(offered(app).client.name);
   });
 
@@ -328,13 +331,13 @@ describe('the new client in the game', () => {
     expect(app.growth).toEqual({ kind: 'client', client: before });
   });
 
-  it('is forgotten by R, and the next game picks its own', () => {
+  it('is forgotten by R, and the next game makes up its own', () => {
     const { app } = toDay(0, 'small', ['a'], [], () => 0);
-    expect(offered(app).client).toEqual(NEW_CLIENTS[0]);
+    const before = offered(app).client;
     hold(app, 'r');
     expect(app.growthOptions).toEqual([]);
     const again = toDay(0, 'small', ['a'], [], sequence(0.999)).app;
-    expect(offered(again).client).toEqual(NEW_CLIENTS.at(-1));
+    expect(offered(again).client).not.toEqual(before);
   });
 
   it('draws no random number for anything else in the game: the new client and the next day only', () => {
@@ -352,18 +355,32 @@ describe('the growth screen', () => {
     expect(text).toContain('END OF THE DAY');
     expect(text).toContain('18:00');
     expect(text).toContain('WHAT TO GROW');
+    const flat = text.replace(/\s+/g, ' ');
     for (const o of app.growthOptions) {
       expect(text).toContain(o.title);
-      expect(text).toContain(o.gain);
+      for (const g of o.gain) expect(flat).toContain(g);
       expect(text).toContain(o.work);
     }
+    const fleet = fleetOf(app.day!);
     expect(text).toContain('WHAT TODAY SHOWED');
-    for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) expect(text).toMatch(new RegExp(`${room} +\\d+% full tomorrow`));
-    expect(text).toContain('the tightest');
+    expect(text).toContain(`${fleet.out} of ${fleet.trucks} trucks went out and none stayed in the yard; together they were ${fleet.use}% full.`);
+    expect(text).toMatch(/Rooms tomorrow: freezer \d+%.*fridge \d+%.*dry store \d+% full\./);
     expect(text).toContain('It takes effect tomorrow');
     expect(text).not.toContain('…');
     expect(text).toContain('The bank holds');
     for (const o of app.growthOptions) expect(text).toContain(o.price > 0 ? formatMoney(o.price) : 'free');
+  });
+
+  it('keeps every line on the screen for a business of dozens of trucks and clients, chosen or not', () => {
+    const { app, press } = toDay(0, 'big', ['9', '9', '9'], [], undefined, undefined, 99999);
+    const model = app.run.trucks[0]!;
+    for (let id = 10; id <= 40; id++) app.run.trucks.push({ ...model, id, driver: `Driver ${id}` });
+    for (let n = 0; n < 60; n++) app.run.clients.push({ name: `Client ${n}`, place: 'docks', contact: 'X' });
+    press(' ');
+    expect(screen(app).join('\n')).toContain('Rooms tomorrow');
+    expect(screen(app).join('\n')).toContain(formatMoney(truckPrice(app.run.clients.length, app.run.trucks.length + 1)));
+    press('3', 'Enter');
+    expect(screen(app).join('\n')).toContain('Rooms tomorrow');
   });
 
   it('highlights the picked option and moves the highlight with the keys', () => {

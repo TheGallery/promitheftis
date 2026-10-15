@@ -17,6 +17,7 @@ import {
   takenIn,
   tripCosts,
   truckCost,
+  truckPrice,
   type Units,
 } from '../src/game/money';
 import { ITEM_LIST, smallMorning } from '../src/game/morning';
@@ -74,7 +75,7 @@ describe('the prices', () => {
 
   it('are whole pounds', () => {
     const all = [
-      PRICES.startingCash, PRICES.truckDriver, PRICES.truckPerSquare, PRICES.truckPerClient, PRICES.roomPerClient,
+      PRICES.startingCash, PRICES.truckDriver, PRICES.truckPerSquare, PRICES.truckPerTruck, PRICES.truckPerClient, PRICES.roomPerClient,
       ...Object.values(PRICES.items).flatMap((p) => [p.supplier, p.client]),
     ];
     for (const price of all) expect(Number.isInteger(price)).toBe(true);
@@ -283,11 +284,22 @@ describe("the day's total", () => {
 
 describe('what growing costs', () => {
   it('is a price for a truck and for a room that depends on the size of the business, and nothing for a client', () => {
-    const client = { kind: 'client', client: { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' } } as const;
-    expect(growthPrice({ kind: 'truck' }, 7)).toBe(7 * PRICES.truckPerClient);
-    expect(growthPrice({ kind: 'room', room: 'fridge' }, 7)).toBe(7 * PRICES.roomPerClient);
-    expect(growthPrice({ kind: 'truck' }, 14)).toBe(2 * growthPrice({ kind: 'truck' }, 7));
-    expect(growthPrice(client, 7)).toBe(0);
+    const client = { kind: 'client', client: { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines', shape: { size: 1 } } } as const;
+    expect(growthPrice({ kind: 'truck' }, 7, 3)).toBe(3 * PRICES.truckPerTruck + 7 * PRICES.truckPerClient);
+    expect(growthPrice({ kind: 'room', room: 'fridge' }, 7, 3)).toBe(7 * PRICES.roomPerClient);
+    expect(growthPrice({ kind: 'room', room: 'fridge' }, 14, 3)).toBe(2 * growthPrice({ kind: 'room', room: 'fridge' }, 7, 3));
+    expect(growthPrice(client, 7, 3)).toBe(0);
+  });
+
+  it('makes each truck cost more than the one before, and a fleet bigger than the clients need dearer still', () => {
+    const prices = Array.from({ length: 12 }, (_, trucks) => truckPrice(10, trucks + 2));
+    for (let i = 1; i < prices.length; i++) expect(prices[i]).toBeGreaterThan(prices[i - 1]!);
+    expect(truckPrice(10, 20)).toBeGreaterThan(truckPrice(10, 5) * 2);
+    expect(truckPrice(20, 5)).toBeGreaterThan(truckPrice(10, 5));
+  });
+
+  it('keeps a room\'s price to the clients alone, however many trucks there are', () => {
+    expect(growthPrice({ kind: 'room', room: 'dry' }, 12, 2)).toBe(growthPrice({ kind: 'room', room: 'dry' }, 12, 30));
   });
 
   it('can be afforded with exactly the cash it costs, and not with a pound less', () => {
@@ -300,11 +312,12 @@ describe('what growing costs', () => {
 
   it('is on each option, which is affordable only when the cash covers the price', () => {
     const { day } = summary(0);
-    const client = { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' } as const;
-    const options = growthOptions(day, client, 7);
-    expect(options.map((o) => o.price)).toEqual([7 * PRICES.truckPerClient, 7 * PRICES.roomPerClient, 0]);
+    const client = { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines', shape: { size: 1 } } as const;
+    const business = runFromMorning(smallMorning());
+    const options = growthOptions(day, client, business);
+    expect(options.map((o) => o.price)).toEqual([truckPrice(7, 2), 7 * PRICES.roomPerClient, 0]);
     expect(options.every((o) => o.affordable)).toBe(true);
-    const poor = growthOptions({ ...day, money: { ...day.money, cash: 100 } }, client, 7);
+    const poor = growthOptions({ ...day, money: { ...day.money, cash: 100 } }, client, business);
     expect(poor.map((o) => o.affordable)).toEqual([false, false, true]);
   });
 
@@ -544,8 +557,8 @@ describe('cash in the save', () => {
   });
 
   it('writes the new version, which the old one was not', () => {
-    expect(SAVE_VERSION).toBe(3);
-    expect(JSON.parse(encodeRun(runFromMorning(smallMorning()), 0)).version).toBe(3);
+    expect(SAVE_VERSION).toBe(4);
+    expect(JSON.parse(encodeRun(runFromMorning(smallMorning()), 0)).version).toBe(4);
   });
 
   it.each([
@@ -983,7 +996,7 @@ describe('the end-of-day breakdown', () => {
 
 describe('saves from before the prices of each item', () => {
   it('still load: the saved run holds no prices, so an older save is read as before', () => {
-    expect(SAVE_VERSION).toBe(3);
+    expect(SAVE_VERSION).toBe(4);
     const run = { ...runFromMorning(smallMorning()), day: 4, cash: 1888 };
     const text = JSON.stringify({ version: 2, daySeed: 99, run });
     const decoded = decodeRun(text);

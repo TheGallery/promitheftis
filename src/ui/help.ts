@@ -133,8 +133,9 @@ export const HELP_PAGES: readonly HelpPage[] = [
         text:
           '{SPACE} on the end of the day opens one last choice: another truck, a bigger room (the tightest one tomorrow) or a new client. Pick ' +
           'with {↑↓} or {1}-{3}, and {ENTER} chooses it. A truck or a bigger room cost money, with the price shown; one you cannot afford ' +
-          'cannot be picked. A new client is free. {U} takes the choice back, with the money. Hold {SPACE} to start the next morning, and ' +
-          'from then on the choice is final.',
+          'cannot be picked. A new client is free. The screen shows how full the trucks were: a truck only helps once yours are nearly full, ' +
+          'and each one costs more than the last. A new client has a shape: big orders or small, near the depot or far, always early, or heavy on ' +
+          'one store room. {U} takes the choice back, with the money. Hold {SPACE} to start the next morning, and from then on the choice is final.',
       },
     ],
   },

@@ -3,7 +3,8 @@ import { DEPART_MINUTE } from '../game/clock';
 import { buildDay, morningMoney, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
 import { generateDay } from '../game/generate';
-import { growthOptions, newClientFor, type Growth, type GrowthOption, type NewClient } from '../game/growth';
+import { newClientFor, randomFrom, type NewClient } from '../game/clients';
+import { growthOptions, type Growth, type GrowthOption } from '../game/growth';
 import { formatMoney, growthPrice } from '../game/money';
 import { loadMorning } from '../game/morning';
 import { mulberry32 } from '../game/random';
@@ -1156,7 +1157,7 @@ export class App {
     this.growthOpen = false;
     this.growthSel = 0;
     this.growth = null;
-    this.newClient = newClientFor(this.run.clients.map((c) => c.name), () => this.luck.client);
+    this.newClient = newClientFor(this.run.clients.map((c) => c.name), randomFrom(this.luck.client));
     this.screen = 'day';
     this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');
@@ -1165,12 +1166,12 @@ export class App {
   // ------------------------------------------------------------ end of the day
   /** The three things the day can end by growing; empty before the day is built. */
   get growthOptions(): GrowthOption[] {
-    return this.day && this.newClient ? growthOptions(this.day, this.newClient, this.run.clients.length) : [];
+    return this.day && this.newClient ? growthOptions(this.day, this.newClient, this.run) : [];
   }
 
   /** What growth has been paid for so far: the price of the choice, or nothing until one is confirmed. */
   get growthPaid(): number {
-    return this.growth ? growthPrice(this.growth, this.run.clients.length) : 0;
+    return this.growth ? growthPrice(this.growth, this.run.clients.length, this.run.trucks.length) : 0;
   }
 
   /**

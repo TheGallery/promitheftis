@@ -216,7 +216,7 @@ describe('a promise through the whole game', () => {
 
 describe('a saved run from before', () => {
   it('still loads with its promises, and the promises are checked the morning they come due', () => {
-    expect(SAVE_VERSION).toBe(3);
+    expect(SAVE_VERSION).toBe(4);
     const run = {
       ...runFromMorning(smallMorning()),
       day: 2,

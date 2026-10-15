@@ -13,6 +13,7 @@ interface Prices {
   items: Record<string, ItemPrice>;
   truckDriver: number;
   truckPerSquare: number;
+  truckPerTruck: number;
   truckPerClient: number;
   roomPerClient: number;
 }
@@ -48,10 +49,15 @@ export const PRICES: Prices = {
   /** The fuel and wear for each square a truck travels on the island map, out and back. */
   truckPerSquare: 12,
   /**
-   * Another truck, and a bigger room, for each client the business serves: the bigger the business, the more it
-   * costs to grow it, so that either takes about the same number of good days whichever morning the run began with.
+   * Another truck costs a sum for each truck the business has and a sum for each client it serves, so that each truck
+   * costs more than the one before, and a fleet bigger than its clients need is dearer still.
    */
-  truckPerClient: 75,
+  truckPerTruck: 120,
+  truckPerClient: 30,
+  /**
+   * A bigger room costs a sum for each client the business serves: the bigger the business, the more it costs to
+   * grow it, so that it takes about the same number of good days whichever morning the run began with.
+   */
   roomPerClient: 75,
 };
 
@@ -170,11 +176,16 @@ export function dayMoney(before: number, delivered: readonly Units[], ordered: r
   };
 }
 
-/** What growing costs when the business serves `clients` restaurants; a new client is free. */
-export function growthPrice(growth: Growth, clients: number): number {
+/** What another truck costs when the business serves `clients` restaurants with `trucks` trucks. */
+export function truckPrice(clients: number, trucks: number): number {
+  return trucks * PRICES.truckPerTruck + clients * PRICES.truckPerClient;
+}
+
+/** What growing costs when the business serves `clients` restaurants with `trucks` trucks; a new client is free. */
+export function growthPrice(growth: Growth, clients: number, trucks: number): number {
   switch (growth.kind) {
     case 'truck':
-      return clients * PRICES.truckPerClient;
+      return truckPrice(clients, trucks);
     case 'room':
       return clients * PRICES.roomPerClient;
     case 'client':

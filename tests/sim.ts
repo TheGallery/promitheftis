@@ -1,6 +1,7 @@
+import { usualWith } from '../src/game/clients';
 import { swings } from '../src/game/demand';
 import { shortYesterday } from '../src/game/history';
-import { clientPrice, growthPrice, supplierPrice, truckCost } from '../src/game/money';
+import { clientPrice, supplierPrice, truckCost, truckPrice } from '../src/game/money';
 import { mulberry32 } from '../src/game/random';
 import { spaceOf } from '../src/game/rooms';
 import { promisesFrom } from '../src/game/run';
@@ -20,10 +21,16 @@ import { fakeEffects, hold } from './helpers';
  *   puts each order on the truck that adds least to the road, orders what the notes say tomorrow will need and no more
  *   than the rooms hold or the bank can pay for, and buys a room when the rooms are costing it sales.
  *
- * Both choose what to grow by the same rule: a new client, unless the trucks were well loaded and a truck can be paid for.
+ * What to grow is a separate rule, so that the rules can be set against each other with the same careful desk:
+ * - `first` presses ENTER on whatever is highlighted: the truck, and when it cannot be paid for the next one down.
+ * - `client` and `truck` always take a new client, or a truck when it can be paid for and a client when it cannot.
+ * - `screen` reads the growth screen: a truck when the trucks were full and one can be paid for with a cushion left,
+ *   a bigger room when the rooms are costing sales, otherwise the new client.
+ * Blind play uses `first` and careful play `screen`, unless the run says otherwise.
  * Everything chance decides comes from the seed, so the same seed always plays the same days.
  */
 export type Policy = 'blind' | 'careful';
+export type GrowthRule = 'first' | 'client' | 'truck' | 'screen';
 
 export interface DayStat {
   /** The day of the run; the first is 1. */
@@ -63,11 +70,11 @@ const ROOM_FULL = 0.9;
 /** A careful player orders this much more than the notes say, where the rooms have space, so a small surprise leaves nobody short. */
 const BUFFER = 0.1;
 
-export function playRun(kind: 'small' | 'big', policy: Policy, seed: number, days: number): DayStat[] {
+export function playRun(kind: 'small' | 'big', policy: Policy, seed: number, days: number, rule: GrowthRule = policy === 'blind' ? 'first' : 'screen'): DayStat[] {
   const random = mulberry32(seed * 7919 + 13);
   const app = new App(fakeEffects([], random, memoryStore()), () => {}, kind);
   const out: DayStat[] = [];
-  for (let d = 0; d < days; d++) out.push(playDay(app, policy));
+  for (let d = 0; d < days; d++) out.push(playDay(app, policy, rule));
   return out;
 }
 
@@ -81,7 +88,7 @@ interface RoomNeeds {
   fill: Record<Kept, number>;
 }
 
-function playDay(app: App, policy: Policy): DayStat {
+function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   const press: Press = (...keys) => keys.forEach((key) => app.press({ key }));
   const day = app.morning.day;
   const spoiled = app.run.spoiled.reduce((sum, s) => sum + s.units, 0);
@@ -98,14 +105,14 @@ function playDay(app: App, policy: Policy): DayStat {
 
   let needs: RoomNeeds | null = null;
   if (policy === 'blind') press('a');
-  else needs = carefulSupply(app, press, !wantsTruck(app, load));
+  else needs = carefulSupply(app, press, !wantsTruck(app, rule, load));
   hold(app, ' ');
 
   const summary = app.day!;
   const result = app.result!;
-  const grew = choose(app, policy, load, needs);
   const [truck, room] = app.growthOptions;
-  press(' ', String(['truck', 'room', 'client'].indexOf(grew) + 1), 'Enter');
+  press(' ');
+  const grew = choose(app, press, rule, load, needs);
   const stat: DayStat = {
     day,
     profit: summary.money.total,
@@ -240,9 +247,16 @@ function carefulDesk(app: App, press: Press): void {
 const marginPerSpace = (item: string): number => (clientPrice(item) - supplierPrice(item)) / spaceOf(item);
 const marginPerPound = (item: string): number => (clientPrice(item) - supplierPrice(item)) / supplierPrice(item);
 
+/** What another truck would cost tonight. */
+function truckBill(app: App): number {
+  return truckPrice(app.run.clients.length, app.run.trucks.length);
+}
+
 /** Whether the growth rule asks for a truck tonight, which leaves tomorrow's usual amounts as they are. */
-function wantsTruck(app: App, load: number): boolean {
-  return load >= TRUCK_LOAD && app.cash >= growthPrice({ kind: 'truck' }, app.run.clients.length);
+function wantsTruck(app: App, rule: GrowthRule, load: number): boolean {
+  if (rule === 'client') return false;
+  if (rule === 'screen' && load < TRUCK_LOAD) return false;
+  return app.cash >= truckBill(app);
 }
 
 /** Takes one unit off the row, among those satisfying `of`, that earns least by `worth`. Returns false if there is none. */
@@ -266,7 +280,7 @@ function carefulSupply(app: App, press: Press, newClient: boolean): RoomNeeds {
   const supply = app.supply!;
   const clients = app.run.clients.length;
   const usual = { ...app.run.usual };
-  if (newClient) for (const [item, n] of Object.entries(usual)) usual[item] = n + Math.round(n / clients);
+  if (newClient) Object.assign(usual, usualWith(usual, app.run.clients, {}));
   const swing = new Map<string, number>();
   for (const s of swings(supply.ahead, usual, clients)) swing.set(s.item, (swing.get(s.item) ?? 0) + s.units);
   const promised = new Map<string, number>();
@@ -310,9 +324,12 @@ function carefulSupply(app: App, press: Press, newClient: boolean): RoomNeeds {
 }
 
 // ------------------------------------------------------------------ growth
-function choose(app: App, policy: Policy, load: number, needs: RoomNeeds | null): 'truck' | 'room' | 'client' {
+/** Which of the three the rule takes tonight; `first` takes whichever it can pay for, top of the list first. */
+function decide(app: App, rule: GrowthRule, load: number, needs: RoomNeeds | null): 'truck' | 'room' | 'client' {
   const [truck, room] = app.growthOptions;
-  const reserve = policy === 'careful' ? app.day!.money.supplier * RESERVE : 0;
+  if (rule === 'client') return 'client';
+  if (rule === 'truck' || rule === 'first') return truck?.affordable ? 'truck' : rule === 'first' && room?.affordable ? 'room' : 'client';
+  const reserve = app.day!.money.supplier * RESERVE;
   const can = (o: typeof truck) => !!o?.affordable && app.cash - o.price >= reserve;
   if (load >= TRUCK_LOAD && can(truck)) return 'truck';
   if (needs && room?.growth.kind === 'room' && can(room)) {
@@ -320,6 +337,16 @@ function choose(app: App, policy: Policy, load: number, needs: RoomNeeds | null)
     if (needs.lost[kept] > 0 || needs.fill[kept] >= ROOM_FULL) return 'room';
   }
   return 'client';
+}
+
+/** Chooses what to grow on the growth screen, by the keys a player would press, and says what was chosen. */
+function choose(app: App, press: Press, rule: GrowthRule, load: number, needs: RoomNeeds | null): 'truck' | 'room' | 'client' {
+  const grew = decide(app, rule, load, needs);
+  if (rule === 'first') {
+    // ENTER on the first option; one that cannot be paid for says so, and the next one down is tried.
+    for (let n = 0; n < app.growthOptions.length && !app.growth; n++) press('Enter', ...(app.growth ? [] : ['ArrowDown']));
+  } else press(String(['truck', 'room', 'client'].indexOf(grew) + 1), 'Enter');
+  return app.growth?.kind ?? grew;
 }
 
 // ------------------------------------------------------------------ results

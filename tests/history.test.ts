@@ -149,7 +149,7 @@ describe('across the days of a run', () => {
   it('has a new client with no history until it has had a day', () => {
     const run = runFromMorning(smallMorning());
     const { day, supply, calls, answers } = dayWithout();
-    const next = nextDay(run, outcomeOf({}, supply, day, calls, answers, { kind: 'client', client: { name: 'Newcomer', place: 'docks', contact: 'Bo' } }));
+    const next = nextDay(run, outcomeOf({}, supply, day, calls, answers, { kind: 'client', client: { name: 'Newcomer', place: 'docks', contact: 'Bo', shape: { size: 1 } } }));
     expect(next.history.Newcomer).toBeUndefined();
     expect(next.clients.some((c) => c.name === 'Newcomer')).toBe(true);
   });

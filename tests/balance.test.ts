@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { median, playRun, summarise, type DayStat, type Policy } from './sim';
+import { median, playRun, summarise, type DayStat, type GrowthRule, type Policy } from './sim';
 
 /**
  * What thinking is worth: the real game played through its keys by `sim.ts`, once pressing ENTER, SPACE and A
- * everywhere and once with its head, over several seeds and more than three weeks, on both mornings. If a number
- * here moves, the game's economy has moved: look at what changed before changing the limits.
+ * everywhere (and taking the first growth option) and once with its head (reading the growth screen), over several seeds
+ * and more than three weeks, on both mornings. If a number here moves, the game's economy has moved: look at what
+ * changed before changing the limits.
  */
 const SEEDS = [1, 2, 3, 4, 5, 6];
 const DAYS = 24;
@@ -12,9 +13,9 @@ const DAYS = 24;
 const FROM = 3;
 
 const cache = new Map<string, DayStat[][]>();
-function runs(kind: 'small' | 'big', policy: Policy): DayStat[][] {
-  const key = `${kind}/${policy}`;
-  if (!cache.has(key)) cache.set(key, SEEDS.map((seed) => playRun(kind, policy, seed, DAYS)));
+function runs(kind: 'small' | 'big', policy: Policy, rule: GrowthRule = policy === 'blind' ? 'first' : 'screen'): DayStat[][] {
+  const key = `${kind}/${policy}/${rule}`;
+  if (!cache.has(key)) cache.set(key, SEEDS.map((seed) => playRun(kind, policy, seed, DAYS, rule)));
   return cache.get(key) as DayStat[][];
 }
 
@@ -27,12 +28,14 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     }
   });
 
-  it('pays a careful player clearly more than one who presses ENTER, SPACE and A', () => {
-    const blind = summarise(runs(kind, 'blind'), FROM).profit;
-    const careful = summarise(runs(kind, 'careful'), FROM).profit;
-    expect(careful).toBeGreaterThan(0);
-    // Thinking is worth at least a quarter more than pressing buttons, on either morning.
-    expect(blind).toBeLessThanOrEqual(careful * 0.8);
+  it('pays a careful player clearly more than one who presses ENTER, SPACE and A and takes the first growth option', () => {
+    const blind = summarise(runs(kind, 'blind'), FROM);
+    const careful = summarise(runs(kind, 'careful'), FROM);
+    expect(careful.profit).toBeGreaterThan(0);
+    // Thinking is worth about a fifth more each day than pressing buttons, and a lot more in the bank, since the first option
+    // is a truck every night and every truck is paid for.
+    expect(blind.profit).toBeLessThanOrEqual(careful.profit * 0.85);
+    expect(blind.cash).toBeLessThanOrEqual(careful.cash * 0.6);
   });
 
   it('keeps blind play calm: it still makes money and most clients are pleased, only less than for a careful player', () => {
@@ -64,8 +67,25 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     }
   });
 
-  it('makes rooms matter: stock spoils for the player who never looks at the bars, and not for the one who does', () => {
-    expect(summarise(runs(kind, 'blind'), FROM).spoiled).toBeGreaterThan(5);
+  it('makes each truck dearer than the last: the truck price climbs with the fleet, day after day, for a player who keeps buying them', () => {
+    for (const run of runs(kind, 'careful', 'truck')) {
+      const bought = run.filter((d) => d.grew === 'truck');
+      expect(bought.length).toBeGreaterThan(5);
+      for (let i = 1; i < bought.length; i++) expect(bought[i]!.truckPrice).toBeGreaterThan(bought[i - 1]!.truckPrice);
+    }
+  });
+
+  it('makes buying a truck every night a poor plan: the fleet stands idle and the bank stays thin', () => {
+    const always = summarise(runs(kind, 'careful', 'truck'), FROM);
+    const reading = summarise(runs(kind, 'careful'), FROM);
+    expect(always.load).toBeLessThan(0.6);
+    expect(reading.load).toBeGreaterThan(always.load + 0.15);
+    expect(always.trucksOwned).toBeGreaterThan(reading.trucksOwned);
+    expect(always.cash).toBeLessThan(reading.cash * 0.8);
+  });
+
+  it('makes rooms matter: stock spoils for the player who never looks at the bars and keeps taking clients, and not for the one who does', () => {
+    expect(summarise(runs(kind, 'blind', 'client'), FROM).spoiled).toBeGreaterThan(5);
     expect(summarise(runs(kind, 'careful'), FROM).spoiled).toBeLessThan(1);
   });
 
@@ -80,5 +100,40 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
 
   it('plays the same days again for the same seed', () => {
     expect(playRun(kind, 'careful', SEEDS[0]!, 6)).toEqual(runs(kind, 'careful')[0]!.slice(0, 6));
+  });
+});
+
+describe.each(['small', 'big'] as const)('what to grow, on the %s morning', (kind) => {
+  const reading = () => summarise(runs(kind, 'careful', 'screen'), FROM);
+  const rules = ['client', 'truck'] as const;
+
+  it.each(rules)('is not settled by always taking %s: reading the screen earns more each day and leaves clients happier', (rule) => {
+    const fixed = summarise(runs(kind, 'careful', rule), FROM);
+    expect(reading().profit).toBeGreaterThan(fixed.profit);
+    expect(reading().pleased).toBeGreaterThan(fixed.pleased + 0.05);
+  });
+
+  it('is not settled by always taking a new client: the trucks stay full and the orders are cut to fit them', () => {
+    const always = summarise(runs(kind, 'careful', 'client'), FROM);
+    expect(reading().profit).toBeGreaterThan(always.profit * 1.1);
+    expect(reading().pleased).toBeGreaterThan(always.pleased + 0.15);
+    expect(always.load).toBeGreaterThan(0.7);
+    expect(always.trucksOwned).toBeLessThan(reading().trucksOwned);
+    expect(always.clients).toBeGreaterThan(reading().clients);
+  });
+
+  it('has no rule that beats reading the screen on earnings, on happy clients and on cash all at once', () => {
+    for (const rule of [...rules, 'first'] as const) {
+      const fixed = summarise(runs(kind, 'careful', rule), FROM);
+      const beats = [fixed.profit >= reading().profit, fixed.pleased >= reading().pleased, fixed.cash >= reading().cash];
+      expect(beats.every(Boolean)).toBe(false);
+    }
+  });
+
+  it('still plays on and pays a profit for a player who always takes the first option', () => {
+    const blind = summarise(runs(kind, 'blind', 'first'), FROM);
+    expect(blind.profit).toBeGreaterThan(0);
+    expect(blind.minCash).toBeGreaterThan(0);
+    expect(blind.trucksOwned).toBeGreaterThan(reading().trucksOwned);
   });
 });
