@@ -217,7 +217,12 @@ describe('a promise through the whole game', () => {
 describe('a saved run from before', () => {
   it('still loads with its promises, and the promises are checked the morning they come due', () => {
     expect(SAVE_VERSION).toBe(3);
-    const run = { ...runFromMorning(smallMorning()), day: 2, promises: [{ client: 'Café Lumen', item: 'peas', qty: 4 }] };
+    const run = {
+      ...runFromMorning(smallMorning()),
+      day: 2,
+      promises: [{ client: 'Café Lumen', item: 'peas', qty: 4 }],
+      ahead: [{ client: "Rosa's", event: 'halfterm' as const }],
+    };
     const { spoiled, ahead, ...before } = run;
     const text = JSON.stringify({ version: 2, daySeed: 7, run: before });
     // A save from before the rooms could spoil stock has nothing spoiled and nothing announced.
