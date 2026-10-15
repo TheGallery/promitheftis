@@ -406,8 +406,8 @@ describe('B and S have to be held down from day 2 on', () => {
       expect(cues).toEqual([]);
       const lines = screen(app).join('\n');
       expect(lines).toContain(`HOLD ${name} TO START A NEW RUN`);
-      expect(lines).toContain('replaces your saved day 2');
-      expect(lines).toContain('press ESC, to keep your run');
+      expect(lines).toContain('Replaces your saved day 2.');
+      expect(lines).toContain('Let go or ESC to cancel');
       wait(HOLD_MS - 1);
       expect(app.run.day).toBe(2);
       expect(store.data.get(RUN_KEY)).toBe(text);
@@ -448,7 +448,7 @@ describe('B and S have to be held down from day 2 on', () => {
     expect(app.run.day).toBe(2);
     expect(store.data.get(RUN_KEY)).toBe(text);
     expect(screen(app).join('\n')).toContain('HOLD B TO START A NEW RUN');
-    expect(screen(app).join('\n')).toContain('Press and hold B until the bar is full.');
+    expect(screen(app).join('\n')).toContain('Let go or ESC to cancel');
   });
 
   it('after letting go early the key can be held again, and the fill starts over', () => {

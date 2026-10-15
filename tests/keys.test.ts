@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ARRIVAL_PAUSE_MS, App, COMMIT_HOLD_MS, HOLD_MS, RUN_KEY, type Effects } from '../src/ui/app';
 import { COLS, plain } from '../src/ui/grid';
-import { BAR_CELLS } from '../src/ui/screens/hold';
+import { BAR_CELLS, BOX_W, holdBox } from '../src/ui/screens/hold';
 import { screenLines } from '../src/ui/view';
 import { memoryStore } from '../src/ui/store';
 import { fakeEffects, hold, playToSupply, screen, toDay, toNextMorning } from './helpers';
@@ -280,6 +280,10 @@ describe('the steps that cannot be taken back need SPACE (or R) held down', () =
   });
 });
 
+/** The most rows the box takes up, with and without a warning in it. */
+const BOX_ROWS = 9;
+const BOX_ROWS_WARNED = 14;
+
 describe('the hold box', () => {
   /** An app with the box for each step on show, as the key for it has just gone down. */
   const asking: Record<string, () => App> = {
@@ -308,18 +312,40 @@ describe('the hold box', () => {
   };
 
   it.each([
-    ['send', 'HOLD SPACE TO SEND THE TRUCKS', 'cannot be called back', 'Let go, or press ESC, and the trucks wait.'],
-    ['order', 'HOLD SPACE TO PLACE THE ORDER', 'cannot be changed', 'Let go, or press ESC, to keep working on the order.'],
-    ['morning', 'HOLD SPACE TO START THE NEXT MORNING', 'Your choice is final', 'Let go, or press ESC, to stay on the choice.'],
-    ['again', 'HOLD R TO PLAY THE DAY AGAIN', 'starts over', 'Let go, or press ESC, to keep this day.'],
-  ] as const)('names the action and the key to %s, and says what letting go does', (step, title, what, back) => {
+    ['send', 'HOLD SPACE TO SEND THE TRUCKS'],
+    ['order', 'HOLD SPACE TO PLACE THE ORDER'],
+    ['morning', 'HOLD SPACE TO START THE NEXT MORNING'],
+    ['again', 'HOLD R TO PLAY THE DAY AGAIN'],
+  ] as const)('names the action and the key to %s, and says how to cancel', (step, title) => {
     const app = asking[step]!();
     expect(app.ask?.action).toBe(step);
     const text = screen(app).join('\n');
     expect(text).toContain(title);
-    expect(text).toContain(what);
-    expect(text).toContain(back);
-    expect(text).toContain('Keep holding…');
+    expect(text).toContain('Let go or ESC to cancel');
+  });
+
+  it('fits within its bounds for every hold, with and without the warning', () => {
+    const warned = timed();
+    warned.press(1000, ' ', 'Enter', 'Tab', 'Enter', ' ', ' ');
+    const store = memoryStore();
+    toNextMorning('1', 'small', 0, () => 0.5, store);
+    const fresh = timed('small', store);
+    fresh.press(1000, 's');
+    const boxes: Array<[string, App, number]> = [
+      ['send with a warning', warned.app, BOX_ROWS_WARNED],
+      ['newRun', fresh.app, BOX_ROWS_WARNED],
+      ...(['send', 'order', 'morning', 'again'] as const).map((step): [string, App, number] => [step, asking[step]!(), BOX_ROWS]),
+    ];
+    for (const [name, app, rows] of boxes) {
+      const box = holdBox(app);
+      expect(box, name).not.toBeNull();
+      expect(box!.length, name).toBeLessThanOrEqual(rows);
+      expect(box!.length, name).toBeGreaterThanOrEqual(rows - 4);
+      for (const line of box!) expect(line.reduce((n, [text]) => n + [...text].length, 0), name).toBe(BOX_W);
+      const text = plain(box!).join('\n');
+      expect(text, name).toContain('Let go or ESC to cancel');
+    }
+    expect(holdBox(warned.app)!.length).toBeGreaterThan(holdBox(boxes[2]![1])!.length);
   });
 
   it('shows the key, a bar that fills while it is held, and what letting go or ESC does, over any screen', () => {
@@ -328,8 +354,7 @@ describe('the hold box', () => {
     const rows = () => plain(screenLines(t.app));
     const text = rows().join('\n');
     expect(text).toContain('HOLD SPACE TO SEND THE TRUCKS');
-    expect(text).toContain('Keep holding…');
-    expect(text).toContain('Let go, or press ESC, and the trucks wait.');
+    expect(text).toContain('Let go or ESC to cancel');
     expect(rows()).toHaveLength(30);
     for (const row of rows()) expect([...row]).toHaveLength(COLS);
     const cells = () => [...(rows().find((r) => r.includes('█') && r.startsWith(' '.repeat(20))) ?? '')].filter((c) => c === '█').length;
@@ -340,14 +365,13 @@ describe('the hold box', () => {
     expect(cells()).toBe(Math.round(BAR_CELLS * 0.75));
     t.app.release(' ');
     expect(cells()).toBe(0);
-    expect(rows().join('\n')).toContain('Press and hold SPACE until the bar is full.');
   });
 
   it('is a box in the middle of the screen, between two rules, the same size for every step', () => {
     const t = atSheets();
     t.press(1000, ' ');
     const lines = plain(screenLines(t.app));
-    const rules = lines.map((l, i) => (l.includes('═'.repeat(40)) ? i : -1)).filter((i) => i >= 0);
+    const rules = lines.map((l, i) => (l.includes('═'.repeat(BOX_W)) ? i : -1)).filter((i) => i >= 0);
     expect(rules).toHaveLength(2);
     const [top, bottom] = rules as [number, number];
     expect(top).toBeGreaterThan(2);
@@ -355,9 +379,8 @@ describe('the hold box', () => {
     const left = lines[top]!.indexOf('═');
     const width = [...lines[top]!.trim()].length;
     expect(left * 2 + width).toBe(COLS);
-    expect(bottom - top).toBeGreaterThanOrEqual(8);
-    // The bar is two rows, and the same box serves every step.
-    expect(lines.slice(top, bottom).filter((l) => l.includes('░')).length).toBe(2);
+    expect(bottom - top).toBeLessThanOrEqual(BOX_ROWS);
+    expect(lines.slice(top, bottom).filter((l) => l.includes('░')).length).toBe(1);
   });
 
   it('shows the orders not handed out inside the box that sends the trucks', () => {
@@ -381,7 +404,7 @@ describe('the hold box', () => {
     t.press(1000, 'Escape');
     const gone = screenLines(t.app).flatMap((l) => l.map(([, c]) => c));
     expect(gone.some((c) => c.split(' ').includes('box'))).toBe(false);
-    expect(plain(screenLines(t.app)).join('\n')).not.toContain('═'.repeat(40));
+    expect(plain(screenLines(t.app)).join('\n')).not.toContain('═'.repeat(BOX_W));
   });
 
   it('is the box for a new run on the welcome back screen too, over the list', () => {
@@ -392,8 +415,8 @@ describe('the hold box', () => {
     t.press(1000, 's');
     const text = plain(screenLines(t.app)).join('\n');
     expect(text).toContain('HOLD S TO START A NEW RUN');
-    expect(text).toContain('replaces your saved day 2');
-    expect(text).toContain('Let go, or press ESC, to keep your run.');
+    expect(text).toContain('Replaces your saved day 2.');
+    expect(text).toContain('Let go or ESC to cancel');
     t.wait(HOLD_MS / 2);
     const cells = plain(screenLines(t.app)).find((r) => r.includes('█') && r.startsWith(' '.repeat(20))) ?? '';
     expect([...cells].filter((c) => c === '█').length).toBe(BAR_CELLS / 2);
