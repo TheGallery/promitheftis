@@ -26,8 +26,8 @@ const HALF = 50;
  * Points of disappointment, never below zero: 1 for less than everything, 2 for less than half, 1 for
  * coming after the time asked, 1 more for being told "nothing more today" about a short delivery,
  * 1 less for being promised the rest tomorrow, 1 more for being short again after being short the
- * day before, and 1 more for a promise from the day before that did not come in full. No points is pleased, one a bit let down, more let down. A full delivery on time is
- * pleased whatever came before.
+ * day before, and 1 more for a promise from the day before that did not come in full. No points is
+ * pleased, one a bit let down, more let down. A full delivery on time is pleased whatever came before.
  */
 export function moodPoints({ percent, late, shortCall, shortBefore, promise }: MoodFacts): number {
   const delivery = percent >= 100 ? 0 : percent >= HALF ? 1 : 2;
