@@ -2,6 +2,7 @@ import { buildCalls, callLine, type Call } from '../game/calls';
 import { DEPART_MINUTE } from '../game/clock';
 import { buildDay, morningMoney, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
+import { garageNotice } from '../game/breakdown';
 import { generateDay } from '../game/generate';
 import { newClientFor, randomFrom, type NewClient } from '../game/clients';
 import { growthOptions, type Growth, type GrowthOption } from '../game/growth';
@@ -455,6 +456,7 @@ export class App {
       case ' ':
         this.screen = 'desk';
         this.sound('confirm');
+        if (this.morning.garage) this.say(garageNotice(this.morning.garage), 'warn');
         return true;
       case 'b':
       case 'B':
@@ -785,10 +787,12 @@ export class App {
     const o = this.orderSel;
     const result = d.assignTruck(o, truckId);
     if (!result.ok) {
-      this.say(
-        result.reason === 'full' ? `Truck ${truckId} is too full for this order. Try another.` : `There is no truck ${truckId} this morning.`,
-        'warn',
-      );
+      const why = {
+        full: `Truck ${truckId} is too full for this order. Try another.`,
+        garage: `Truck ${truckId} is at the garage today. Try another.`,
+        'no-such-truck': `There is no truck ${truckId} this morning.`,
+      }[result.reason];
+      this.say(why, 'warn');
       return;
     }
     this.truckSel = this.truckIndexOf(truckId) ?? this.truckSel;

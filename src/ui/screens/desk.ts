@@ -1,3 +1,4 @@
+import { shortReason } from '../../game/breakdown';
 import { place, PLACES, type PlaceId } from '../../game/places';
 import { plainName, shortItems } from '../../game/headsup';
 import { shortMarker } from '../../game/history';
@@ -174,7 +175,8 @@ function deadlineRows(app: App, room: number): Line[] {
     mine.push(cat(s(` ${clip(current.client, 22)}`, 'b'), s(` before ${formatTime(current.before)}`)));
     const truck = previewTruck(app);
     const arriveAt = truck == null ? null : d.arrivalOn(app.orderSel, truck, departAt);
-    if (truck == null || arriveAt == null) mine.push(s('   pick a truck to see when it gets there', 'd'));
+    if (truck != null && d.inGarage(truck)) mine.push(s(`   truck ${truck} is at the garage today`, 'w'));
+    else if (truck == null || arriveAt == null) mine.push(s('   pick a truck to see when it gets there', 'd'));
     else {
       const arrival = arrivalText(arriveAt, current.before);
       mineLate = arrival.late;
@@ -209,6 +211,15 @@ function trucksPane(app: App): Line[] {
     const places = d.placesOf(t.id);
     const cursor = lit && i === app.truckSel;
     const mark = t.id === current ? '▶' : ' ';
+    if (d.inGarage(t.id)) {
+      const reason = shortReason(d.morning.garage?.reason ?? '');
+      out.push(cat(
+        s(`${mark}${t.id} ${t.driver.padEnd(t.id > 9 ? 5 : 6)} `, cursor ? 'hl' : 'd'),
+        s('at the garage'.padEnd(15), cursor ? 'w hl' : 'w'),
+        s(clip(reason, 16).padEnd(16), cursor ? 'hl' : 'd'),
+      ));
+      return;
+    }
     const row = cat(
       s(`${mark}${t.id} ${t.driver.padEnd(t.id > 9 ? 5 : 6)} `, cursor ? 'hl' : ''),
       bar(pct, 8, cursor ? 'hl' : ''),

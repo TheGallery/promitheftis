@@ -30,7 +30,7 @@ function leftColumn(app: App): Line[] {
     const used = t.backAt != null;
     out.push(
       s(
-        ` ${t.truckId} ${t.driver.padEnd(7)}${(used ? placesLabel(t.places, 17) : 'stayed in the yard').padEnd(19)}${String(t.stops).padStart(5)}${`${Math.round(t.fullness * 100)}%`.padStart(6)}${(used ? formatTime(t.backAt as number) : '—').padStart(8)}`,
+        ` ${t.truckId} ${t.driver.padEnd(7)}${(used ? placesLabel(t.places, 17) : t.garage ? 'at the garage' : 'stayed in the yard').padEnd(19)}${String(t.stops).padStart(5)}${`${Math.round(t.fullness * 100)}%`.padStart(6)}${(used ? formatTime(t.backAt as number) : '—').padStart(8)}`,
         used ? '' : 'd',
       ),
     );

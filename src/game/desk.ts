@@ -3,7 +3,7 @@ import type { PlaceId } from './places';
 import { planRoute, type RoutePlan } from './routes';
 import type { Item, Morning, Order } from './types';
 
-export type AssignResult = { ok: true } | { ok: false; reason: 'no-such-truck' | 'full' };
+export type AssignResult = { ok: true } | { ok: false; reason: 'no-such-truck' | 'garage' | 'full' };
 
 /**
  * The order desk: what has been given on every line, which truck each order
@@ -81,6 +81,11 @@ export class Desk {
     return total;
   }
 
+  /** True for the truck that is at the garage today. */
+  inGarage(truckId: number): boolean {
+    return this.morning.garage?.truckId === truckId;
+  }
+
   capacity(truckId: number): number {
     return this.morning.trucks.find((t) => t.id === truckId)?.capacity ?? 0;
   }
@@ -127,6 +132,7 @@ export class Desk {
   /** Puts an order on a truck if its lines fit. Choosing a truck takes a minute. */
   assignTruck(o: number, truckId: number): AssignResult {
     if (!this.morning.trucks.some((t) => t.id === truckId)) return { ok: false, reason: 'no-such-truck' };
+    if (this.inGarage(truckId)) return { ok: false, reason: 'garage' };
     const others = this.load(truckId) - (this.truckOf[o] === truckId ? this.orderSpace(o) : 0);
     if (this.orderSpace(o) > this.capacity(truckId) - others) return { ok: false, reason: 'full' };
     this.truckOf[o] = truckId;

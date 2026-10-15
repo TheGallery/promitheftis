@@ -159,7 +159,8 @@ export const HELP_PAGES: readonly HelpPage[] = [
         text:
           'The supplier order is in the store rooms, on top of what was left, as much as each room holds; an item you did not order is as low as you left it. The first ' +
           'day is a fixed morning; from day 2 on the orders, notes and calls are made up, different every day. A promise on the phone is on the ' +
-          'client\'s order ("As promised: 4 frozen peas"). The growth choice is at work: the new truck, the bigger room, the new client.',
+          'client\'s order ("As promised: 4 frozen peas"). The growth choice is at work: the new truck, the bigger room, the new client. ' +
+          'Now and then a staff note says a truck is at the garage for the day: it cannot be loaded and costs nothing, so spread its orders over the others.',
       },
       {
         head: 'SHORT DELIVERIES ARE REMEMBERED',

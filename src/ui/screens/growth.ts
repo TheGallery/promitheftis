@@ -52,10 +52,13 @@ function todayRows(app: App): Line[] {
   const late = day.trucks.reduce((n, t) => n + t.lateTo.length, 0);
   const fleet = fleetOf(day);
   const yard = fleet.yard > 0 ? `${plural(fleet.yard, 'truck')} stayed in the yard` : 'none stayed in the yard';
+  const went = fleet.garage > 0
+    ? `${fleet.out} of ${plural(fleet.trucks, 'truck')} went out, ${fleet.yard > 0 ? `${yard}, ` : ''}${fleet.garage} at the garage`
+    : `${fleet.out} of ${plural(fleet.trucks, 'truck')} went out and ${yard}`;
   return [
     s(' WHAT TODAY SHOWED', 'b'),
     cat(
-      s(` ${fleet.out} of ${plural(fleet.trucks, 'truck')} went out and ${yard}; together they were ${fleet.use}% full.`, fleet.use < 50 ? 'w' : ''),
+      s(` ${went}; together they were ${fleet.use}% full.`, fleet.use < 50 ? 'w' : ''),
       s(` ${late > 0 ? `${plural(late, 'client')} reached late.` : 'Every client was reached on time.'}`, late > 0 ? 'w' : 'd'),
     ),
     s(` ${roomsLine(day)}`, day.rooms.some((r) => r.space.spoils > 0) ? 'w' : 'd'),

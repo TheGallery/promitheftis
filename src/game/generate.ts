@@ -1,3 +1,4 @@
+import { breakdownFor } from './breakdown';
 import type { CallKind } from './calls';
 import { itemWeight } from './clients';
 import { formatTime } from './clock';
@@ -242,7 +243,13 @@ export function generateDay(run: RunState, random: Random): Morning {
   const messages: Message[] = [
     ...orders.map((o): Message => ({ kind: 'order', orderId: o.id, at: o.leftAt })),
     ...overnightNotes(run, random),
-  ].sort((a, b) => a.at - b.at);
+  ];
+  const callKinds = callKindsFor(orders.length, random);
+  const callSalt = below(random, 1000);
+  // Drawn last, so that a truck at the garage moves nothing else that chance decides.
+  const breakdown = breakdownFor(run, random, SUPPLIER_FIRST, SUPPLIER_LAST);
+  if (breakdown) messages.push({ ...breakdown.note, at: breakdown.at });
+  messages.sort((a, b) => a.at - b.at);
 
   return {
     id: run.kind,
@@ -257,8 +264,9 @@ export function generateDay(run: RunState, random: Random): Morning {
     messages,
     crews: run.crews.map((c) => ({ names: [...c.names], trucks: [...c.trucks] })),
     storeRoom: [...run.storeRoom],
-    callKinds: callKindsFor(orders.length, random),
-    callSalt: below(random, 1000),
+    callKinds,
+    callSalt,
     ...(run.short.length > 0 ? { short: run.short.map((s) => ({ ...s })) } : {}),
+    ...(breakdown ? { garage: breakdown.garage } : {}),
   };
 }

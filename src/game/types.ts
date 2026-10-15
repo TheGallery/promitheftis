@@ -39,6 +39,13 @@ export interface Truck {
   capacity: number;
 }
 
+/** A truck that is at the garage for the day: it cannot be loaded or sent, and costs nothing. */
+export interface Garage {
+  truckId: number;
+  /** What is wrong with it, as it follows "with": "a flat battery". */
+  reason: string;
+}
+
 export type Message =
   | { kind: 'order'; orderId: number; at: number }
   | { kind: 'supplier' | 'staff'; from: string; text: string; at: number };
@@ -74,6 +81,8 @@ export interface Morning {
   storeRoom: string[];
   /** The kinds of phone call this morning, in order; a morning without any uses its size's usual kinds. */
   callKinds?: CallKind[];
+  /** The truck out for the day, if one is. */
+  garage?: Garage;
   /** Varies which item a client forgets, so the same client does not forget the same thing every day. */
   callSalt?: number;
   /** The items the supplier delivered less of overnight than was ordered; the stock already holds only what came. */

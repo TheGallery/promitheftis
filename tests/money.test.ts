@@ -1023,8 +1023,8 @@ describe('the end-of-day breakdown', () => {
       expect(app.screen).toBe('day');
       const text = screen(app).join('\n');
       for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) expect(text).toMatch(new RegExp(`${room} +\\d+% full tomorrow`));
-      for (const word of ['MONEY', 'Taken in', 'Supplier order', 'Trucks (9 out)', 'Cash now', 'squares driven', "TOMORROW'S ORDER"]) expect(text).toContain(word);
-      for (const t of app.day!.trucks) expect(text).toContain(formatMoney(t.cost));
+      for (const word of ['MONEY', 'Taken in', 'Supplier order', `Trucks (${app.day!.trucks.filter((t) => t.backAt != null).length} out)`, 'Cash now', 'squares driven', "TOMORROW'S ORDER"]) expect(text).toContain(word);
+      for (const t of app.day!.trucks.filter((x) => x.backAt != null)) expect(text).toContain(formatMoney(t.cost));
     }
   });
 });

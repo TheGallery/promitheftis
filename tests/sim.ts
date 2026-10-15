@@ -17,7 +17,7 @@ import { fakeEffects, hold } from './helpers';
  * Plays the real game through its keys, day after day, the way a player would, to see what thinking is worth.
  *
  * - `blind` presses ENTER and SPACE everywhere: every line as asked, the truck the cursor is on (one step down when it
- *   is too full), the first answer to every call, and A on the supplier order.
+ *   is too full or at the garage), the first answer to every call, and A on the supplier order.
  * - `careful` does the same work with its head: it shares a short item out (whatever made it short: a big day, or a supplier
  *   that left part of the order behind) so that as few clients as possible go short, those promised it on the phone first,
  *   plans the trucks against the times clients asked for (each order goes on the truck where it adds least to the road and
@@ -30,7 +30,8 @@ import { fakeEffects, hold } from './helpers';
  * - `screen` reads the growth screen: a truck when the trucks were full and one can be paid for with a cushion left,
  *   a bigger room when the rooms are costing sales, otherwise the new client.
  * Blind play uses `first` and careful play `screen`, unless the run says otherwise.
- * Everything chance decides comes from the seed, so the same seed always plays the same days.
+ * On a morning with a truck at the garage the blind desk meets the warning and moves down a truck, and the careful desk plans
+ * on the trucks that are there, trimming the orders the others cannot carry. Everything chance decides comes from the seed, so the same seed always plays the same days.
  */
 export type Policy = 'blind' | 'careful';
 export type GrowthRule = 'first' | 'client' | 'truck' | 'screen';
@@ -59,6 +60,8 @@ export interface DayStat {
   squares: number;
   /** Share of all the truck space that was loaded when the trucks left, 0 to 1. */
   load: number;
+  /** True when a truck was at the garage that morning. */
+  garage: boolean;
   /** Units that spoiled in the rooms overnight, at the start of this day. */
   spoiled: number;
   /** True when the supplier left part of the night's delivery behind, so that the morning began with an item short. */
@@ -109,8 +112,11 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   if (policy === 'blind') blindDesk(app, press);
   else carefulDesk(app, press);
 
-  const capacity = app.morning.trucks.reduce((sum, t) => sum + t.capacity, 0);
-  const load = app.morning.trucks.reduce((sum, t) => sum + app.desk.load(t.id), 0) / capacity;
+  // A truck at the garage has no space to give, so it is left out of how full the trucks were.
+  const free = app.morning.trucks.filter((t) => !app.desk.inGarage(t.id));
+  const capacity = free.reduce((sum, t) => sum + t.capacity, 0);
+  const load = free.reduce((sum, t) => sum + app.desk.load(t.id), 0) / capacity;
+  const garage = app.morning.garage != null;
   press(' ');
   hold(app, ' ');
   for (let n = 0; n < 100 && !app.roadOver; n++) press(app.roadCall ? 'Enter' : ' ');
@@ -142,6 +148,7 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
     lateCut: summary.money.lateCut,
     squares: summary.money.squares,
     load,
+    garage,
     spoiled,
     supplierShort,
     clients: app.run.clients.length,
@@ -225,7 +232,8 @@ type Stop = { orderId: number; place: App['morning']['orders'][number]['place'] 
  * order has been handed out, two minutes an order, which is when the plan is judged.
  */
 function carefulDesk(app: App, press: Press): void {
-  const { orders, trucks } = app.morning;
+  const { orders } = app.morning;
+  const trucks = app.morning.trucks.filter((t) => !app.desk.inGarage(t.id));
   const size = new Map(app.morning.items.map((i) => [i.id, i.size]));
   const gives = shareOut(app);
   const space = (o: number) => orders[o]!.lines.reduce((sum, l, li) => sum + gives[o]![li]! * (size.get(l.item) ?? 1), 0);

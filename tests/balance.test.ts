@@ -149,6 +149,57 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
   });
 });
 
+/** Averages of one figure over the days where a truck was at the garage, or over the days where none was, leaving out the days the supplier was short so that one event does not blur the other. */
+const onDays = (days: DayStat[], garage: boolean, figure: (d: DayStat) => number) => {
+  const picked = days.filter((d) => d.garage === garage && !d.supplierShort);
+  return picked.reduce((sum, d) => sum + figure(d), 0) / picked.length;
+};
+const inFull = (d: DayStat) => d.inFull / d.orders;
+const pleased = (d: DayStat) => d.pleased / d.orders;
+
+describe.each(['small', 'big'] as const)('a truck at the garage, on the %s morning', (kind) => {
+  it('comes on about one day in four or five, and never on the first', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      const days = runs(kind, policy).flatMap((r) => r.filter((d) => d.day > 1));
+      const share = days.filter((d) => d.garage).length / days.length;
+      expect(share).toBeGreaterThan(0.1);
+      expect(share).toBeLessThan(0.32);
+      for (const run of runs(kind, policy)) expect(run[0]!.garage).toBe(false);
+    }
+  });
+
+  it('is handled clearly better by a careful player: the orders still go out, and blind play leaves more of them short', () => {
+    const blind = later(kind, 'blind');
+    const careful = later(kind, 'careful');
+    expect(onDays(careful, true, inFull)).toBeGreaterThan(onDays(blind, true, inFull) + 0.2);
+    expect(onDays(careful, true, pleased)).toBeGreaterThan(onDays(blind, true, pleased) + 0.2);
+    expect(onDays(careful, true, (d) => d.stranded)).toBeLessThan(0.5);
+    expect(onDays(blind, true, (d) => d.stranded)).toBeGreaterThan(onDays(blind, false, (d) => d.stranded));
+  });
+
+  it('does not make blind play collapse: it still earns on those days, and still pleases most of its clients about as often as it does', () => {
+    const blind = later(kind, 'blind');
+    expect(onDays(blind, true, (d) => d.profit)).toBeGreaterThan(0);
+    expect(onDays(blind, true, pleased)).toBeGreaterThan(onDays(blind, false, pleased) - 0.15);
+    expect(onDays(blind, true, pleased)).toBeGreaterThan(0.4);
+  });
+
+  it('costs a careful player little', () => {
+    const careful = later(kind, 'careful');
+    const dip = onDays(careful, false, inFull) - onDays(careful, true, inFull);
+    expect(dip).toBeLessThan(0.15);
+    expect(onDays(careful, true, (d) => d.profit)).toBeGreaterThan(0);
+  });
+});
+
+it('hurts a small fleet more than a big one: with no spare truck, a careful player loses more orders', () => {
+  const dip = (kind: 'small' | 'big') => {
+    const careful = later(kind, 'careful');
+    return onDays(careful, false, inFull) - onDays(careful, true, inFull);
+  };
+  expect(dip('small')).toBeGreaterThan(dip('big') + 0.03);
+});
+
 describe.each(['small', 'big'] as const)('what to grow, on the %s morning', (kind) => {
   const reading = () => summarise(runs(kind, 'careful', 'screen'), FROM);
   const rules = ['client', 'truck'] as const;
