@@ -241,14 +241,14 @@ describe('the supplier ordering screen', () => {
       const row = supply.rows[r]!;
       const lines = screen(app);
       const here = noted.filter((c) => c.item === row.item.id);
-      const noteLines = lines.filter((l) => l.includes('rang:') || l.includes("tomorrow's order") && l.includes('←'));
+      const noteLines = lines.filter((l) => l.includes('promised for tomorrow') && l.includes('←'));
       if (here.length > 0) {
         expect(noteLines).toHaveLength(1);
         expect(noteLines[0]).toContain(here[0]!.client);
         // Below the last bar, in the panel on the right, never on the item's own line.
         expect(lines.indexOf(noteLines[0]!)).toBeGreaterThan(bars(lines));
         expect(noteLines[0]!.indexOf('←')).toBeGreaterThanOrEqual(56);
-        expect(rowOf(lines, row.item.name)).not.toContain('rang');
+        expect(rowOf(lines, row.item.name)).not.toContain('promised');
       } else {
         expect(noteLines).toHaveLength(0);
       }
@@ -288,15 +288,32 @@ describe('the supplier ordering screen', () => {
     for (const [, cls] of marked) expect(cls.split(' ')).not.toContain('d');
   });
 
-  it('leaves the supplier screen without amounts, and the result screen shows them', () => {
+  it('shows on the supplier screen who was promised how many of the highlighted item, and the result screen shows them too', () => {
     const { app, press } = toResult(0);
     const text = screen(app).join('\n');
     for (const call of app.calls.filter((c) => c.qty != null)) expect(text).toContain(`added ${call.qty} to tomorrow`);
     press(' ');
-    const supplier = screen(app).join('\n');
-    expect(supplier).not.toContain('PROMISED');
-    expect(supplier).not.toContain('promised');
-    expect(supplier).not.toMatch(/added \d+ to tomorrow/);
+    expect(screen(app).join('\n')).not.toMatch(/added \d+ to tomorrow/);
+    const supply = app.supply!;
+    const promised = app.calls.filter((c) => c.item && c.options[0]!.addsToOrder);
+    expect(promised.length).toBeGreaterThan(0);
+    for (const call of promised) {
+      const r = supply.rows.findIndex((row) => row.item.id === call.item);
+      while (app.supplySel < r) press('ArrowDown');
+      while (app.supplySel > r) press('ArrowUp');
+      const note = screen(app).find((l) => l.includes('promised for tomorrow'))!;
+      expect(note).toContain(`${call.client} ${call.qty}`);
+    }
+  });
+
+  it('adds up the promises to one item: who was promised how many, and how many in all', () => {
+    const answers = new Map([[0, 0], [1, 0], [2, 0]]);
+    const call = (id: number, client: string, qty: number) => ({
+      id, kind: 'forgot' as const, at: 0, orderIndex: id, client, contact: 'x', topic: 't', item: 'peas', qty, say: '',
+      options: [{ label: 'Promise', record: 'r', addsToOrder: true }],
+    });
+    const notes = callNotes([call(0, 'Café Lumen', 4), call(1, "Rosa's", 3), call(2, 'Café Lumen', 2)], answers);
+    expect(notes.get('peas')).toEqual([{ client: 'Café Lumen', qty: 6 }, { client: "Rosa's", qty: 3 }]);
   });
 
   it('keeps the amounts typed when going back to the result screen and in again', () => {
@@ -311,7 +328,7 @@ describe('the supplier ordering screen', () => {
   it('shows no notes when every call was answered "not today"', () => {
     const { app, press } = toResult(1);
     press(' ');
-    expect(screen(app).join('\n')).not.toContain('rang:');
+    expect(screen(app).join('\n')).not.toContain('promised for tomorrow');
     expect(callNotes(app.calls, app.answers).size).toBe(0);
   });
 

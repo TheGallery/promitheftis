@@ -3,6 +3,7 @@ import type { Desk } from './desk';
 import { plainName } from './headsup';
 import type { MorningResult, OrderResult } from './results';
 import type { Road } from './road';
+import { stockAfterDeliveries } from './supply';
 
 /** Calls that come in during the small morning; the big morning has a few more. */
 const SMALL_KINDS: readonly CallKind[] = ['short', 'time', 'forgot'];
@@ -27,7 +28,7 @@ export interface CallOption {
   label: string;
   /** How the answer reads on the result screen. */
   record: string;
-  /** True when the answer promises the item on tomorrow's order. */
+  /** True when the answer promises the item on tomorrow's order: a promise, checked when tomorrow's trucks are loaded. */
   addsToOrder?: boolean;
 }
 
@@ -46,6 +47,10 @@ export interface Call {
   item?: string;
   /** How many the client is promised for tomorrow if the player adds them: what was missing, or what they ask for. */
   qty?: number;
+  /** How many of the item are left in the store once today's trucks have gone, when the call is about one. */
+  inStore?: number;
+  /** How many more the usual order for tomorrow would bring in, when the call is about an item. */
+  usualOrder?: number;
   say: string;
   options: CallOption[];
 }
@@ -70,6 +75,7 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
   const delivered = result.orders.filter((o) => o.arriveAt != null && o.truckId != null);
   const taken = new Set<number>();
   const calls: Omit<Call, 'id'>[] = [];
+  const left = stockAfterDeliveries(desk);
 
   const shorts = delivered
     .filter((o) => o.shortLines.length > 0)
@@ -92,7 +98,7 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
       kind === 'short' ? shortCall(desk, take(shorts)) : kind === 'time' ? timeCall(desk, take(times)) : forgotCall(desk, take(rest));
     // A kind with nobody to ring about it gives way to an item forgotten by someone else.
     const call = made ?? (kind === 'forgot' ? undefined : forgotCall(desk, take(rest)));
-    if (call) calls.push(call);
+    if (call) calls.push(withStock(desk, call, left));
   }
 
   // A truck that unloads at the depot is back soon after: the last ring is before the end of the log.
@@ -105,6 +111,13 @@ export function buildCalls(desk: Desk, result: MorningResult, road: Road): Call[
     if (call.at >= after.at) call.at = after.at - 1;
   }
   return calls.map((c, id) => ({ ...c, id }));
+}
+
+/** A call about an item, with what is left of it in the store and what the usual order for tomorrow would add. */
+function withStock(desk: Desk, call: Omit<Call, 'id'>, left: Record<string, number>): Omit<Call, 'id'> {
+  if (!call.item) return call;
+  const inStore = left[call.item] ?? 0;
+  return { ...call, inStore, usualOrder: Math.max(0, (desk.morning.usual[call.item] ?? 0) - inStore) };
 }
 
 /** Clients who asked for a time are the ones most likely to ring about it. */
@@ -136,7 +149,7 @@ function shortCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | u
         ? `The delivery came, thank you! But we got no ${item}, and we asked for ${worst.asked}. Is some coming?`
         : `The delivery came, thank you! But we only got ${worst.given} of the ${worst.asked} ${item}. Is some more coming?`,
     options: [
-      { label: "Add the rest to tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
+      { label: "Promise the rest for tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
       { label: 'Sorry, nothing more today', record: 'told not today' },
     ],
   };
@@ -161,7 +174,7 @@ function forgotCall(desk: Desk, o: OrderResult | undefined): Omit<Call, 'id'> | 
     qty,
     say: `Silly me, I forgot to put ${name} on the order. Could you send ${qty}?`,
     options: [
-      { label: "I'll add it to tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
+      { label: "Promise it for tomorrow's order", record: `added ${qty} to tomorrow`, addsToOrder: true },
       { label: 'Sorry, not today', record: 'told not today' },
     ],
   };

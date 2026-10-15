@@ -1151,7 +1151,7 @@ export class App {
   private placeOrder(supply: Supply): void {
     supply.placed = true;
     this.supplyTyped = '';
-    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply, this.run.history, this.run.cash);
+    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply, this.run.history, this.run.cash, this.run.promises);
     this.daySel = 0;
     this.growthOpen = false;
     this.growthSel = 0;

@@ -66,9 +66,9 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'PHONE CALLS',
         text:
-          'Now and then a client rings while the trucks are out. The log waits. Pick a friendly answer with {↑↓} and {ENTER}: add it to ' +
-          'tomorrow\'s order, sorry not today, or the time the truck really reaches them. An answer does not change today\'s deliveries, but ' +
-          'a promise for tomorrow turns up on that client\'s order in the morning.',
+          'Now and then a client rings while the trucks are out. A call about an item shows what is in stock. Pick an answer with {↑↓} and {ENTER}: ' +
+          'promise it for tomorrow, sorry not today, or the time the truck reaches them. A promise is on that client\'s order in the morning ' +
+          'and is checked: broken, it lets them down more than a sorry.',
       },
       {
         head: 'THE RESULT',
