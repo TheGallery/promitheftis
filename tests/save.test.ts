@@ -23,6 +23,7 @@ function laterRun(): RunState {
     },
     promises: [{ client: "Rosa's", item: 'chips', qty: 3 }],
     growth: { kind: 'truck' },
+    earned: 340,
   });
   return nextDay(day2, {
     left: {},
@@ -31,6 +32,7 @@ function laterRun(): RunState {
     today: { "Rosa's": { percent: 100, late: false, lacked: [] } },
     promises: [],
     growth: { kind: 'client', client: { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' } },
+    earned: -80,
   });
 }
 
@@ -293,7 +295,7 @@ describe('a run saved in the browser', () => {
 describe('B and S replace the save', () => {
   it.each([['b', 'big'], ['s', 'small']] as const)('%s on the opening screen starts the %s morning and saves it over the old run', (key, kind) => {
     const store = memoryStore();
-    toNextMorning('1', kind === 'big' ? 'small' : 'big', 0, RANDOM, store);
+    toNextMorning('1', kind === 'big' ? 'small' : 'big', 0, RANDOM, store, 99999);
     expect(savedRun(store)?.run.day).toBe(2);
     const { app } = appOn(store);
     holdNewRun(app, key.toUpperCase());

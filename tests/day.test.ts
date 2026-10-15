@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildDay } from '../src/game/day';
 import { plainName } from '../src/game/headsup';
+import { formatChange, formatMoney } from '../src/game/money';
 import { ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
 import { summary, toDay, screen } from './helpers';
@@ -192,9 +193,14 @@ describe('the end-of-day screen', () => {
     for (const c of classes) expect(['', 'b', 'd', 'w', 'acc', 'hl', 'w hl', 'acc hl', 'kbar', 'k']).toContain(c);
   });
 
-  it('says nothing about money', () => {
+  it('has a short money block: taken in, supplier order, trucks, today and cash now', () => {
     const { app } = toDay();
-    expect(screen(app).join('\n')).not.toMatch(/[$£€]|money|price|cost|profit/i);
+    const text = screen(app).join('\n');
+    const money = app.day!.money;
+    for (const label of ['MONEY', 'Taken in', 'Supplier order', 'Trucks (2 out)', 'Today', 'Cash now']) expect(text).toContain(label);
+    for (const amount of [formatMoney(money.takenIn), formatMoney(-money.supplier), formatMoney(-money.trucks), formatChange(money.total), formatMoney(money.cash)]) {
+      expect(text).toContain(amount);
+    }
   });
 
   it('has no ESC back to the supplier order once it is placed, and no key it does not use', () => {

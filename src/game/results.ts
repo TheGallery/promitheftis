@@ -17,6 +17,12 @@ export interface ShortLine {
   given: number;
 }
 
+/** What an order was given on one line, whatever it came to. */
+export interface GivenLine {
+  item: string;
+  units: number;
+}
+
 export interface OrderResult {
   orderIndex: number;
   client: string;
@@ -25,6 +31,8 @@ export interface OrderResult {
   /** The share of the order's lines that were delivered, 0 to 100. */
   percent: number;
   shortLines: ShortLine[];
+  /** What each line of the order came to; nothing for an order with no truck. */
+  delivered: GivenLine[];
   /** When the truck gets to this client; null if nothing was delivered. */
   arriveAt: number | null;
   before: number | null;
@@ -71,9 +79,11 @@ export function buildResult(desk: Desk, departAt: number): MorningResult {
     const truckId = desk.truckFor(o);
     const shipped = truckId != null;
     const shortLines: ShortLine[] = [];
+    const delivered: GivenLine[] = [];
     let share = 0;
     order.lines.forEach((line, l) => {
       const given = shipped ? (desk.given(o, l) ?? 0) : 0;
+      delivered.push({ item: line.item, units: given });
       share += line.asked === 0 ? 1 : given / line.asked;
       if (given < line.asked) shortLines.push({ item: line.item, asked: line.asked, given });
     });
@@ -86,6 +96,7 @@ export function buildResult(desk: Desk, departAt: number): MorningResult {
       truckId,
       percent: Math.round((share / order.lines.length) * 100),
       shortLines,
+      delivered,
       arriveAt,
       before,
       lateForAsk: before != null && arriveAt != null && arriveAt > before,

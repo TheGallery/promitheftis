@@ -182,7 +182,7 @@ function headsUp(app: App): Line {
 }
 
 export function deskScreen(app: App): Line[] {
-  const top = header('ORDER DESK', clockLine(app.morning.day, app.desk.clock, true));
+  const top = header('ORDER DESK', clockLine(app.morning.day, app.desk.clock, true, app.cash));
   const left = ordersPane(app);
   const mid = linesPane(app);
   const right = trucksPane(app);

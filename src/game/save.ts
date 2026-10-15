@@ -1,12 +1,17 @@
 import { HISTORY_DAYS, type ClientDay, type History } from './history';
 import { ITEM_LIST } from './morning';
+import { MOST_CASH, STARTING_CASH } from './money';
 import type { Mood } from './moods';
 import { PLACES, type PlaceId } from './places';
 import type { Delivery, Promised, RunClient, RunState } from './run';
 import type { Crew, Kept, Truck } from './types';
 
-/** The version of the saved data. A save with any other version is not read. */
-export const SAVE_VERSION = 1;
+/**
+ * The version of the saved data. The first version, which had no cash, is still read, and a run saved by it starts
+ * from the starting cash; a save with any other version is not read.
+ */
+export const SAVE_VERSION = 2;
+const FIRST_VERSION = 1;
 
 /** The run, as it stood when a day began, with the seed that makes up that day (for day 1, the fixed morning, it is 0). */
 export interface SavedRun {
@@ -37,6 +42,11 @@ function isObject(v: unknown): v is Json {
 
 function isCount(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1e9;
+}
+
+/** A sum of money: a whole number, which may be below zero. */
+function isMoney(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && Math.abs(v) <= MOST_CASH;
 }
 
 function isText(v: unknown): v is string {
@@ -110,7 +120,7 @@ function mapped<T>(v: unknown, make: (x: unknown) => T | null): T[] | null {
 }
 
 /** Builds a run state from parsed data, copying only what it knows; null if any of it is not what a run holds. */
-function runOf(v: unknown): RunState | null {
+function runOf(v: unknown, version: number): RunState | null {
   if (!isObject(v)) return null;
   const { kind, day } = v;
   if ((kind !== 'small' && kind !== 'big') || !isCount(day) || day < 1) return null;
@@ -125,8 +135,10 @@ function runOf(v: unknown): RunState | null {
   const history = historyOf(v.history);
   const promises = mapped(v.promises, promisedOf);
   const delivery = v.delivery;
+  const cash = version === FIRST_VERSION ? STARTING_CASH : v.cash;
   if (!stock || !usual || !trucks || !crews || !storeRoom || !capacity || !clients || !moods || !history || !promises) return null;
   if (trucks.length === 0 || clients.length === 0 || KEPT.some((k) => !((capacity[k] ?? 0) > 0))) return null;
+  if (!isMoney(cash)) return null;
   if (!isObject(delivery) || !isCount(delivery.items) || !isCount(delivery.units)) return null;
   const sent: Delivery = { items: delivery.items, units: delivery.units };
   return {
@@ -143,13 +155,14 @@ function runOf(v: unknown): RunState | null {
     history,
     promises,
     delivery: sent,
+    cash,
   };
 }
 
 function parse(text: string): Json | null {
   try {
     const data: unknown = JSON.parse(text);
-    return isObject(data) && data.version === SAVE_VERSION ? data : null;
+    return isObject(data) && (data.version === FIRST_VERSION || data.version === SAVE_VERSION) ? data : null;
   } catch {
     return null;
   }
@@ -164,7 +177,7 @@ export function encodeRun(run: RunState, daySeed: number): string {
 export function decodeRun(text: string): SavedRun | null {
   const data = parse(text);
   if (!data || typeof data.daySeed !== 'number' || !Number.isInteger(data.daySeed) || data.daySeed < 0 || data.daySeed > MAX_SEED) return null;
-  const run = runOf(data.run);
+  const run = runOf(data.run, data.version as number);
   return run ? { run, daySeed: data.daySeed } : null;
 }
 

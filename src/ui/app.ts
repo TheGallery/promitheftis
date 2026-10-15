@@ -4,6 +4,7 @@ import { buildDay, type DaySummary } from '../game/day';
 import { Desk } from '../game/desk';
 import { generateDay } from '../game/generate';
 import { growthOptions, newClientFor, type Growth, type GrowthOption, type NewClient } from '../game/growth';
+import { formatMoney, growthPrice } from '../game/money';
 import { loadMorning } from '../game/morning';
 import { mulberry32 } from '../game/random';
 import { buildResult, type MorningResult } from '../game/results';
@@ -987,7 +988,7 @@ export class App {
     }
     supply.placed = true;
     this.supplyTyped = '';
-    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply, this.run.history);
+    if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply, this.run.history, this.run.cash);
     this.daySel = 0;
     this.growthOpen = false;
     this.growthSel = 0;
@@ -1001,7 +1002,17 @@ export class App {
   // ------------------------------------------------------------ end of the day
   /** The three things the day can end by growing; empty before the day is built. */
   get growthOptions(): GrowthOption[] {
-    return this.day && this.newClient ? growthOptions(this.day, this.newClient) : [];
+    return this.day && this.newClient ? growthOptions(this.day, this.newClient, this.run.clients.length) : [];
+  }
+
+  /** What growth has been paid for so far: the price of the choice, or nothing until one is confirmed. */
+  get growthPaid(): number {
+    return this.growth ? growthPrice(this.growth, this.run.clients.length) : 0;
+  }
+
+  /** The cash in the bank now: once the day is settled it is what the day left, less any growth chosen. */
+  get cash(): number {
+    return (this.day?.money.cash ?? this.run.cash) - this.growthPaid;
   }
 
   /** R plays this day again, B and S start a new run from a fixed morning (from day 2 on, once the key has been held): all of them start over and drop the growth choice. */
@@ -1067,17 +1078,21 @@ export class App {
           this.nextMorning(this.day, this.supply);
           this.sound('confirm');
         }
+      } else if (picked && !picked.affordable) {
+        this.say('Not enough money yet.', 'warn');
       } else if (picked) {
         this.growth = picked.growth;
-        this.say(`Chosen: ${picked.title}. It takes effect tomorrow. ENTER starts the next morning.`);
+        const paid = picked.price > 0 ? ` ${formatMoney(picked.price)} paid.` : '';
+        this.say(`Chosen: ${picked.title}.${paid} It takes effect tomorrow. ENTER starts the next morning.`);
         this.sound('finish');
       }
       return true;
     }
     if (key === 'u' || key === 'U' || key === 'Backspace') {
       if (!this.growth) return false;
+      const back = this.growthPaid > 0 ? ` ${formatMoney(this.growthPaid)} is back in the bank.` : '';
       this.growth = null;
-      this.say('Choice taken back. Pick one of the three.');
+      this.say(`Choice taken back.${back} Pick one of the three.`);
       this.sound('confirm');
       return true;
     }

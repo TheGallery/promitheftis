@@ -1,6 +1,7 @@
 import { callLine, type Call } from './calls';
 import type { History } from './history';
 import { moodFacts, moodOf, moodReasons, type Mood } from './moods';
+import { dayMoney, STARTING_CASH, type DayMoney, type Units } from './money';
 import type { MorningResult, OrderResult } from './results';
 import { KEPT_ORDER, type Supply } from './supply';
 import type { RoomSpace } from './rooms';
@@ -42,6 +43,7 @@ export interface DaySummary {
   rooms: DayRoom[];
   /** The rooms that tomorrow's order fills past full. */
   overFull: DayRoom[];
+  money: DayMoney;
 }
 
 /** Everything the end-of-day screen says, worked out once the supplier order is placed. */
@@ -51,6 +53,7 @@ export function buildDay(
   answers: ReadonlyMap<number, number>,
   supply: Supply,
   history: History = {},
+  cash = STARTING_CASH,
 ): DaySummary {
   const orders = result.orders.map((o): DayOrder => {
     const facts = moodFacts(o, calls, answers, history[o.client]);
@@ -64,6 +67,10 @@ export function buildDay(
   }));
   const answered = calls.filter((c) => answers.has(c.id));
   const rooms = KEPT_ORDER.map((kept): DayRoom => ({ kept, space: supply.roomSpace(kept) }));
+  const keptOf = new Map(supply.rows.map((row) => [row.item.id, row.kept]));
+  const delivered = result.orders.flatMap((o): Units[] => o.delivered.map((d) => ({ kept: keptOf.get(d.item) ?? 'dry', units: d.units })));
+  const ordered = supply.ordered().map((o): Units => ({ kept: o.item.kept, units: o.amount }));
+  const trucksOut = result.trucks.filter((t) => t.backAt != null).length;
   return {
     orders,
     trucks,
@@ -75,5 +82,6 @@ export function buildDay(
     units: supply.total(),
     rooms,
     overFull: rooms.filter((r) => r.space.overBy > 0),
+    money: dayMoney(cash, delivered, ordered, trucksOut),
   };
 }

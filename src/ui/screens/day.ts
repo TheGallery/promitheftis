@@ -1,6 +1,7 @@
 import { DAY_END_MINUTE, formatTime } from '../../game/clock';
 import type { DayOrder, DayRoom, DaySummary } from '../../game/day';
 import { plainName } from '../../game/headsup';
+import { formatChange, formatMoney } from '../../game/money';
 import type { Mood } from '../../game/moods';
 import { KEPT_LABEL } from '../../game/supply';
 import { plural } from '../format';
@@ -129,12 +130,33 @@ function tomorrowBlock(day: DaySummary, room: number): Line[] {
   ];
 }
 
+/** One entry of the money block: a label and an amount at the right, in the warning colour when `warn`. */
+function moneyCell(label: string, text: string, labelW: number, amountW: number, extra = '', warn = false): Line {
+  return cat(s(label.padEnd(labelW), extra), s(text.padStart(amountW), warn ? `w ${extra}`.trim() : extra));
+}
+
+/**
+ * What the day took in and paid out, and the cash in the bank now. What was paid out is a cost, not a loss, so
+ * only a day that ends below zero, and cash below zero, are in the warning colour.
+ */
+export function moneyBlock({ money }: DaySummary): Line[] {
+  const left = (label: string, amount: number): Line => moneyCell(` ${label}`, formatMoney(amount), 15, 9);
+  const right = (label: string, text: string, warn: boolean, extra = ''): Line => cat(s('    '), moneyCell(label, text, 9, 10, extra, warn));
+  return [
+    s(' MONEY', 'b'),
+    cat(left('Taken in', money.takenIn)),
+    cat(left('Supplier order', -money.supplier), right('Today', formatChange(money.total), money.total < 0)),
+    cat(left(`Trucks (${money.trucksOut} out)`, -money.trucks), right('Cash now', formatMoney(money.cash), money.cash < 0, 'b')),
+  ];
+}
+
 function rightColumn(day: DaySummary): Line[] {
   const trucks = trucksBlock(day);
   const calls = callsBlock(day);
   // What the three rooms and the headings leave of the column is for the list of what was ordered.
-  const room = Math.max(1, Math.min(MAX_ORDERED_ROWS, BODY_ROWS - trucks.length - calls.length - 2 - 1 - day.rooms.length));
-  return [...trucks, [], ...calls, [], ...tomorrowBlock(day, room)];
+  const money = moneyBlock(day);
+  const room = Math.max(1, Math.min(MAX_ORDERED_ROWS, BODY_ROWS - trucks.length - calls.length - money.length - 3 - 1 - day.rooms.length));
+  return [...trucks, [], ...calls, [], ...money, [], ...tomorrowBlock(day, room)];
 }
 
 export function dayScreen(app: App): Line[] {
