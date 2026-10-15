@@ -107,7 +107,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'WHEN THE SUPPLIER COMES UP SHORT',
         text:
           'Now and then an item you ordered arrives only in part. An overnight note says how much came and that the rest is not charged for; ' +
-          'HEADS UP names the item. Decide who gets it: a client you promised it to, one let down yesterday, or the most clients in full.',
+          'when today\'s orders need more than is on hand, HEADS UP names it. Decide who gets it: a client you promised it to, one let down yesterday, or the most clients in full.',
       },
     ],
   },
