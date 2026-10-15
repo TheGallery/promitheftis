@@ -24,6 +24,8 @@ export type Tone = 'info' | 'warn';
 
 const PANES: readonly Pane[] = ['orders', 'lines', 'trucks'];
 const MAX_DIGITS = 3;
+/** What happens to an order that is not handed out when the trucks go. */
+export const NOT_HANDED_OUT = 'On a truck: go with the lines decided so far. No truck: not delivered.';
 /** Where the run and the settings are kept; the saved text carries its own version. */
 export const RUN_KEY = 'promitheftis.run';
 export const SETTINGS_KEY = 'promitheftis.settings';
@@ -34,6 +36,15 @@ export const START_CHOICES: readonly StartChoice[] = ['continue', 'small', 'big'
 export const RING_GUARD_MS = 600;
 /** How long the key for a new run over a saved run is held down before it starts, in ms. */
 export const HOLD_MS = 1500;
+/** How long SPACE (or R) is held to send the trucks, place the supplier order, start the next morning or play the day again, in ms. */
+export const COMMIT_HOLD_MS = 700;
+/** How long SPACE is ignored after the screen changes, in ms, so a double tap goes on one step and not two. */
+export const ARRIVAL_PAUSE_MS = 400;
+
+/** The steps that cannot be taken back and so need a key held down: what is asked, and for a new run, which morning. */
+export type HoldAsk =
+  | { action: 'newRun'; morning: 'small' | 'big' }
+  | { action: 'send' | 'order' | 'morning' | 'again' };
 
 /** What the app needs from the browser, so the game can run without one. */
 export interface Effects {
@@ -89,15 +100,18 @@ export class App {
   lineSel = 0;
   truckSel = 0;
   typed = '';
-  private confirmEnd = false;
-  /** The fixed morning a new run was asked for over the save of a later day; while it is set, the hold-to-start button is on show. */
-  newRunAsk: 'small' | 'big' | null = null;
-  /** When the key for the new run went down, in real time; null while it is up. */
+  /** The step waiting for its key to be held down; while it is set, the hold box is on show. */
+  ask: HoldAsk | null = null;
+  /** When the key for the step went down, in real time; null while it is up. */
   private holdSince: number | null = null;
-  /** The key (lower case) that has to be held for the new run asked for. */
+  /** The key (lower case) that has to be held for the step asked for. */
   private holdKey = '';
-  /** The key that has just started a new run and may still be held down, whose repeats are then ignored. */
+  /** How long that key has to be held, in ms. */
+  private holdMs = HOLD_MS;
+  /** The key that has just carried out a held step and may still be held down, whose repeats are then ignored. */
   private spentKey: string | null = null;
+  /** When the screen last changed, in real time. */
+  private arrivedAt = Number.NEGATIVE_INFINITY;
   /** The sound this key press makes: the last one asked for wins. Null is silence. */
   private heard: { moment: Moment; arg?: CueArg } | null = null;
 
@@ -209,16 +223,16 @@ export class App {
     const key0 = key.toLowerCase();
     if (repeat && key0 === this.spentKey) return true;
     if (!repeat) this.spentKey = null;
-    const asked = this.newRunAsk;
+    const asked = this.ask;
     if (asked && key0 === this.holdKey) {
-      // The key the button asks to be held: the first press starts the fill, the keyboard repeating it changes nothing.
+      // The key the box asks to be held: the first press starts the fill, the keyboard repeating it changes nothing.
       if (!repeat && this.holdSince == null) {
         this.holdSince = this.effects.now();
         this.changed();
       }
       return true;
     }
-    this.cancelNewRun();
+    this.cancelHold();
     if (asked && key === 'Escape') {
       this.changed();
       return true;
@@ -228,13 +242,16 @@ export class App {
       this.changed();
       return used;
     }
-    const wasConfirming = this.confirmEnd;
-    this.confirmEnd = false;
+    // A held SPACE or ENTER never goes on by itself, and SPACE just after the screen changed is a double tap.
+    if (repeat && (key === ' ' || key === 'Enter')) return true;
+    if (key === ' ' && this.effects.now() - this.arrivedAt < ARRIVAL_PAUSE_MS) return true;
     this.status = '';
     this.tone = 'info';
     this.heard = null;
 
-    const handled = this.route(key, shift, repeat, wasConfirming);
+    const from = this.where();
+    const handled = this.route(key, shift);
+    this.noteArrival(from);
     if (handled) {
       // One sound per key press: a warning replaces the ordinary sound, a key that only shows a message warns,
       // and a key that changed nothing is silent.
@@ -266,7 +283,7 @@ export class App {
       this.status = '';
       this.tone = 'info';
       this.heard = null;
-      this.route(key, false, repeat, false);
+      this.route(key, false);
       return this.cueHeard();
     }
     if (key0 === 'h' || key === 'Escape') {
@@ -307,7 +324,17 @@ export class App {
     this.heard = { moment, arg };
   }
 
-  private route(key: string, shift: boolean, repeat: boolean, wasConfirming: boolean): boolean {
+  /** Which screen is showing, for noticing a change. */
+  private where(): string {
+    return `${this.screen}/${this.growthOpen}`;
+  }
+
+  /** Starts the short pause for SPACE when the screen is not the one it was. */
+  private noteArrival(from: string): void {
+    if (this.where() !== from) this.arrivedAt = this.effects.now();
+  }
+
+  private route(key: string, shift: boolean): boolean {
     if (key === 'F2') {
       this.blue = !this.blue;
       this.saveSettings();
@@ -327,11 +354,11 @@ export class App {
       case 'messages':
         return this.messagesKey(key);
       case 'desk':
-        return this.deskKey(key, shift, wasConfirming);
+        return this.deskKey(key, shift);
       case 'sheets':
         return this.sheetsKey(key);
       case 'road':
-        return this.roadKey(key, repeat);
+        return this.roadKey(key);
       case 'result':
         return this.resultKey(key);
       case 'supply':
@@ -355,8 +382,15 @@ export class App {
         this.startSel = Math.max(0, Math.min(START_CHOICES.length - 1, before + (key === 'ArrowUp' ? -1 : 1)));
         if (this.startSel !== before) this.sound('move');
         return true;
+      case '1':
+      case '2':
+      case '3':
+        this.startSel = Number(key) - 1;
+        if (this.startSel !== before) this.sound('move');
+        return true;
       case 'Enter':
         return this.choose(START_CHOICES[this.startSel] as StartChoice, key);
+      case ' ':
       case 'c':
       case 'C':
         return this.choose('continue', key);
@@ -370,13 +404,13 @@ export class App {
     return false;
   }
 
-  /** Continue is one press; a new run replaces the save, so the key that chose it has to be held down (see `tick`). */
+  /** Continue is one press; a new run replaces the save, so the key that chose it has to be held down (see `tick`). SPACE always continues. */
   private choose(choice: StartChoice, key: string): boolean {
     if (choice === 'continue') {
       this.resume();
       this.sound('confirm');
     } else {
-      this.askNewRun(choice, key);
+      this.askHold({ action: 'newRun', morning: choice }, key);
     }
     return true;
   }
@@ -427,11 +461,11 @@ export class App {
 
   /**
    * B or S during play. From day 2 on the new run would replace the saved one, so the key has to be held down
-   * until the button fills (see `tick`); on day 1 there is little to lose and it starts at once.
+   * until the box fills (see `tick`); on day 1 there is little to lose and it starts at once.
    */
   private newRun(id: 'small' | 'big'): boolean {
     if (this.run.day > 1) {
-      this.askNewRun(id, id === 'big' ? 'b' : 's');
+      this.askHold({ action: 'newRun', morning: id }, id === 'big' ? 'b' : 's');
       return true;
     }
     this.loadMorning(id);
@@ -439,49 +473,82 @@ export class App {
     return true;
   }
 
-  private askNewRun(id: 'small' | 'big', key: string): void {
-    this.newRunAsk = id;
+  /** Puts a step that cannot be taken back in the hold box: the key has to be held down until the bar is full. */
+  private askHold(ask: HoldAsk, key = ' '): void {
+    this.ask = ask;
     this.holdKey = key.toLowerCase();
+    this.holdMs = ask.action === 'newRun' ? HOLD_MS : COMMIT_HOLD_MS;
     this.holdSince = this.effects.now();
   }
 
-  /** The name of the key to hold, as the button shows it. */
+  /** The name of the key to hold, as the box shows it. */
   get holdKeyName(): string {
-    return this.holdKey.toUpperCase();
+    return this.holdKey === ' ' ? 'SPACE' : this.holdKey.toUpperCase();
   }
 
-  private cancelNewRun(): void {
-    this.newRunAsk = null;
+  /** The fixed morning a new run was asked for, or null while something else (or nothing) is asked. */
+  get newRunAsk(): 'small' | 'big' | null {
+    return this.ask?.action === 'newRun' ? this.ask.morning : null;
+  }
+
+  private cancelHold(): void {
+    this.ask = null;
     this.holdSince = null;
   }
 
-  /** True while the key for a new run is held down and the button is filling. */
+  /** True while the key for a step is held down and the bar is filling. */
   get holding(): boolean {
-    return this.newRunAsk != null && this.holdSince != null;
+    return this.ask != null && this.holdSince != null;
   }
 
-  /** How much of the hold-to-start button is filled, 0 to 1. */
+  /** How much of the hold bar is filled, 0 to 1. */
   get holdProgress(): number {
-    return this.holdSince == null ? 0 : Math.max(0, Math.min(1, (this.effects.now() - this.holdSince) / HOLD_MS));
+    return this.holdSince == null ? 0 : Math.max(0, Math.min(1, (this.effects.now() - this.holdSince) / this.holdMs));
   }
 
-  /** Called as often as the screen is drawn while `holding`: the button fills, and when it is full the new run starts. */
+  /** Called as often as the screen is drawn while `holding`: the bar fills, and when it is full the step is taken. */
   tick(): void {
-    const id = this.newRunAsk;
-    if (!id || this.holdSince == null) return;
+    const ask = this.ask;
+    if (!ask || this.holdSince == null) return;
     if (this.holdProgress >= 1) {
-      this.loadMorning(id);
+      const from = this.where();
+      this.cancelHold();
       this.spentKey = this.holdKey;
-      this.effects.cue('confirm');
+      this.status = '';
+      this.tone = 'info';
+      this.heard = null;
+      this.carryOut(ask);
+      this.noteArrival(from);
+      const heard = this.heardNow();
+      this.effects.cue(heard?.moment ?? 'confirm', heard?.arg);
     }
     this.changed();
   }
 
-  /** A key has come up: letting go of the key for a new run before the button is full empties it and nothing happens. */
+  private carryOut(ask: HoldAsk): void {
+    switch (ask.action) {
+      case 'newRun':
+        this.loadMorning(ask.morning);
+        break;
+      case 'send':
+        this.sendTrucks();
+        break;
+      case 'order':
+        if (this.supply) this.placeOrder(this.supply);
+        break;
+      case 'morning':
+        if (this.day && this.supply) this.nextMorning(this.day, this.supply);
+        break;
+      case 'again':
+        this.restartDay();
+        break;
+    }
+  }
+
+  /** A key has come up: letting go of the key for a step before the bar is full empties it and nothing happens. */
   release(key: string): void {
     if (key.toLowerCase() === this.spentKey) this.spentKey = null;
-    const id = this.newRunAsk;
-    if (!id || this.holdSince == null || key.toLowerCase() !== this.holdKey) return;
+    if (!this.ask || this.holdSince == null || key.toLowerCase() !== this.holdKey) return;
     this.holdSince = null;
     this.changed();
   }
@@ -549,11 +616,11 @@ export class App {
     this.growthSel = 0;
     this.growth = null;
     this.newClient = null;
-    this.cancelNewRun();
+    this.cancelHold();
   }
 
   // ------------------------------------------------------------ order desk
-  private deskKey(key: string, shift: boolean, wasConfirming: boolean): boolean {
+  private deskKey(key: string, shift: boolean): boolean {
     if (!/^\d$/.test(key) && key !== 'Backspace') this.typed = '';
 
     switch (key) {
@@ -561,8 +628,8 @@ export class App {
         this.nextPane(shift ? -1 : 1);
         this.sound('tab');
         return true;
-      case 'F10':
-        this.endMorning(wasConfirming);
+      case ' ':
+        this.openSheets();
         return true;
       case 'ArrowUp':
         this.moveWithin(-1);
@@ -725,7 +792,7 @@ export class App {
     this.typed = '';
     if (next === -1) {
       this.pane = 'lines';
-      this.say('Every order is handed out. F10 for the truck sheets.');
+      this.say('Every order is handed out. SPACE for the truck sheets.');
       return;
     }
     this.orderSel = next;
@@ -733,13 +800,8 @@ export class App {
     this.pane = 'lines';
   }
 
-  private endMorning(confirmed: boolean): void {
-    const left = this.desk.unfinishedCount();
-    if (left > 0 && !confirmed) {
-      this.confirmEnd = true;
-      this.say(`${plural(left, 'order')} not handed out. On a truck: go with the lines decided so far. No truck: not delivered. F10 again.`, 'warn');
-      return;
-    }
+  /** The truck sheets. Nothing is committed here, so orders still to hand out are only a warning: ESC goes back to them. */
+  private openSheets(): void {
     this.screen = 'sheets';
     this.sound('confirm');
     this.sheetSel = 0;
@@ -747,6 +809,8 @@ export class App {
     this.printed = false;
     this.printing = null;
     this.typed = '';
+    const left = this.desk.unfinishedCount();
+    if (left > 0) this.say(`${plural(left, 'order')} not handed out. ${NOT_HANDED_OUT}`, 'warn');
   }
 
   // ------------------------------------------------------------ truck sheets
@@ -787,11 +851,24 @@ export class App {
         this.screen = 'desk';
         this.sound('sheetClose');
         return true;
-      case 'F9':
-        this.sendTrucks();
+      case ' ':
+        this.askSend();
         return true;
     }
     return false;
+  }
+
+  /** Sending the trucks cannot be taken back, so SPACE has to be held down; nothing is asked while the sheets cannot go. */
+  private askSend(): void {
+    if (this.printing) {
+      this.say('Wait for the printer to finish first.', 'warn');
+      return;
+    }
+    if (this.morning.trucks.every((t) => this.desk.stopsOf(t.id).length === 0)) {
+      this.say('Nothing is loaded yet. ESC goes back to the desk.', 'warn');
+      return;
+    }
+    this.askHold({ action: 'send' });
   }
 
   /** Prints one line for the heading, one per truck and one for the staff. */
@@ -820,14 +897,6 @@ export class App {
   }
 
   private sendTrucks(): void {
-    if (this.printing) {
-      this.say('Wait for the printer to finish first.', 'warn');
-      return;
-    }
-    if (this.morning.trucks.every((t) => this.desk.stopsOf(t.id).length === 0)) {
-      this.say('Nothing is loaded yet. ESC goes back to the desk.', 'warn');
-      return;
-    }
     const departAt = Math.max(DEPART_MINUTE, this.desk.clock);
     this.result = buildResult(this.desk, departAt);
     this.resultSel = 0;
@@ -885,11 +954,11 @@ export class App {
     }, ROAD_TICK_MS);
   }
 
-  private roadKey(key: string, repeat: boolean): boolean {
+  /** SPACE skips ahead, and once every truck is home goes on to the result; ENTER only answers a call. */
+  private roadKey(key: string): boolean {
     const call = this.roadCall;
-    const go = key === ' ' || key === 'Enter';
-    // A held key neither answers nor skips, and a call that has just started ringing is not answered by a skip.
-    if (go && (repeat || (call && this.effects.now() - this.ringAt < RING_GUARD_MS))) return true;
+    // A call that has just started ringing is not answered by a key that was meant for what came before it.
+    if (call && (key === ' ' || key === 'Enter') && this.effects.now() - this.ringAt < RING_GUARD_MS) return true;
     if (call) {
       const last = call.options.length - 1;
       const before = this.callSel;
@@ -913,13 +982,17 @@ export class App {
       }
       return false;
     }
-    if (go) {
+    if (key === 'Enter') {
+      this.say(this.roadOver ? 'SPACE shows how it went.' : 'SPACE skips ahead.');
+      return true;
+    }
+    if (key === ' ') {
       if (!this.roadOver) {
         // Skipping runs on to the next call that is still to come, or to the end.
         this.roadClock = this.nextCall()?.at ?? this.road?.end ?? this.roadClock;
         this.noteRing();
         this.sound(this.roadCall ? 'ring' : 'confirm');
-      } else if (key === 'Enter') {
+      } else {
         this.screen = 'result';
         this.sound('confirm');
       }
@@ -950,7 +1023,7 @@ export class App {
         this.restartDay();
         this.sound('confirm');
         return true;
-      case 'Enter':
+      case ' ':
         this.openSupply();
         return true;
       case 'b':
@@ -988,8 +1061,8 @@ export class App {
         this.screen = 'result';
         this.sound('confirm');
         return true;
-      case 'F9':
-        this.placeOrder(supply);
+      case ' ':
+        this.askOrder(supply);
         return true;
     }
     switch (key) {
@@ -1011,7 +1084,7 @@ export class App {
         supply.confirm(r);
         this.sound('confirm');
         if (r < supply.count - 1) this.supplySel = r + 1;
-        else this.say('That was the last row. F9 places the order.');
+        else this.say('That was the last row. Hold SPACE to place the order.');
         return true;
       case 'Backspace':
         this.typeSupplyDigit(supply, null);
@@ -1047,11 +1120,16 @@ export class App {
     if (this.supplyTyped !== before[0] || used !== before[1]) this.sound('digit');
   }
 
-  private placeOrder(supply: Supply): void {
+  /** Placing the order cannot be taken back, so SPACE has to be held down; an empty order is not placed. */
+  private askOrder(supply: Supply): void {
     if (supply.total() === 0) {
       this.say('Nothing is on the order yet: type amounts, U fills a row, A fills them all.', 'warn');
       return;
     }
+    this.askHold({ action: 'order' });
+  }
+
+  private placeOrder(supply: Supply): void {
     supply.placed = true;
     this.supplyTyped = '';
     if (this.result) this.day = buildDay(this.result, this.calls, this.answers, supply, this.run.history, this.run.cash);
@@ -1081,13 +1159,12 @@ export class App {
     return (this.day?.money.cash ?? this.run.cash) - this.growthPaid;
   }
 
-  /** R plays this day again, B and S start a new run from a fixed morning (from day 2 on, once the key has been held): all of them start over and drop the growth choice. */
+  /** R plays this day again once it has been held, B and S start a new run from a fixed morning (from day 2 on, once the key has been held): all of them start over and drop the order and the growth choice. */
   private restartKey(key: string): boolean {
     switch (key) {
       case 'r':
       case 'R':
-        this.restartDay();
-        this.sound('confirm');
+        this.askHold({ action: 'again' }, 'r');
         return true;
       case 'b':
       case 'B':
@@ -1117,7 +1194,7 @@ export class App {
       case 'PageDown':
         this.daySel = Math.min(last, this.daySel + 10);
         break;
-      case 'Enter':
+      case ' ':
         this.growthOpen = true;
         this.sound('confirm');
         return true;
@@ -1128,7 +1205,7 @@ export class App {
     return true;
   }
 
-  /** The growth choice: pick with ↑↓ or 1-3, ENTER confirms, and U or BACKSPACE takes a confirmed choice back so another can be picked. It is final once the next morning starts. */
+  /** The growth choice: pick with ↑↓ or 1-3, ENTER confirms, and U or BACKSPACE takes a confirmed choice back so another can be picked. SPACE, held down, starts the next morning, and the choice is final from then on. */
   private growthKey(key: string): boolean {
     const options = this.growthOptions;
     const before = this.growthSel;
@@ -1137,19 +1214,21 @@ export class App {
       this.sound('confirm');
       return true;
     }
+    if (key === ' ') {
+      if (this.growth) this.askHold({ action: 'morning' });
+      else this.say('Choose one of the three first: ↑↓ then ENTER.', 'warn');
+      return true;
+    }
     if (key === 'Enter') {
       const picked = options[this.growthSel];
       if (this.growth) {
-        if (this.day && this.supply) {
-          this.nextMorning(this.day, this.supply);
-          this.sound('confirm');
-        }
+        this.say('Hold SPACE to start the next morning, or U to change the choice.');
       } else if (picked && !picked.affordable) {
         this.say('Not enough money yet.', 'warn');
       } else if (picked) {
         this.growth = picked.growth;
         const paid = picked.price > 0 ? ` ${formatMoney(picked.price)} paid.` : '';
-        this.say(`Chosen: ${picked.title}.${paid} It takes effect tomorrow. ENTER starts the next morning.`);
+        this.say(`Chosen: ${picked.title}.${paid} It takes effect tomorrow. Hold SPACE to start the next morning.`);
         this.sound('finish');
       }
       return true;

@@ -5,7 +5,7 @@ import { formatMoney } from '../src/game/money';
 import { PLACES } from '../src/game/places';
 import { plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
-import { screen, summary, toDay } from './helpers';
+import { hold, screen, summary, toDay } from './helpers';
 
 const clientsOf = (m: { orders: Array<{ client: string }> }) => m.orders.map((o) => o.client);
 const CLIENT: NewClient = { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' };
@@ -130,11 +130,13 @@ describe('the new client', () => {
 });
 
 describe('choosing what to grow', () => {
-  it('starts with nothing chosen, and ENTER on the day opens the choice', () => {
+  it('starts with nothing chosen, and SPACE on the day opens the choice', () => {
     const { app, press } = toDay();
     expect(app.growth).toBeNull();
     expect(app.growthOpen).toBe(false);
     press('Enter');
+    expect(app.growthOpen).toBe(false);
+    press(' ');
     expect(app.growthOpen).toBe(true);
     expect(app.screen).toBe('day');
     expect(app.growthSel).toBe(0);
@@ -143,7 +145,7 @@ describe('choosing what to grow', () => {
 
   it('moves with ↑↓ and 1-3 and stays within the three', () => {
     const { app, press } = toDay();
-    press('Enter', 'ArrowDown', 'ArrowDown', 'ArrowDown');
+    press(' ', 'ArrowDown', 'ArrowDown', 'ArrowDown');
     expect(app.growthSel).toBe(2);
     press('ArrowUp');
     expect(app.growthSel).toBe(1);
@@ -160,7 +162,7 @@ describe('choosing what to grow', () => {
 
   it('records the choice as plain state when ENTER confirms, and the arrows and numbers leave it alone', () => {
     const { app, press } = toDay(0, 'small', ['9', '9', '9'], [], undefined, undefined, 99999);
-    press('Enter', '2', 'Enter');
+    press(' ', '2', 'Enter');
     expect(app.growth).toEqual({ kind: 'room', room: tightestRoom(app.day!.rooms).kept });
     expect(app.status).toContain('Chosen: A bigger');
     expect(app.status).toContain('tomorrow');
@@ -173,10 +175,10 @@ describe('choosing what to grow', () => {
 
   it('records a truck and a new client as well', () => {
     const truck = toDay();
-    truck.press('Enter', '1', 'Enter');
+    truck.press(' ', '1', 'Enter');
     expect(truck.app.growth).toEqual({ kind: 'truck' });
     const client = toDay();
-    client.press('Enter', 'ArrowDown', 'ArrowDown', 'Enter');
+    client.press(' ', 'ArrowDown', 'ArrowDown', 'Enter');
     const option = client.app.growthOptions[2]!;
     expect(client.app.growth).toEqual(option.growth);
     expect(client.app.growth?.kind).toBe('client');
@@ -185,17 +187,17 @@ describe('choosing what to grow', () => {
   it('does not touch today: the result, the order and the day are as they were', () => {
     const { app, press } = toDay();
     const before = JSON.stringify([app.result, app.day, app.supply?.ordered(), app.desk.clock]);
-    press('Enter', '3', 'Enter');
+    press(' ', '3', 'Enter');
     expect(JSON.stringify([app.result, app.day, app.supply?.ordered(), app.desk.clock])).toBe(before);
     expect(app.morning.orders.map((o) => o.client)).not.toContain((app.growth as { client: { name: string } }).client.name);
   });
 
   it('goes back to the day with ESC and opens again on the choice that was made', () => {
     const { app, press } = toDay();
-    press('Enter', '2', 'Escape');
+    press(' ', '2', 'Escape');
     expect(app.growthOpen).toBe(false);
     expect(app.growth).toBeNull();
-    press('Enter', 'Enter', 'Escape', 'Enter');
+    press(' ', 'Enter', 'Escape', ' ');
     expect(app.growth).not.toBeNull();
     expect(app.growthSel).toBe(1);
   });
@@ -204,7 +206,7 @@ describe('choosing what to grow', () => {
     const cues: string[] = [];
     const { app, press } = toDay(0, 'small', ['a'], cues);
     cues.length = 0;
-    press('Enter', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'Enter');
+    press(' ', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'Enter');
     expect(cues).toEqual(['confirm', 'move', 'move', 'finish']);
     cues.length = 0;
     press('ArrowDown', 'x');
@@ -213,16 +215,17 @@ describe('choosing what to grow', () => {
     expect(cues).toEqual(['confirm']);
     expect(app.growthOpen).toBe(false);
     cues.length = 0;
-    press('Enter', 'Enter');
+    press(' ');
+    hold(app, ' ');
     expect(cues).toEqual(['confirm', 'confirm']);
     expect(app.screen).toBe('messages');
   });
 
   it.each(['r', 'R'])('%s plays the morning again and forgets the choice', (key) => {
     const { app, press } = toDay();
-    press('Enter', '2', 'Enter');
+    press(' ', '2', 'Enter');
     expect(app.growth).not.toBeNull();
-    press(key);
+    hold(app, key);
     expect(app.screen).toBe('messages');
     expect(app.morning.id).toBe('small');
     expect([app.growth, app.growthOpen, app.growthSel]).toEqual([null, false, 0]);
@@ -230,9 +233,9 @@ describe('choosing what to grow', () => {
 
   it.each([['b', 'big'], ['s', 'small']] as const)('%s loads the %s morning and forgets the choice', (key, id) => {
     const { app, press } = toDay(0, id === 'big' ? 'small' : 'big');
-    press('Enter', '3', 'Enter');
+    press(' ', '3', 'Enter');
     expect(app.growth?.kind).toBe('client');
-    press(key);
+    hold(app, key);
     expect(app.screen).toBe('messages');
     expect(app.morning.id).toBe(id);
     expect([app.growth, app.growthOpen, app.growthSel]).toEqual([null, false, 0]);
@@ -240,7 +243,7 @@ describe('choosing what to grow', () => {
 
   it('forgets a choice when the same morning is played to the end of the day again', () => {
     const first = toDay();
-    first.press('Enter', '1', 'Enter');
+    first.press(' ', '1', 'Enter');
     expect(first.app.growth).toEqual({ kind: 'truck' });
     const again = toDay();
     expect(again.app.growth).toBeNull();
@@ -251,7 +254,7 @@ describe('choosing what to grow', () => {
 describe('changing the choice before the next morning', () => {
   it.each(['u', 'U', 'Backspace'])('%s takes a confirmed choice back to the three options with nothing chosen', (key) => {
     const { app, press } = toDay();
-    press('Enter', '2', 'Enter');
+    press(' ', '2', 'Enter');
     expect(app.growth).not.toBeNull();
     press(key);
     expect(app.growth).toBeNull();
@@ -262,7 +265,7 @@ describe('changing the choice before the next morning', () => {
 
   it('lets a different option, or the same one, be confirmed after taking it back', () => {
     const { app, press } = toDay();
-    press('Enter', '1', 'Enter', 'u', '3', 'Enter');
+    press(' ', '1', 'Enter', 'u', '3', 'Enter');
     expect(app.growth?.kind).toBe('client');
     press('Backspace', 'Enter');
     expect(app.growth?.kind).toBe('client');
@@ -273,7 +276,7 @@ describe('changing the choice before the next morning', () => {
   it('does nothing when nothing is chosen yet, and the key bar offers it only once chosen', () => {
     const cues: string[] = [];
     const { app, press } = toDay(0, 'small', ['a'], cues);
-    press('Enter');
+    press(' ');
     cues.length = 0;
     press('u', 'Backspace');
     expect(cues).toEqual([]);
@@ -287,7 +290,8 @@ describe('changing the choice before the next morning', () => {
   it('puts the last choice to work when the next morning starts', () => {
     const { app, press } = toDay();
     const trucks = app.morning.trucks.length;
-    press('Enter', '2', 'Enter', 'u', '1', 'Enter', 'Enter');
+    press(' ', '2', 'Enter', 'u', '1', 'Enter');
+    hold(app, ' ');
     expect(app.screen).toBe('messages');
     expect(app.run.day).toBe(2);
     expect(app.morning.trucks.length).toBe(trucks + 1);
@@ -296,7 +300,7 @@ describe('changing the choice before the next morning', () => {
   it('keeps the same new client across taking back and choosing again', () => {
     const { app, press } = toDay(0, 'small', ['a'], [], sequence(0.3, 0.9));
     const before = (app.growthOptions[2]!.growth as { client: NewClient }).client;
-    press('Enter', '3', 'Enter', 'u', '1', 'Enter', 'u', '3', 'Enter');
+    press(' ', '3', 'Enter', 'u', '1', 'Enter', 'u', '3', 'Enter');
     expect(app.growth).toEqual({ kind: 'client', client: before });
     expect(app.growthOptions[2]!.growth).toEqual({ kind: 'client', client: before });
   });
@@ -317,7 +321,7 @@ describe('the new client in the game', () => {
     const random = sequence(0.3, 0.9);
     const { app, press } = toDay(0, 'small', ['a'], [], random);
     const before = offered(app).client;
-    press('Enter', 'Escape', 'Enter', 'ArrowDown', 'ArrowUp', 'ArrowDown', 'ArrowDown');
+    press(' ', 'Escape', ' ', 'ArrowDown', 'ArrowUp', 'ArrowDown', 'ArrowDown');
     expect(offered(app).client).toEqual(before);
     expect(screen(app).join('\n')).toContain(`A new client: ${before.name}`);
     press('Enter');
@@ -325,9 +329,9 @@ describe('the new client in the game', () => {
   });
 
   it('is forgotten by R, and the next game picks its own', () => {
-    const { app, press } = toDay(0, 'small', ['a'], [], () => 0);
+    const { app } = toDay(0, 'small', ['a'], [], () => 0);
     expect(offered(app).client).toEqual(NEW_CLIENTS[0]);
-    press('r');
+    hold(app, 'r');
     expect(app.growthOptions).toEqual([]);
     const again = toDay(0, 'small', ['a'], [], sequence(0.999)).app;
     expect(offered(again).client).toEqual(NEW_CLIENTS.at(-1));
@@ -343,7 +347,7 @@ describe('the new client in the game', () => {
 describe('the growth screen', () => {
   it('shows the three options and what today showed, 120 columns by 30 rows', () => {
     const { app, press } = toDay(0, 'small', ['9', '9', '9'], [], undefined, undefined, 99999);
-    press('Enter');
+    press(' ');
     const text = screen(app).join('\n');
     expect(text).toContain('END OF THE DAY');
     expect(text).toContain('18:00');
@@ -364,7 +368,7 @@ describe('the growth screen', () => {
 
   it('highlights the picked option and moves the highlight with the keys', () => {
     const { app, press } = toDay();
-    press('Enter');
+    press(' ');
     const highlighted = () =>
       screenLines(app)
         .filter((l) => l.some(([, c]) => c === 'hl'))
@@ -379,7 +383,7 @@ describe('the growth screen', () => {
 
   it('says what was chosen and that it takes effect tomorrow, and lists only the keys that work', () => {
     const { app, press } = toDay();
-    press('Enter');
+    press(' ');
     const pending = screen(app);
     for (const word of ['pick one', 'choose it', 'back', 'play again', 'big morning', 'colours', 'sound']) expect(pending[ROWS - 1]).toContain(word);
     press('3', 'Enter');
@@ -390,7 +394,7 @@ describe('the growth screen', () => {
     expect(text).toContain(app.growthOptions[2]!.title);
     expect(text).toContain('chosen');
     expect(text).toContain('It takes effect tomorrow');
-    expect(lines[ROWS - 1]).toContain('next morning');
+    expect(lines[ROWS - 1]).toContain('hold: next morning');
     expect(lines[ROWS - 1]).toContain('back');
     expect(lines[ROWS - 1]).not.toContain('choose it');
     expect(lines[ROWS - 1]).not.toContain('1-3');
@@ -398,7 +402,7 @@ describe('the growth screen', () => {
 
   it('fits 120 columns in both colour schemes, before and after choosing', () => {
     const { app, press } = toDay(0, 'big');
-    press('Enter');
+    press(' ');
     screen(app);
     press('F2');
     expect(app.blue).toBe(true);
@@ -414,7 +418,7 @@ describe('the growth screen', () => {
 
   it('is the day screen again after ESC, with the same client highlighted', () => {
     const { app, press } = toDay();
-    press('ArrowDown', 'Enter', 'Escape');
+    press('ArrowDown', ' ', 'Escape');
     expect(app.daySel).toBe(1);
     expect(screen(app).join('\n')).toContain('HOW THE DAY WENT');
     expect(screen(app).join('\n')).toContain(app.day!.orders[1]!.client.toUpperCase());

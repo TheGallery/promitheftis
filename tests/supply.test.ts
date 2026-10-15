@@ -7,6 +7,7 @@ import { App, type Effects } from '../src/ui/app';
 import { memoryStore } from '../src/ui/store';
 import { COLS, plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
+import { hold } from './helpers';
 
 const SMALL_TRUCKS: Record<string, number> = {
   'Café Lumen': 1, "Rosa's": 2, 'The Anchor': 2, 'Golden Dragon': 1, 'Hotel Bellevue': 1, 'Burger Shack': 1, 'The Plough': 2,
@@ -154,12 +155,13 @@ function toResult(answer = 0, morning: 'small' | 'big' = 'small') {
       for (let i = 0; i < 9 && !app.desk.isFinished(o); i++) press(...Array(9).fill('ArrowUp'), ...Array((n + i) % 9).fill('ArrowDown'), 'Enter');
     }
   }
-  press('F10', 'F9');
+  press(' ');
+  hold(app, ' ');
   for (let n = 0; n < 30 && !app.roadOver; n++) {
     if (app.roadCall) press(...Array(answer).fill('ArrowDown'), 'Enter');
     else press(' ');
   }
-  press('Enter');
+  press(' ');
   return { app, press };
 }
 
@@ -173,11 +175,11 @@ function screen(app: App): string[] {
 const rowOf = (lines: string[], word: string) => lines.find((l) => l.includes(word)) ?? '';
 
 describe('the supplier ordering screen', () => {
-  it('is reached with ENTER from the result and shows each item with its room, stock and usual amount', () => {
+  it('is reached with SPACE from the result and shows each item with its room, stock and usual amount', () => {
     const { app, press } = toResult();
     expect(app.screen).toBe('result');
-    expect(screen(app).join('\n')).toContain('ENTER supplier order');
-    press('Enter');
+    expect(screen(app).join('\n')).toContain('SPACE supplier order');
+    press(' ');
     expect(app.screen).toBe('supply');
     const lines = screen(app);
     const text = lines.join('\n');
@@ -196,7 +198,7 @@ describe('the supplier ordering screen', () => {
 
   it('types an amount, nudges it with the arrows, and ENTER confirms the row and moves on', () => {
     const { app, press } = toResult();
-    press('Enter');
+    press(' ');
     press('1', '2');
     expect(app.supply!.amount(0)).toBe(12);
     expect(rowOf(screen(app), app.supply!.rows[0]!.item.name)).toContain('[ 12_]');
@@ -218,19 +220,19 @@ describe('the supplier ordering screen', () => {
 
   it('fills the highlighted row with U and every row with A', () => {
     const { app, press } = toResult();
-    press('Enter', 'ArrowDown', 'u');
+    press(' ', 'ArrowDown', 'u');
     const s = app.supply!;
     expect(s.amount(0)).toBe(0);
     expect(s.amount(1)).toBe(s.gap(1));
     press('a');
     s.rows.forEach((row, r) => expect(s.amount(r)).toBe(Math.max(0, row.usual - row.onHand)));
-    expect(screen(app).join('\n')).toContain('U fill row');
-    expect(screen(app).join('\n')).toContain('A fill all');
+    expect(screen(app).join('\n')).toContain('U row');
+    expect(screen(app).join('\n')).toContain('A all');
   });
 
   it('shows a call note below the room bars only while its item is the highlighted row', () => {
     const { app, press } = toResult(0);
-    press('Enter');
+    press(' ');
     const noted = app.calls.filter((c) => c.item && c.options[0]?.addsToOrder);
     expect(noted.length).toBeGreaterThan(0);
     const supply = app.supply!;
@@ -256,7 +258,7 @@ describe('the supplier ordering screen', () => {
 
   it('marks every row with a note in amber, whether or not it is highlighted, and no other row', () => {
     const { app, press } = toResult(0);
-    press('Enter', 'a');
+    press(' ', 'a');
     const supply = app.supply!;
     const noted = new Set(supply.rows.flatMap((row) => (supply.notes.get(row.item.id)?.length ? [row.item.id] : [])));
     expect(noted.size).toBeGreaterThan(0);
@@ -276,7 +278,7 @@ describe('the supplier ordering screen', () => {
 
   it('does not dim a confirmed row while it is highlighted', () => {
     const { app, press } = toResult(0);
-    press('Enter', 'Enter', 'ArrowUp');
+    press(' ', 'Enter', 'ArrowUp');
     const supply = app.supply!;
     expect(supply.isConfirmed(0)).toBe(true);
     expect(app.supplySel).toBe(0);
@@ -290,7 +292,7 @@ describe('the supplier ordering screen', () => {
     const { app, press } = toResult(0);
     const text = screen(app).join('\n');
     for (const call of app.calls.filter((c) => c.qty != null)) expect(text).toContain(`added ${call.qty} to tomorrow`);
-    press('Enter');
+    press(' ');
     const supplier = screen(app).join('\n');
     expect(supplier).not.toContain('PROMISED');
     expect(supplier).not.toContain('promised');
@@ -299,27 +301,29 @@ describe('the supplier ordering screen', () => {
 
   it('keeps the amounts typed when going back to the result screen and in again', () => {
     const { app, press } = toResult(0);
-    press('Enter', '5', 'ArrowDown', '7', 'Escape');
+    press(' ', '5', 'ArrowDown', '7', 'Escape');
     expect(app.screen).toBe('result');
-    press('Enter');
+    press(' ');
     expect(app.supply!.amount(0)).toBe(5);
     expect(app.supply!.amount(1)).toBe(7);
   });
 
   it('shows no notes when every call was answered "not today"', () => {
     const { app, press } = toResult(1);
-    press('Enter');
+    press(' ');
     expect(screen(app).join('\n')).not.toContain('rang:');
     expect(callNotes(app.calls, app.answers).size).toBe(0);
   });
 
-  it('warns about an empty order, then F9 places it and opens the end of the day', () => {
+  it('warns about an empty order, then holding SPACE places it and opens the end of the day', () => {
     const { app, press } = toResult();
-    press('Enter', 'F9');
+    press(' ');
+    hold(app, ' ');
     expect(app.supply!.placed).toBe(false);
     expect(app.screen).toBe('supply');
     expect(screen(app).join('\n')).toContain('Nothing is on the order yet');
-    press('3', 'ArrowDown', '4', 'F9');
+    press('3', 'ArrowDown', '4');
+    hold(app, ' ');
     expect(app.supply!.placed).toBe(true);
     expect(app.screen).toBe('day');
     const text = screen(app).join('\n');
@@ -329,11 +333,12 @@ describe('the supplier ordering screen', () => {
 
   it('goes back to the result with ESC and keeps the order', () => {
     const { app, press } = toResult();
-    press('Enter', '6', 'Escape');
+    press(' ', '6', 'Escape');
     expect(app.screen).toBe('result');
-    press('Enter');
+    press(' ');
     expect(app.supply!.amount(0)).toBe(6);
-    press('F9', 'r');
+    hold(app, ' ');
+    hold(app, 'r');
     expect(app.screen).toBe('messages');
     expect(app.supply).toBeNull();
     expect(app.day).toBeNull();
@@ -341,7 +346,7 @@ describe('the supplier ordering screen', () => {
 
   it('fits 120 columns in both colour schemes and in the big morning', () => {
     const { app, press } = toResult(0, 'big');
-    press('Enter', 'a');
+    press(' ', 'a');
     screen(app);
     for (let i = 0; i < 14; i++) {
       press('ArrowDown');
@@ -349,7 +354,7 @@ describe('the supplier ordering screen', () => {
     }
     press('F2');
     screen(app);
-    press('F9');
+    hold(app, ' ');
     screen(app);
     expect(app.blue).toBe(true);
   });
@@ -360,7 +365,7 @@ describe('the supplier ordering screen', () => {
 
     it('sit in a panel on the right under the legend, one per room with its per cent', () => {
       const { app, press } = toResult();
-      press('Enter');
+      press(' ');
       const lines = screen(app);
       const text = lines.join('\n');
       for (const word of ['█ in store', '▓ ordered', '░ free']) expect(text).toContain(word);
@@ -382,7 +387,7 @@ describe('the supplier ordering screen', () => {
 
     it('update as an amount is typed, nudged or filled', () => {
       const { app, press } = toResult();
-      press('Enter');
+      press(' ');
       const freezer = () => heading(screen(app), 'FREEZER');
       const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
       const before = shades(freezer());
@@ -405,9 +410,9 @@ describe('the supplier ordering screen', () => {
       expect(freezer()).toContain(`${app.supply!.roomSpace('freezer').pct}%`);
     });
 
-    it('cap at full and warn in amber when the order is more than a room holds, and F9 still places it', () => {
+    it('cap at full and warn in amber when the order is more than a room holds, and holding SPACE still places it', () => {
       const { app, press } = toResult(0, 'big');
-      press('Enter');
+      press(' ');
       const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
       press(...Array(chips).fill('ArrowDown'), '9', '9', '9');
       const space = app.supply!.roomSpace('freezer');
@@ -422,14 +427,14 @@ describe('the supplier ordering screen', () => {
       expect(amber!.filter(([t]) => t.includes('over by') || /^ +\d+%$/.test(t)).every(([, cls]) => cls === 'w')).toBe(true);
       // The other rooms are not over, so say nothing about them.
       expect(lines.join('\n').match(/over by/g)).toHaveLength(1);
-      press('F9');
+      hold(app, ' ');
       expect(app.supply!.placed).toBe(true);
       expect(app.screen).toBe('day');
     });
 
     it('draw the three shades with their own colour in both colour schemes', () => {
       const { app, press } = toResult(0, 'big');
-      press('Enter', 'a');
+      press(' ', 'a');
       for (const theme of [false, true]) {
         expect(app.blue).toBe(theme);
         const classes = new Map<string, string>();
@@ -448,7 +453,8 @@ describe('the supplier ordering screen', () => {
     const app = new App(fx, () => {}, 'small');
     app.screen = 'supply';
     app.supply = new Supply(app.morning, app.morning.stock);
-    for (const key of ['1', 'ArrowRight', 'ArrowDown', 'u', 'a', 'Enter', 'F9']) app.press({ key });
+    for (const key of ['1', 'ArrowRight', 'ArrowDown', 'u', 'a', 'Enter']) app.press({ key });
+    hold(app, ' ');
     expect(new Set(cues)).toEqual(new Set(['digit', 'nudge', 'move', 'confirm', 'finish']));
   });
 });

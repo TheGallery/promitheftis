@@ -4,7 +4,7 @@ import { plainName } from '../src/game/headsup';
 import { formatChange, formatMoney } from '../src/game/money';
 import { ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
-import { summary, toDay, screen } from './helpers';
+import { hold, summary, toDay, screen } from './helpers';
 
 describe('how the day went', () => {
   it('has each order with how much of it was delivered, when, and the client mood', () => {
@@ -208,12 +208,13 @@ describe('the end-of-day screen', () => {
     press('Escape');
     expect(app.screen).toBe('day');
     expect(app.press({ key: 'F9' })).toBe(false);
+    expect(app.press({ key: 'Enter' })).toBe(false);
     expect(app.press({ key: 'x' })).toBe(false);
   });
 
   it('plays the morning again with R and loads either morning with B and S', () => {
     const a = toDay();
-    a.press('r');
+    hold(a.app, 'r');
     expect(a.app.screen).toBe('messages');
     expect(a.app.morning.id).toBe('small');
     expect(a.app.supply).toBeNull();
@@ -225,7 +226,7 @@ describe('the end-of-day screen', () => {
     b.press('s');
     expect(b.app.morning.id).toBe('small');
     const c = toDay(0, 'big');
-    c.press('R');
+    hold(c.app, 'R');
     expect(c.app.morning.id).toBe('big');
     expect(c.app.screen).toBe('messages');
     expect(c.app.desk.unfinishedCount()).toBe(38);
@@ -234,7 +235,7 @@ describe('the end-of-day screen', () => {
   it('lists the keys that work, and only those', () => {
     const { app } = toDay();
     const bar = screen(app)[ROWS - 1]!;
-    for (const word of ['look through the clients', 'what to grow', 'play again', 'big morning', 'colours', 'sound']) expect(bar).toContain(word);
+    for (const word of ['clients', 'what to grow', 'play again', 'big morning', 'colours', 'sound']) expect(bar).toContain(word);
     expect(bar).not.toContain('ESC');
   });
 
@@ -243,7 +244,8 @@ describe('the end-of-day screen', () => {
     const { app, press } = toDay(0, 'small', ['a'], cues);
     expect(cues.at(-1)).toBe('finish');
     cues.length = 0;
-    press('ArrowDown', 'ArrowUp', 'ArrowUp', 'r');
+    press('ArrowDown', 'ArrowUp', 'ArrowUp');
+    hold(app, 'r');
     expect(cues).toEqual(['move', 'move', 'confirm']);
     expect(app.screen).toBe('messages');
   });

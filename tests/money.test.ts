@@ -19,7 +19,7 @@ import { decodeRun, decodeSettings, encodeRun, encodeSettings, SAVE_VERSION } fr
 import { App, RUN_KEY, SETTINGS_KEY } from '../src/ui/app';
 import { memoryStore } from '../src/ui/store';
 import { screenLines } from '../src/ui/view';
-import { fakeEffects, playToSupply, screen, summary, toDay, toNextMorning } from './helpers';
+import { fakeEffects, hold, playToSupply, screen, summary, toDay, toNextMorning } from './helpers';
 
 const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, earned: 0, ...over });
 
@@ -205,7 +205,7 @@ describe('what growing costs', () => {
     const price = app.growthOptions[0]!.price;
     expect(price).toBeGreaterThan(0);
     expect(app.cash).toBe(before);
-    press('Enter', '1', 'Enter');
+    press(' ', '1', 'Enter');
     expect(app.cash).toBe(before - price);
     expect(app.status).toContain(formatMoney(price));
     press('u');
@@ -223,7 +223,7 @@ describe('what growing costs', () => {
 
   it('shows the price on each option, the cash in the header, and the money paid once chosen', () => {
     const { app, press } = toDay();
-    press('Enter');
+    press(' ');
     const text = screen(app).join('\n');
     expect(text).toContain(`CASH ${formatMoney(app.cash)}`);
     for (const o of app.growthOptions) expect(text).toContain(o.price > 0 ? formatMoney(o.price) : 'free');
@@ -240,7 +240,8 @@ describe('what growing costs', () => {
     const { app, press } = toDay();
     const before = app.day!.money.cash;
     const price = app.growthOptions[1]!.price;
-    press('Enter', '2', 'Enter', 'Enter');
+    press(' ', '2', 'Enter');
+    hold(app, ' ');
     expect(app.run.day).toBe(2);
     expect(app.run.cash).toBe(before - price);
     expect(app.cash).toBe(before - price);
@@ -249,7 +250,8 @@ describe('what growing costs', () => {
   it('costs nothing for a new client, who is always on offer', () => {
     const { app, press } = toDay();
     const before = app.day!.money.cash;
-    press('Enter', '3', 'Enter', 'Enter');
+    press(' ', '3', 'Enter');
+    hold(app, ' ');
     expect(app.run.cash).toBe(before);
     expect(app.run.clients).toHaveLength(8);
   });
@@ -261,7 +263,7 @@ describe('growth that cannot be afforded', () => {
     const [truck, room, client] = app.growthOptions;
     expect(app.day!.money.cash).toBeLessThan(truck!.price);
     expect([truck!.affordable, room!.affordable, client!.affordable]).toEqual([false, false, true]);
-    press('Enter');
+    press(' ');
     const text = screen(app).join('\n');
     expect(text).toContain(truck!.title);
     expect(text).toContain(room!.title);
@@ -278,11 +280,11 @@ describe('growth that cannot be afforded', () => {
 
   it('leaves the pointer free to move over it, and the free client can still be picked', () => {
     const { app, press } = toDay(0, 'big');
-    press('Enter', '1');
+    press(' ', '1');
     expect(app.growthSel).toBe(0);
     press('3', 'Enter');
     expect(app.growth?.kind).toBe('client');
-    press('Enter');
+    hold(app, ' ');
     expect(app.run.day).toBe(2);
   });
 
@@ -292,11 +294,11 @@ describe('growth that cannot be afforded', () => {
     const total = app.day!.money.total;
     const exact = toDay(0, 'small', ['a'], [], undefined, undefined, price - total);
     expect(exact.app.day!.money.cash).toBe(price);
-    exact.press('Enter', '1', 'Enter');
+    exact.press(' ', '1', 'Enter');
     expect(exact.app.growth).toEqual({ kind: 'truck' });
     expect(exact.app.cash).toBe(0);
     const short = toDay(0, 'small', ['a'], [], undefined, undefined, price - total - 1);
-    short.press('Enter', '1', 'Enter');
+    short.press(' ', '1', 'Enter');
     expect(short.app.growth).toBeNull();
     expect(short.app.status).toBe('Not enough money yet.');
   });
@@ -315,7 +317,7 @@ describe('cash below zero', () => {
     expect(negative.startsWith('-£')).toBe(true);
     expect(amber(app).some((t) => t.includes(negative))).toBe(true);
     expect(amber(app).some((t) => t.includes(formatChange(app.day!.money.total)))).toBe(true);
-    press('Enter');
+    press(' ');
     expect(amber(app).some((t) => t.includes(negative))).toBe(true);
     expect(screen(app).join('\n')).toContain(`CASH ${negative}`);
   });
@@ -323,9 +325,10 @@ describe('cash below zero', () => {
   it('does not stop play: a free client can still be taken on, the next morning starts and the day plays on', () => {
     const { app, press } = broke();
     const cash = app.cash;
-    press('Enter');
+    press(' ');
     expect(app.growthOptions.map((o) => o.affordable)).toEqual([false, false, true]);
-    press('3', 'Enter', 'Enter');
+    press('3', 'Enter');
+    hold(app, ' ');
     expect(app.run.day).toBe(2);
     expect(app.run.cash).toBe(cash);
     press(' ');
@@ -366,7 +369,8 @@ describe('cash on the order desk', () => {
   it('is the cash the day began with when the day is played again', () => {
     const { app, press } = toDay();
     const began = app.run.cash;
-    press('r', ' ');
+    hold(app, 'r');
+    press(' ');
     expect(screen(app)[0]).toContain(`CASH ${formatMoney(began)}`);
   });
 });
@@ -478,15 +482,18 @@ describe('the balance', () => {
           else app.desk.finishOrder(o);
           app.orderSel = app.desk.nextUnfinished(o);
         }
-        press('F10', 'F10', 'F9');
+        press(' ');
+        hold(app, ' ');
         for (let n = 0; n < 60 && !app.roadOver; n++) press(...(app.roadCall ? ['Enter'] : [' ']));
-        press('Enter', 'Enter');
+        press(' ', ' ');
       } else {
         playToSupply(app, press);
       }
-      press('a', 'F9');
+      press('a');
+      hold(app, ' ');
       out.push({ money: app.day!.money, truck: growthPrice({ kind: 'truck' }, clients), room: growthPrice({ kind: 'room', room: 'dry' }, clients) });
-      press('Enter', '3', 'Enter', 'Enter');
+      press(' ', '3', 'Enter');
+      hold(app, ' ');
     }
     return out;
   }

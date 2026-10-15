@@ -25,8 +25,21 @@ function fakeEffects() {
   return { effects, log };
 }
 
+/** The clock of the app made last, so `hold` can let time pass. */
+let clock: { time: number } = { time: 0 };
+
+/** Holds a key down until the hold box is full, then lets go. */
+function hold(app: App, key: string) {
+  clock.time += 1000;
+  app.press({ key });
+  clock.time += 2000;
+  app.tick();
+  app.release(key);
+}
+
 function newApp(morning: 'small' | 'big' = 'small') {
   const fx = fakeEffects();
+  clock = fx.log;
   const app = new App(fx.effects, () => {}, morning);
   // The helpers press each key well after the one before, as a player reading the screen would.
   const press = (...keys: string[]) => {
@@ -57,7 +70,7 @@ function expectFullScreen(app: App) {
 /** Skips along the road, answering every call with the first answer, and leaves for the result screen. */
 function leaveRoad(press: (...k: string[]) => void, app: App) {
   for (let n = 0; n < 20 && !app.roadOver; n++) press(app.roadCall ? 'Enter' : ' ');
-  press('Enter');
+  press(' ');
 }
 
 /** The keys that move the highlight in the TRUCKS pane to the given truck and choose it. */
@@ -209,8 +222,8 @@ describe('sounds', () => {
   it('makes the warning sound instead of the ordinary one', () => {
     const { heard, press } = newApp();
     press(' ');
-    // Ending the morning with orders left asks to be pressed again: a warning, then the ordinary sound.
-    expect(heard('F10', 'F10')).toEqual([['warn'], ['confirm']]);
+    // Going to the truck sheets with orders left warns of them, in place of the ordinary sound.
+    expect(heard(' ')).toEqual([['warn']]);
   });
 
   it('makes the warning sound, and only that, when a truck is too full for an order', () => {
@@ -223,7 +236,7 @@ describe('sounds', () => {
 
   it('makes the sheet open and close sounds on the truck sheets, and keeps the printer to itself', () => {
     const { app, press, heard, log } = newApp();
-    press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
+    press(' ', 'Enter', 'Tab', 'Enter', ' ');
     expect(app.screen).toBe('sheets');
     expect(heard('ArrowUp')).toEqual([[]]);
     expect(heard('ArrowDown')).toEqual([['move']]);
@@ -237,7 +250,7 @@ describe('sounds', () => {
 
   it('makes the warning sound, not the printer, for P while the printer is still going', () => {
     const { app, press, heard, effects, log } = newApp();
-    press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
+    press(' ', 'Enter', 'Tab', 'Enter', ' ');
     effects.later = () => {};
     expect(heard('p')).toEqual([[]]);
     const printed = log.printed;
@@ -249,14 +262,16 @@ describe('sounds', () => {
   });
 
   it('makes the confirm sound when the trucks are sent and the move sound on the result', () => {
-    const { app, press, heard } = newApp();
-    press(' ', 'Enter', 'Tab', 'Enter', 'F10', 'F10');
-    expect(heard('F9')).toEqual([['confirm']]);
+    const { app, press, heard, log } = newApp();
+    press(' ', 'Enter', 'Tab', 'Enter', ' ');
+    const before = log.cues.length;
+    hold(app, ' ');
+    expect(log.cues.slice(before).map((c) => c.moment)).toEqual(['confirm']);
     expect(app.screen).toBe('road');
     // The first skip stops at a call and the phone rings; answering it is a confirm, then the rest of the road.
     expect(heard(' ', 'Enter', ' ')).toEqual([['ring'], ['confirm'], ['confirm']]);
     expect(app.roadOver).toBe(true);
-    expect(heard('Enter')).toEqual([['confirm']]);
+    expect(heard(' ')).toEqual([['confirm']]);
     expect(app.screen).toBe('result');
     expect(heard('ArrowUp', 'ArrowDown', 'q', 'r')).toEqual([[], ['move'], [], ['confirm']]);
   });
@@ -407,12 +422,24 @@ describe('order desk', () => {
     expect(app.desk.clock).toBe(start + 2);
   });
 
-  it('warns before leaving orders unhandled and goes on with a second F10', () => {
+  it('goes to the truck sheets with one SPACE, warning of the orders left, and ESC comes back', () => {
     const { app, press } = newApp();
-    press(' ', 'F10');
+    press(' ', ' ');
+    expect(app.screen).toBe('sheets');
+    expect(app.status).toContain('7 orders not handed out');
+    expect(app.tone).toBe('warn');
+    press('Escape');
     expect(app.screen).toBe('desk');
-    expect(app.status).toContain('not handed out');
-    press('F10');
+  });
+
+  it('asks again of the orders left when the trucks are about to go', () => {
+    const { app, press } = newApp();
+    press(' ');
+    handOutNext(press, app, 1);
+    press(' ', ' ');
+    const text = expectFullScreen(app).join('\n');
+    expect(text).toContain('HOLD SPACE TO SEND THE TRUCKS');
+    expect(text).toContain('6 orders not handed out.');
     expect(app.screen).toBe('sheets');
   });
 
@@ -444,10 +471,10 @@ describe('a whole small morning', () => {
   it('shows the game name in the header of every screen', () => {
     const { app, press } = play();
     const header = () => expectFullScreen(app)[0];
-    press('F10');
+    press(' ');
     expect(app.screen).toBe('sheets');
     expect(header()).toContain(' PROMITHEFTIS · ');
-    press('F9');
+    hold(app, ' ');
     expect(app.screen).toBe('road');
     expect(header()).toContain(' PROMITHEFTIS · ');
     leaveRoad(press, app);
@@ -469,7 +496,7 @@ describe('a whole small morning', () => {
 
   it('shows the truck sheets with an accordion and a route', () => {
     const { app, press } = play();
-    press('F10');
+    press(' ');
     expect(app.screen).toBe('sheets');
     let text = expectFullScreen(app).join('\n');
     expect(text).toContain('TRUCK SHEETS');
@@ -487,13 +514,13 @@ describe('a whole small morning', () => {
     expect(app.sheetOpen.size).toBe(2);
   });
 
-  it('prints with P and sends the trucks with F9', () => {
+  it('prints with P and sends the trucks by holding SPACE', () => {
     const { app, press, log } = play();
-    press('F10', 'p');
+    press(' ', 'p');
     expect(log.printed).toBe(4);
     expect(app.printed).toBe(true);
     expect(expectFullScreen(app).join('\n')).toContain('Truck sheets printed.');
-    press('F9');
+    hold(app, ' ');
     leaveRoad(press, app);
     expect(app.screen).toBe('result');
     const text = expectFullScreen(app).join('\n');
@@ -504,7 +531,8 @@ describe('a whole small morning', () => {
 
   it('runs the road clock a few minutes per tick, filling the log, until every truck is back', () => {
     const { app, press, log } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     expect(app.screen).toBe('road');
     const start = app.roadClock;
     expect(start).toBe(7 * 60);
@@ -523,7 +551,8 @@ describe('a whole small morning', () => {
 
   it('logs each delivery in the screen text, and each truck back', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     for (let n = 0; n < 20 && !app.roadOver; n++) press(app.roadCall ? 'Enter' : ' ');
     const text = expectFullScreen(app).join('\n');
     expect(text).toMatch(/\d\d:\d\d Truck 2 · The Plough, Fenwick · \d+ items/);
@@ -532,21 +561,29 @@ describe('a whole small morning', () => {
     expect(text).toContain('Every truck is back at the depot.');
   });
 
-  it('skips with SPACE or ENTER, then ENTER goes to the result and SPACE does not', () => {
+  it('skips ahead with SPACE only, and SPACE goes to the result once every truck is back', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
+    const start = app.roadClock;
+    // ENTER does not skip: it says what does.
+    press('Enter');
+    expect(app.roadClock).toBe(start);
+    expect(app.status).toBe('SPACE skips ahead.');
     for (let n = 0; n < 20 && !app.roadOver; n++) press(app.roadCall ? 'Enter' : ' ');
     expect(app.screen).toBe('road');
     expect(app.roadOver).toBe(true);
-    press(' ');
-    expect(app.screen).toBe('road');
     press('Enter');
+    expect(app.screen).toBe('road');
+    expect(app.status).toBe('SPACE shows how it went.');
+    press(' ');
     expect(app.screen).toBe('result');
   });
 
   it('rings at the call time, pauses the log and waits for an answer', () => {
     const { app, press, log } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     const first = app.calls[0]!;
     expect(app.roadCall).toBeNull();
     // Ticks run the clock to the call, not past it.
@@ -577,7 +614,9 @@ describe('a whole small morning', () => {
 
   it('picks an answer with the arrow keys and records that one', () => {
     const { app, press, heard } = play();
-    press('F10', 'F9', ' ');
+    press(' ');
+    hold(app, ' ');
+    press(' ');
     const call = app.roadCall!;
     expect(call.options.length).toBeGreaterThanOrEqual(2);
     expect(app.callSel).toBe(0);
@@ -597,7 +636,8 @@ describe('a whole small morning', () => {
 
   it('stops SPACE skipping at each call that has not been answered', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     const stops: number[] = [];
     for (let n = 0; n < 20 && !app.roadOver; n++) {
       if (app.roadCall) press('Enter');
@@ -614,7 +654,9 @@ describe('a whole small morning', () => {
 
   it('ignores ENTER and SPACE for a moment after a call starts ringing, then ENTER answers', () => {
     const { app, press, log } = play();
-    press('F10', 'F9', ' ');
+    press(' ');
+    hold(app, ' ');
+    press(' ');
     const call = app.roadCall!;
     expect(call).not.toBeNull();
     // A quick second press of the skip key does not answer the call that has just rung.
@@ -635,7 +677,8 @@ describe('a whole small morning', () => {
 
   it('starts the moment when a tick makes the phone ring, not when a key is pressed', () => {
     const { app, press, log } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     let guard = 0;
     while (!app.roadCall && guard++ < 200) log.ticks.shift()!();
     const call = app.roadCall!;
@@ -648,7 +691,8 @@ describe('a whole small morning', () => {
 
   it('neither answers nor skips with a held ENTER or SPACE', () => {
     const { app, press, log } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     const start = app.roadClock;
     app.press({ key: ' ', repeat: true });
     app.press({ key: 'Enter', repeat: true });
@@ -664,7 +708,9 @@ describe('a whole small morning', () => {
 
   it('does not let ENTER leave the road while a call is unanswered', () => {
     const { app, press } = play();
-    press('F10', 'F9', ' ');
+    press(' ');
+    hold(app, ' ');
+    press(' ');
     expect(app.roadCall).not.toBeNull();
     expect(app.roadOver).toBe(false);
     press('Enter');
@@ -673,7 +719,8 @@ describe('a whole small morning', () => {
 
   it('shows the answers on the result screen, one short line each', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     const chosen: string[] = [];
     for (let n = 0; n < 20 && !app.roadOver; n++) {
       if (app.roadCall) {
@@ -682,7 +729,7 @@ describe('a whole small morning', () => {
         chosen.push(`${call.client} · ${call.topic} · ${call.options[1]!.record}`);
       } else press(' ');
     }
-    press('Enter');
+    press(' ');
     expect(app.screen).toBe('result');
     expect(app.callLines).toEqual(chosen);
     const text = expectFullScreen(app).join('\n');
@@ -693,7 +740,8 @@ describe('a whole small morning', () => {
 
   it('goes on to an indented second line when a call line is too long, so the amount always shows', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     leaveRoad(press, app);
     const base = app.calls.find((c) => c.kind === 'short')!;
     const long = {
@@ -719,7 +767,8 @@ describe('a whole small morning', () => {
 
   it('forgets the calls when the morning is played again', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     leaveRoad(press, app);
     expect(app.callLines.length).toBeGreaterThan(0);
     press('r');
@@ -729,7 +778,8 @@ describe('a whole small morning', () => {
 
   it('stays quiet with F4 off: the ring is only asked for, the effects decide', () => {
     const { app, press, log } = play();
-    press('F4', 'F10', 'F9');
+    press('F4', ' ');
+    hold(app, ' ');
     expect(log.sound).toBe(false);
     press(' ');
     expect(app.roadCall).not.toBeNull();
@@ -737,7 +787,8 @@ describe('a whole small morning', () => {
 
   it('stops the ticks once the road is left', () => {
     const { app, press, log } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     leaveRoad(press, app);
     expect(app.screen).toBe('result');
     const before = app.roadClock;
@@ -748,7 +799,8 @@ describe('a whole small morning', () => {
 
   it('reports who got less when the stock ran short', () => {
     const { app, press } = play();
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     const less = app.result?.gotLess.map((g) => g.client) ?? [];
     // 16 ketchup were asked for and 12 were on hand: the last to ask went short.
     expect(less).toContain('The Plough');
@@ -757,9 +809,10 @@ describe('a whole small morning', () => {
 
   it('goes back to the desk with ESC from the sheets and plays again with R', () => {
     const { app, press } = play();
-    press('F10', 'Escape');
+    press(' ', 'Escape');
     expect(app.screen).toBe('desk');
-    press('F10', 'F9');
+    press(' ');
+    hold(app, ' ');
     leaveRoad(press, app);
     press('r');
     expect(app.screen).toBe('messages');
@@ -768,7 +821,8 @@ describe('a whole small morning', () => {
 
   it('will not send trucks with nothing on them', () => {
     const { app, press } = newApp();
-    press(' ', 'F10', 'F10', 'F9');
+    press(' ', ' ');
+    hold(app, ' ');
     expect(app.screen).toBe('sheets');
     expect(app.status).toContain('Nothing is loaded');
   });
@@ -785,14 +839,14 @@ describe('the big morning', () => {
     }
     press('Tab', 'Tab');
     expectFullScreen(app);
-    press('F10');
+    press(' ');
     expect(app.screen).toBe('sheets');
     press('+');
     for (let i = 0; i < 9; i++) {
       press('ArrowDown');
       expectFullScreen(app);
     }
-    press('F9');
+    hold(app, ' ');
     expect(app.screen).toBe('road');
     expectFullScreen(app);
     for (let n = 0; n < 20 && !app.roadOver; n++) {
@@ -801,7 +855,7 @@ describe('the big morning', () => {
     }
     expect(app.calls.length).toBeGreaterThan(2);
     expect(app.callLines).toHaveLength(app.calls.length);
-    press('Enter');
+    press(' ');
     expect(app.screen).toBe('result');
     // Every call is on the screen in full, below the CALLS heading of the left column.
     const left = expectFullScreen(app).map((l) => l.slice(0, 58).trimEnd());
