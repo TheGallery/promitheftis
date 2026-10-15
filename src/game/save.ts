@@ -1,18 +1,21 @@
 import { LAST_DAY } from './clock';
+import { EVENTS, type Announced } from './demand';
 import { HISTORY_DAYS, type ClientDay, type History } from './history';
 import { ITEM_LIST } from './morning';
 import { MOST_CASH, STARTING_CASH } from './money';
 import type { Mood } from './moods';
 import { PLACES, type PlaceId } from './places';
-import type { Delivery, Promised, RunClient, RunState } from './run';
+import type { Delivery, Promised, RunClient, RunState, Spoiled } from './run';
 import type { Crew, Kept, Truck } from './types';
 
 /**
  * The version of the saved data. The first version, which had no cash, is still read, and a run saved by it starts
- * from the starting cash; a save with any other version is not read.
+ * from the starting cash; the second, which did not say what spoiled or what the notes announced, is read too, with
+ * nothing spoiled and nothing announced. A save with any other version is not read.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 const FIRST_VERSION = 1;
+const SECOND_VERSION = 2;
 
 /** The run, as it stood when a day began, with the seed that makes up that day (for day 1, the fixed morning, it is 0). */
 export interface SavedRun {
@@ -92,6 +95,18 @@ function promisedOf(v: unknown): Promised | null {
   return { client: v.client, item: v.item as string, qty: v.qty };
 }
 
+function spoiledOf(v: unknown): Spoiled | null {
+  if (!isObject(v) || !ITEM_IDS.has(v.item as string) || !isCount(v.units) || v.units < 1) return null;
+  return { item: v.item as string, units: v.units };
+}
+
+const EVENT_IDS = new Set(EVENTS.map((e) => e.id));
+
+function announcedOf(v: unknown): Announced | null {
+  if (!isObject(v) || !isText(v.client) || !EVENT_IDS.has(v.event as string)) return null;
+  return { client: v.client, event: v.event as string };
+}
+
 function clientDayOf(v: unknown): ClientDay | null {
   if (!isObject(v) || !isCount(v.percent) || v.percent > 100 || typeof v.late !== 'boolean' || !Array.isArray(v.lacked) || v.lacked.length > MOST) return null;
   const lacked = [];
@@ -136,8 +151,11 @@ function runOf(v: unknown, version: number): RunState | null {
   const history = historyOf(v.history);
   const promises = mapped(v.promises, promisedOf);
   const delivery = v.delivery;
+  // A run saved before the rooms could spoil stock, and before the notes were read, has neither to carry over.
+  const spoiled = version < SAVE_VERSION ? [] : mapped(v.spoiled, spoiledOf);
+  const ahead = version < SAVE_VERSION ? [] : mapped(v.ahead, announcedOf);
   const cash = version === FIRST_VERSION ? STARTING_CASH : v.cash;
-  if (!stock || !usual || !trucks || !crews || !storeRoom || !capacity || !clients || !moods || !history || !promises) return null;
+  if (!stock || !usual || !trucks || !crews || !storeRoom || !capacity || !clients || !moods || !history || !promises || !spoiled || !ahead) return null;
   if (trucks.length === 0 || clients.length === 0 || KEPT.some((k) => !((capacity[k] ?? 0) > 0))) return null;
   if (!isMoney(cash)) return null;
   if (!isObject(delivery) || !isCount(delivery.items) || !isCount(delivery.units)) return null;
@@ -156,6 +174,8 @@ function runOf(v: unknown, version: number): RunState | null {
     history,
     promises,
     delivery: sent,
+    spoiled,
+    ahead,
     cash,
   };
 }
@@ -163,7 +183,7 @@ function runOf(v: unknown, version: number): RunState | null {
 function parse(text: string): Json | null {
   try {
     const data: unknown = JSON.parse(text);
-    return isObject(data) && (data.version === FIRST_VERSION || data.version === SAVE_VERSION) ? data : null;
+    return isObject(data) && (data.version === FIRST_VERSION || data.version === SECOND_VERSION || data.version === SAVE_VERSION) ? data : null;
   } catch {
     return null;
   }

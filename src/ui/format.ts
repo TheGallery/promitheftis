@@ -1,3 +1,4 @@
+import type { RoomSpace } from '../game/rooms';
 import { place, type PlaceId } from '../game/places';
 
 /**
@@ -22,4 +23,9 @@ export function placesLabel(ids: readonly PlaceId[], w: number): string {
 
 export function plural(n: number, one: string, many = one + 's'): string {
   return `${n} ${n === 1 ? one : many}`;
+}
+
+/** What a room says about what will not fit: the units that will spoil, or nothing when it all fits. */
+export function spoilText(space: RoomSpace): string {
+  return space.spoils > 0 ? `${space.spoils} will spoil` : '';
 }

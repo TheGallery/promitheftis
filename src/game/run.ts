@@ -1,12 +1,13 @@
 import type { DaySummary } from './day';
 import type { Call } from './calls';
-import { BIG_TRUCKS } from './morning';
+import { announcedBy, type Announced } from './demand';
+import { BIG_TRUCKS, ITEM_LIST } from './morning';
 import type { Growth } from './growth';
 import { growthPrice, STARTING_CASH } from './money';
 import { clientDay, remember, type ClientDay, type History } from './history';
 import type { Mood } from './moods';
 import type { PlaceId } from './places';
-import { ROOM_GROWTH } from './rooms';
+import { fitRoom, ROOM_GROWTH } from './rooms';
 import type { Supply } from './supply';
 import type { Crew, Kept, Morning, Truck } from './types';
 
@@ -29,6 +30,12 @@ export interface Promised {
 /** What the supplier brought in overnight, for the note about it. */
 export interface Delivery {
   items: number;
+  units: number;
+}
+
+/** Units of an item that had no space in its room overnight and spoiled. */
+export interface Spoiled {
+  item: string;
   units: number;
 }
 
@@ -57,6 +64,10 @@ export interface RunState {
   promises: Promised[];
   /** What came in overnight from the supplier. */
   delivery: Delivery;
+  /** What spoiled overnight because its room was full; it was paid for all the same. */
+  spoiled: Spoiled[];
+  /** What the notes on yesterday's orders announced for today. */
+  ahead: Announced[];
   /** The cash in the bank when the day begins; below zero when the business owes money. */
   cash: number;
 }
@@ -74,6 +85,8 @@ export interface DayOutcome {
   growth: Growth | null;
   /** What the day came to: taken in, less the supplier order and the trucks. */
   earned: number;
+  /** What the notes on the day's orders announce for tomorrow; none when it is not said. */
+  ahead?: Announced[];
 }
 
 /** The state a run starts from: the fixed morning, with its clients, stock, trucks and rooms. */
@@ -92,6 +105,8 @@ export function runFromMorning(m: Morning): RunState {
     history: {},
     promises: [],
     delivery: { items: 0, units: 0 },
+    spoiled: [],
+    ahead: announcedBy(m.orders),
     cash: STARTING_CASH,
   };
 }
@@ -122,6 +137,7 @@ export function outcomeOf(
     promises: promisesFrom(calls, answers),
     growth,
     earned: day.money.total,
+    ahead: supply.ahead.map((a) => ({ ...a })),
   };
 }
 
@@ -147,14 +163,31 @@ export function newTruck(id: number, drivers: Iterable<string> = []): Truck {
 }
 
 /**
+ * The stock in the rooms when the next morning begins: what was left and the delivery on top of it, as much as each
+ * room holds. The rest spoils, and is listed in the order the rooms and their items are listed on the supplier screen.
+ */
+function settleRooms(run: RunState, outcome: DayOutcome): { stock: Record<string, number>; spoiled: Spoiled[] } {
+  const stock: Record<string, number> = {};
+  const spoiled: Spoiled[] = [];
+  const ids = new Set([...Object.keys(run.stock), ...Object.keys(outcome.left), ...Object.keys(outcome.ordered)]);
+  for (const kept of ['freezer', 'fridge', 'dry'] as const) {
+    const items = ITEM_LIST.filter((i) => i.kept === kept);
+    const entries = items.map((i) => ({ item: i.id, inStore: outcome.left[i.id] ?? 0, ordered: outcome.ordered[i.id] ?? 0 }));
+    for (const fit of fitRoom(run.capacity[kept], entries)) {
+      stock[fit.item] = fit.keeps;
+      if (fit.spoils > 0) spoiled.push({ item: fit.item, units: fit.spoils });
+    }
+  }
+  for (const id of ids) if (!(id in stock)) stock[id] = (outcome.left[id] ?? 0) + (outcome.ordered[id] ?? 0);
+  return { stock, spoiled };
+}
+
+/**
  * The state of the next morning: yesterday's stock with the supplier's delivery on top, the cash with the day's
  * money settled and any growth paid for, and the growth put to work.
  */
 export function nextDay(run: RunState, outcome: DayOutcome): RunState {
-  const stock: Record<string, number> = {};
-  for (const id of new Set([...Object.keys(run.stock), ...Object.keys(outcome.left), ...Object.keys(outcome.ordered)])) {
-    stock[id] = (outcome.left[id] ?? 0) + (outcome.ordered[id] ?? 0);
-  }
+  const { stock, spoiled } = settleRooms(run, outcome);
   const next: RunState = {
     ...run,
     day: run.day + 1,
@@ -171,6 +204,8 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
       items: Object.values(outcome.ordered).filter((n) => n > 0).length,
       units: Object.values(outcome.ordered).reduce((sum, n) => sum + n, 0),
     },
+    spoiled,
+    ahead: (outcome.ahead ?? []).map((a) => ({ ...a })),
     cash: run.cash + outcome.earned - (outcome.growth ? growthPrice(outcome.growth, run.clients.length) : 0),
   };
   grow(next, outcome.growth);

@@ -3,17 +3,17 @@ import { formatMoney } from '../../game/money';
 import type { RoomSpace } from '../../game/rooms';
 import { KEPT_LABEL, KEPT_ORDER, type Supply } from '../../game/supply';
 import type { Kept } from '../../game/types';
-import { plural } from '../format';
+import { plural, spoilText } from '../format';
 import type { App } from '../app';
 import { cat, header, keyBar, layout, rule, s, width, wrapText, type Line } from '../grid';
 import { clockLine, moneySeg } from './common';
 
 const NAME_W = 19;
 /** Where the panel on the right starts: the room bars and the money, with the call notes below them. */
-const PANEL_AT = 60;
+const PANEL_AT = 67;
 const PANEL_W = 120 - PANEL_AT;
 const LABEL_W = 11;
-const BAR_W = 26;
+const BAR_W = 18;
 const MONEY_LABEL_W = 12;
 const MONEY_W = 9;
 
@@ -25,7 +25,7 @@ const SHADES = [
 ] as const;
 
 function titles(): Line {
-  return s(`  ${'ITEM'.padEnd(NAME_W)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(7)}${'PRICE'.padStart(7)}${'ORDER'.padStart(8)}${'COST'.padStart(8)}`, 'd');
+  return s(`  ${'ITEM'.padEnd(NAME_W)}${'ON HAND'.padStart(8)}${'USUAL'.padStart(7)}${'ASKED'.padStart(7)}  ${'PRICE'.padStart(5)}${'ORDER'.padStart(8)}${'COST'.padStart(8)}`, 'd');
 }
 
 function legend(): Line {
@@ -75,7 +75,7 @@ function roomLine(kept: Kept, space: RoomSpace): Line {
     s(KEPT_LABEL[kept].padEnd(LABEL_W), 'b'),
     roomBar(space),
     s(` ${String(space.pct).padStart(3)}%`, over ? 'w' : ''),
-    over ? s(`  over by ${space.overPct}%`, 'w') : [],
+    over ? s(`  ${spoilText(space)}`, 'w') : [],
   );
 }
 
@@ -97,14 +97,35 @@ function costCell(supply: Supply, r: number, cls: string): Line {
   return s((cost > 0 ? formatMoney(cost) : '—').padStart(8), cls);
 }
 
-/** Who was promised this item for tomorrow, and how many, as lines for the panel. */
-function noteLines(supply: Supply, itemId: string): Line[] {
-  const notes = supply.notes.get(itemId);
-  if (!notes || notes.length === 0) return [];
-  const total = notes.reduce((sum, n) => sum + n.qty, 0);
-  const who = notes.map((n) => `${n.client} ${n.qty}`).join(', ');
-  const [first = '', ...rest] = wrapText(`${total} promised for tomorrow: ${who}`, PANEL_W - 4);
-  return [s(` ← ${first}`, 'w'), ...rest.slice(0, 2).map((t) => s(`   ${t}`, 'w'))];
+/** The names of up to two clients, then how many more. */
+function whoLine(who: readonly string[]): string {
+  return who.length > 2 ? `${who.slice(0, 2).join(', ')} +${who.length - 2}` : who.join(', ');
+}
+
+/** The lines for a note: the first after an arrow, the rest indented, at most three. */
+function noted(arrow: string, text: string, cls: string): Line[] {
+  const [first = '', ...rest] = wrapText(text, PANEL_W - 4);
+  return [s(` ${arrow} ${first}`, cls), ...rest.slice(0, 2).map((t) => s(`   ${t}`, cls))];
+}
+
+/** What the highlighted item has to say, as lines for the panel: what will spoil, who was promised, and what the notes say about tomorrow. */
+function noteLines(supply: Supply, r: number): Line[] {
+  const row = supply.rows[r];
+  if (!row) return [];
+  const out: Line[] = [];
+  const spoil = supply.spoilage(row.kept).get(row.item.id) ?? 0;
+  if (spoil > 0) out.push(...noted('←', `${spoil} of these will spoil: the ${KEPT_LABEL[row.kept].toLowerCase()} is full`, 'w'));
+  const promised = supply.notes.get(row.item.id);
+  if (promised && promised.length > 0) {
+    const total = promised.reduce((sum, n) => sum + n.qty, 0);
+    out.push(...noted('←', `${total} promised for tomorrow: ${promised.map((n) => `${n.client} ${n.qty}`).join(', ')}`, 'w'));
+  }
+  const busy = supply.hints(r).filter((h) => h.busy);
+  const quiet = supply.hints(r).filter((h) => !h.busy);
+  const phrase = (hints: typeof busy) => hints.map((h) => `${h.client} (${h.word})`);
+  if (busy.length > 0) out.push(...noted('↑', `Tomorrow: ${whoLine(phrase(busy))}, so more`, 'acc'));
+  if (quiet.length > 0) out.push(...noted('↓', `Tomorrow: ${whoLine(phrase(quiet))}, so less`, 'acc'));
+  return out;
 }
 
 /** What the order costs, the cash in the bank now and what is left of it; amber, with a line to say so, when it falls below zero. */
@@ -130,8 +151,8 @@ function panel(app: App, supply: Supply): Line[] {
   const out: Line[] = [legend(), []];
   for (const kept of KEPT_ORDER) out.push(cat(s(' '), roomLine(kept, supply.roomSpace(kept))));
   out.push([], ...moneyLines(app, supply));
-  const row = supply.rows[app.supplySel];
-  if (row) out.push([], ...noteLines(supply, row.item.id));
+  const notes = noteLines(supply, app.supplySel);
+  if (notes.length > 0) out.push([], ...notes);
   return out;
 }
 
@@ -145,13 +166,16 @@ function rows(app: App, supply: Supply): Line[] {
     }
     const current = r === app.supplySel;
     const done = supply.isConfirmed(r);
-    const noted = (supply.notes.get(row.item.id)?.length ?? 0) > 0;
-    const rest = `${String(row.onHand).padStart(8)}${String(row.usual).padStart(7)}${formatMoney(supply.price(r)).padStart(7)}`;
+    const rang = (supply.notes.get(row.item.id)?.length ?? 0) > 0 || supply.spoilage(row.kept).has(row.item.id);
+    const hints = supply.hints(r);
+    const mark = hints.length === 0 ? ' ' : hints.every((h) => h.busy) ? '↑' : hints.every((h) => !h.busy) ? '↓' : '↕';
+    const asked = `${String(row.asked).padStart(5)} ${mark}`;
+    const rest = `${String(row.onHand).padStart(8)}${String(row.usual).padStart(7)}${asked.padStart(7)}  ${formatMoney(supply.price(r)).padStart(5)}`;
     const base = done && !current ? 'd' : '';
     const hl = (cls: string) => (current ? `${cls} hl`.trim() : cls);
     out.push(cat(
       s(current ? '▶ ' : done ? '✓ ' : '  ', hl(base)),
-      s(row.item.name.padEnd(NAME_W), hl(noted ? 'w' : base)),
+      s(row.item.name.padEnd(NAME_W), hl(rang ? 'w' : base)),
       s(rest, hl(base)),
       orderCell(app, supply, r),
       costCell(supply, r, current ? (supply.cost(r) > 0 ? 'acc hl' : 'hl') : done || supply.cost(r) === 0 ? 'd' : 'acc'),

@@ -59,9 +59,9 @@ export const NEW_CLIENTS: readonly NewClient[] = [
   { name: 'The Harbour Master', place: 'docks', contact: 'Ivor' },
 ];
 
-/** The room that will be fullest tomorrow; the first listed wins a tie. */
+/** The room that will be tightest tomorrow: the one with the most that will spoil, then the fullest; the first listed wins a tie. */
 export function tightestRoom(rooms: readonly DayRoom[]): DayRoom {
-  return rooms.reduce((best, r) => (r.space.pct > best.space.pct ? r : best));
+  return rooms.reduce((best, r) => (r.space.spoils > best.space.spoils || (r.space.spoils === best.space.spoils && r.space.pct > best.space.pct) ? r : best));
 }
 
 /**

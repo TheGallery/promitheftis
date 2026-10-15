@@ -4,7 +4,7 @@ import { plainName } from '../../game/headsup';
 import { formatChange, formatMoney } from '../../game/money';
 import type { Mood } from '../../game/moods';
 import { KEPT_LABEL, KEPT_ORDER } from '../../game/supply';
-import { plural } from '../format';
+import { plural, spoilText } from '../format';
 import type { App } from '../app';
 import { cat, clip, cols, header, keyBar, layout, rule, s, scrollRows, wrapText, type Line } from '../grid';
 import { clockLine, otherMornings } from './common';
@@ -124,7 +124,7 @@ export function roomLine({ kept, space }: DayRoom): Line {
   return cat(
     s(` ${KEPT_LABEL[kept].padEnd(11)}`),
     s(`${String(space.pct).padStart(3)}% full tomorrow`, over ? 'w' : ''),
-    over ? s(`  over by ${space.overPct}%`, 'w') : [],
+    over ? s(`  ${spoilText(space)}`, 'w') : [],
   );
 }
 
