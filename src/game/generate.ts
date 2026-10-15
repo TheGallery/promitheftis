@@ -5,6 +5,7 @@ import { plainName } from './headsup';
 import { arrivalTime, generateLines, ITEM_LIST } from './morning';
 import { moodEffect } from './moods';
 import { below, pick, type Random } from './random';
+import { KEPT_ORDER } from './supply';
 import type { RunClient, RunState } from './run';
 import type { Kept, Message, Morning, Order, OrderLine } from './types';
 
@@ -177,7 +178,7 @@ function listed(entries: readonly string[]): string {
 function spoilNotes(run: RunState): Array<Omit<Note, 'at'>> {
   const keptOf = new Map(ITEM_LIST.map((i) => [i.id, i.kept]));
   const names = new Map(ITEM_LIST.map((i) => [i.id, plainName(i.name)]));
-  return (['freezer', 'fridge', 'dry'] as const).flatMap((kept): Array<Omit<Note, 'at'>> => {
+  return KEPT_ORDER.flatMap((kept): Array<Omit<Note, 'at'>> => {
     const lost = run.spoiled.filter((s) => keptOf.get(s.item) === kept && s.units > 0);
     if (lost.length === 0) return [];
     const what = listed(lost.map((s) => `${s.units} ${names.get(s.item) ?? s.item}`));

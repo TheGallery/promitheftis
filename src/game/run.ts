@@ -1,6 +1,6 @@
 import type { DaySummary } from './day';
 import type { Call } from './calls';
-import { announcedBy, type Announced } from './demand';
+import type { Announced } from './demand';
 import { BIG_TRUCKS, ITEM_LIST } from './morning';
 import type { Growth } from './growth';
 import { growthPrice, STARTING_CASH } from './money';
@@ -8,7 +8,7 @@ import { clientDay, remember, type ClientDay, type History } from './history';
 import type { Mood } from './moods';
 import type { PlaceId } from './places';
 import { fitRoom, ROOM_GROWTH } from './rooms';
-import type { Supply } from './supply';
+import { KEPT_ORDER, type Supply } from './supply';
 import type { Crew, Kept, Morning, Truck } from './types';
 
 /** A restaurant that sends orders. */
@@ -106,7 +106,7 @@ export function runFromMorning(m: Morning): RunState {
     promises: [],
     delivery: { items: 0, units: 0 },
     spoiled: [],
-    ahead: announcedBy(m.orders),
+    ahead: [],
     cash: STARTING_CASH,
   };
 }
@@ -166,14 +166,18 @@ export function newTruck(id: number, drivers: Iterable<string> = []): Truck {
  * The stock in the rooms when the next morning begins: what was left and the delivery on top of it, as much as each
  * room holds. The rest spoils, and is listed in the order the rooms and their items are listed on the supplier screen.
  */
-function settleRooms(run: RunState, outcome: DayOutcome): { stock: Record<string, number>; spoiled: Spoiled[] } {
+function settleRooms(
+  run: RunState,
+  outcome: DayOutcome,
+  capacity: Record<Kept, number>,
+): { stock: Record<string, number>; spoiled: Spoiled[] } {
   const stock: Record<string, number> = {};
   const spoiled: Spoiled[] = [];
   const ids = new Set([...Object.keys(run.stock), ...Object.keys(outcome.left), ...Object.keys(outcome.ordered)]);
-  for (const kept of ['freezer', 'fridge', 'dry'] as const) {
+  for (const kept of KEPT_ORDER) {
     const items = ITEM_LIST.filter((i) => i.kept === kept);
     const entries = items.map((i) => ({ item: i.id, inStore: outcome.left[i.id] ?? 0, ordered: outcome.ordered[i.id] ?? 0 }));
-    for (const fit of fitRoom(run.capacity[kept], entries)) {
+    for (const fit of fitRoom(capacity[kept], entries)) {
       stock[fit.item] = fit.keeps;
       if (fit.spoils > 0) spoiled.push({ item: fit.item, units: fit.spoils });
     }
@@ -187,7 +191,9 @@ function settleRooms(run: RunState, outcome: DayOutcome): { stock: Record<string
  * money settled and any growth paid for, and the growth put to work.
  */
 export function nextDay(run: RunState, outcome: DayOutcome): RunState {
-  const { stock, spoiled } = settleRooms(run, outcome);
+  const capacity = { ...run.capacity };
+  if (outcome.growth?.kind === 'room') capacity[outcome.growth.room] += ROOM_GROWTH[outcome.growth.room];
+  const { stock, spoiled } = settleRooms(run, outcome, capacity);
   const next: RunState = {
     ...run,
     day: run.day + 1,
@@ -195,7 +201,7 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
     usual: { ...run.usual },
     trucks: run.trucks.map((t) => ({ ...t })),
     crews: run.crews.map((c) => ({ names: [...c.names], trucks: [...c.trucks] })),
-    capacity: { ...run.capacity },
+    capacity,
     clients: run.clients.map((c) => ({ ...c })),
     moods: { ...outcome.moods },
     history: remember(run.history, outcome.today),
@@ -221,9 +227,7 @@ function grow(state: RunState, growth: Growth | null): void {
     );
     state.trucks.push(truck);
     state.crews.at(-1)?.trucks.push(truck.id);
-  } else if (growth.kind === 'room') {
-    state.capacity[growth.room] += ROOM_GROWTH[growth.room];
-  } else if (!state.clients.some((c) => c.name === growth.client.name)) {
+  } else if (growth.kind === 'client' && !state.clients.some((c) => c.name === growth.client.name)) {
     const { name, place, contact } = growth.client;
     const before = state.clients.length;
     if (before > 0) for (const [item, n] of Object.entries(state.usual)) state.usual[item] = n + Math.round(n / before);

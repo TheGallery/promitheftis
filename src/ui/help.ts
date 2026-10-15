@@ -86,7 +86,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
         text:
           'At 13:00 you order stock for tomorrow. Every item is grouped by where it is kept (freezer, fridge, dry store), with what is on hand, ' +
           'the usual daily amount, what clients asked for today and what you order. Type a number or use {←→}; {ENTER} confirms a row and moves on; {U} fills a row up to the ' +
-          'usual amount and {A} fills every row, though a little short of what a full room holds. Hold {SPACE} to place the order and end the day; {ESC} goes back to the result.',
+          'usual amount and {A} fills every row, which can take a room a little over full, so check the bars and the spoil warning first. Hold {SPACE} to place the order and end the day; {ESC} goes back to the result.',
       },
       {
         head: 'DEMAND SWINGS',

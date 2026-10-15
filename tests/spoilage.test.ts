@@ -29,13 +29,13 @@ describe('a room that is full overnight', () => {
     expect(next.stock.pork).toBe(40);
   });
 
-  it('uses the room as it was when the delivery came: a bigger room bought tonight helps from the day after', () => {
+  it('holds tonight\'s delivery in a bigger room bought today, so what would have spoiled is kept', () => {
+    const tight = nextDay(small(), outcome({ ordered: { chips: 80 } }));
+    expect(tight.spoiled).toEqual([{ item: 'chips', units: 10 }]);
     const grown = nextDay(small(), outcome({ ordered: { chips: 80 }, growth: { kind: 'room', room: 'freezer' } }));
-    expect(grown.stock.chips).toBe(70);
     expect(grown.capacity.freezer).toBe(SMALL_ROOM_CAPACITY.freezer + ROOM_GROWTH.freezer);
-    const again = nextDay(grown, outcome({ ordered: { chips: 80 } }));
-    expect(again.stock.chips).toBe(80);
-    expect(again.spoiled).toEqual([]);
+    expect(grown.stock.chips).toBe(80);
+    expect(grown.spoiled).toEqual([]);
   });
 
   it('is known on the supplier order and the end of the day before it happens, in the same numbers', () => {
