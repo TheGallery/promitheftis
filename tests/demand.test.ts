@@ -132,7 +132,8 @@ describe('a made-up day', () => {
 
   it('carries the notes of one day to the next: what the orders say today moves tomorrow', () => {
     const run = runFromMorning(smallMorning());
-    expect(run.ahead).toEqual(announcedBy(smallMorning().orders));
+    // Nothing was said before the first morning; its own notes reach the second day through the day's outcome.
+    expect(run.ahead).toEqual([]);
     const next = nextDay(run, outcome({ ahead: [{ client: "Rosa's", event: 'halfterm' }] }));
     expect(next.ahead).toEqual([{ client: "Rosa's", event: 'halfterm' }]);
     // A day that says nothing announces nothing.
