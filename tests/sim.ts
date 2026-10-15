@@ -1,6 +1,7 @@
 import type { Call } from '../src/game/calls';
-import { DEPART_MINUTE, START_MINUTE } from '../src/game/clock';
+import { DEPART_MINUTE, START_MINUTE, weekdayOf } from '../src/game/clock';
 import { usualWith } from '../src/game/clients';
+import { isTownEvent, weekFactor } from '../src/game/daysize';
 import { swings } from '../src/game/demand';
 import { shortYesterday } from '../src/game/history';
 import { clientPrice, LATE_PAYS, supplierPrice, truckCost, truckPrice } from '../src/game/money';
@@ -52,6 +53,8 @@ export interface DayStat {
   orders: number;
   inFull: number;
   pleased: number;
+  /** Units all the orders together asked for. */
+  asked: number;
   /** Orders that got no truck. */
   stranded: number;
   /** Orders that asked for a time, and of those the ones the truck reached too late. */
@@ -74,6 +77,12 @@ export interface DayStat {
   /** What the rush order paid, and what its trip cost; nothing when no truck took it. */
   rushPaid: number;
   rushCost: number;
+  /** The day of the week of the morning, 0 for Sunday. */
+  weekday: number;
+  /** True when a town event the night before announced made some clients ask for more this morning. */
+  town: boolean;
+  /** How many clients were closed this morning and sent no order. */
+  closed: number;
   clients: number;
   trucksOwned: number;
   /** What a truck and a room would have cost that evening. */
@@ -116,6 +125,8 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   const day = app.morning.day;
   const spoiled = app.run.spoiled.reduce((sum, s) => sum + s.units, 0);
   const supplierShort = app.run.short.length > 0;
+  const town = app.run.ahead.some((a) => isTownEvent(a.event));
+  const closed = app.run.clients.length - app.morning.orders.length;
   if (app.screen === 'messages') press(' ');
   if (policy === 'blind') blindDesk(app, press);
   else carefulDesk(app, press);
@@ -154,6 +165,7 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
     orders: result.orders.length,
     inFull: result.inFull,
     pleased: summary.orders.filter((o) => o.mood === 'pleased').length,
+    asked: app.morning.orders.reduce((sum, o) => sum + o.lines.reduce((n, l) => n + l.asked, 0), 0),
     stranded: result.orders.filter((o) => o.truckId == null).length,
     timed: result.orders.filter((o) => o.before != null).length,
     late: result.orders.filter((o) => o.lateForAsk).length,
@@ -166,6 +178,9 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
     rush: rushOutcome(app),
     rushPaid: result.rush?.paid ?? 0,
     rushCost: result.rush?.cost ?? 0,
+    weekday: weekdayOf(day),
+    town,
+    closed,
     clients: app.run.clients.length,
     trucksOwned: app.run.trucks.length,
     truckPrice: truck?.price ?? 0,
@@ -364,7 +379,7 @@ function giveUpOne(app: App, of: (r: number) => boolean, worth: (item: string) =
 }
 
 /**
- * Orders what tomorrow needs: the usual amounts, what the notes say will be different, and what was promised on the
+ * Orders what tomorrow needs: the usual amounts for the day of the week, what the notes and the overnight messages say will be different, and what was promised on the
  * phone, less what is on hand. What a room cannot hold, and what the bank cannot pay for, is given up, the stock that
  * earns least first; then a little extra goes in where there is space. The amounts are keyed in, row by row.
  */
@@ -377,7 +392,8 @@ function carefulSupply(app: App, press: Press, newClient: boolean): RoomNeeds {
   for (const s of swings(supply.ahead, usual, clients)) swing.set(s.item, (swing.get(s.item) ?? 0) + s.units);
   const promised = new Map<string, number>();
   for (const p of promisesFrom(app.calls, app.answers)) promised.set(p.item, (promised.get(p.item) ?? 0) + p.qty);
-  const need = supply.rows.map((row) => Math.round((usual[row.item.id] ?? 0) + (swing.get(row.item.id) ?? 0)) + (promised.get(row.item.id) ?? 0));
+  const week = weekFactor(supply.day + 1);
+  const need = supply.rows.map((row) => Math.round((usual[row.item.id] ?? 0) * week + (swing.get(row.item.id) ?? 0)) + (promised.get(row.item.id) ?? 0));
   supply.rows.forEach((row, r) => supply.set(r, Math.max(0, need[r]! - row.onHand)));
 
   const needs: RoomNeeds = { lost: { freezer: 0, fridge: 0, dry: 0 }, fill: { freezer: 0, fridge: 0, dry: 0 } };

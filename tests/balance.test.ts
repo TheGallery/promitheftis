@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { weekFactor } from '../src/game/daysize';
 import { STARTING_CASH } from '../src/game/money';
 import { median, playRun, summarise, type DayStat, type GrowthRule, type Policy } from './sim';
 
@@ -61,10 +62,16 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     expect(blind.minCash).toBeGreaterThan(-2 * STARTING_CASH);
   });
 
-  it('leaves a careful day in profit', () => {
+  it('leaves a careful day in profit, and nearly every one: only a quiet day can cost more than it brings in', () => {
     const days = later(kind, 'careful');
     expect(median(days.map((d) => d.profit))).toBeGreaterThan(0);
-    expect(days.filter((d) => d.profit > 0).length / days.length).toBeGreaterThanOrEqual(0.9);
+    expect(days.filter((d) => d.profit > 0).length / days.length).toBeGreaterThanOrEqual(0.8);
+    expect(days.filter((d) => weekFactor(d.day) >= 1 && d.profit > 0).length / days.filter((d) => weekFactor(d.day) >= 1).length).toBeGreaterThanOrEqual(0.85);
+    // A whole week of them is always in profit.
+    for (const run of runs(kind, 'careful')) {
+      const weeks = Math.floor((DAYS - FROM + 1) / 7);
+      for (let w = 0; w < weeks; w++) expect(run.slice(FROM - 1 + 7 * w, FROM + 6 + 7 * w).reduce((sum, d) => sum + d.profit, 0)).toBeGreaterThan(0);
+    }
   });
 
   it('never needs the cash to go below zero for a careful player, who is never left without a truck', () => {
@@ -174,7 +181,7 @@ describe.each(['small', 'big'] as const)('a truck at the garage, on the %s morni
     expect(onDays(careful, true, inFull)).toBeGreaterThan(onDays(blind, true, inFull) + 0.2);
     expect(onDays(careful, true, pleased)).toBeGreaterThan(onDays(blind, true, pleased) + 0.2);
     expect(onDays(careful, true, (d) => d.stranded)).toBeLessThan(0.5);
-    expect(onDays(blind, true, (d) => d.stranded)).toBeGreaterThan(onDays(blind, false, (d) => d.stranded));
+    expect(onDays(blind, true, inFull)).toBeLessThan(onDays(blind, false, inFull));
   });
 
   it('does not make blind play collapse: it still earns on those days, and still pleases most of its clients about as often as it does', () => {
@@ -277,5 +284,112 @@ describe.each(['small', 'big'] as const)('a rush order, on the %s morning', (kin
   it('costs a careful player little on the days it comes: the clients are about as pleased as on any other day', () => {
     const careful = later(kind, 'careful');
     expect(onRush(careful, false, pleased) - onRush(careful, true, pleased)).toBeLessThan(0.1);
+  });
+});
+
+/** Averages of one figure over the days `of` picks, from each policy's days after the first two. */
+const mean = (days: DayStat[], figure: (d: DayStat) => number) => days.reduce((sum, d) => sum + figure(d), 0) / days.length;
+const busy = (d: DayStat) => weekFactor(d.day) >= 1.1;
+const quiet = (d: DayStat) => weekFactor(d.day) <= 0.9;
+
+describe.each(['small', 'big'] as const)('busy and quiet days of the week, on the %s morning', (kind) => {
+  it('ask for clearly more on a busy day than on a quiet one, with a few orders on every day', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      const days = later(kind, policy);
+      expect(mean(days.filter(busy), (d) => d.asked / d.orders)).toBeGreaterThan(mean(days.filter(quiet), (d) => d.asked / d.orders) * 1.15);
+      for (const d of days) expect(d.orders).toBeGreaterThanOrEqual(Math.max(3, d.clients - Math.max(1, Math.floor(d.clients / 10))));
+    }
+  });
+
+  it('are handled clearly better by a careful player, who orders for the day it is: more clients in full on a busy day', () => {
+    const blind = later(kind, 'blind').filter(busy);
+    const careful = later(kind, 'careful').filter(busy);
+    expect(mean(careful, pleased)).toBeGreaterThan(mean(blind, pleased) + 0.2);
+    expect(mean(careful, inFull)).toBeGreaterThan(mean(blind, inFull) + 0.15);
+    expect(mean(careful, (d) => d.stranded)).toBeLessThan(0.5);
+  });
+
+  it('press on the trucks a little on a busy day and leave them spare on a quiet one, for a careful player', () => {
+    const days = later(kind, 'careful');
+    expect(mean(days.filter(busy), (d) => d.load)).toBeGreaterThan(mean(days.filter(quiet), (d) => d.load) + 0.1);
+  });
+
+  it('do not make blind play collapse: it still pleases about half its clients on a busy day and loses little on a quiet one', () => {
+    const days = later(kind, 'blind');
+    expect(mean(days.filter(busy), pleased)).toBeGreaterThan(0.3);
+    expect(mean(days.filter(busy), (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
+    expect(mean(days.filter(quiet), pleased)).toBeGreaterThan(0.4);
+    expect(mean(days.filter(quiet), (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
+  });
+});
+
+describe.each(['small', 'big'] as const)('a town event, on the %s morning', (kind) => {
+  const town = (d: DayStat) => d.town;
+  const plainDay = (d: DayStat) => !d.town && d.closed === 0 && !d.supplierShort && !d.garage;
+
+  it('comes on about one day in four or five, never on the first or the second, for both players alike', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      const days = runs(kind, policy).flat();
+      expect(days.filter((d) => d.day <= 2 && d.town)).toHaveLength(0);
+      const share = days.filter((d) => d.day > 2 && d.town).length / days.filter((d) => d.day > 2).length;
+      expect(share).toBeGreaterThan(0.1);
+      expect(share).toBeLessThan(0.32);
+    }
+  });
+
+  it('makes clients ask for more than the day of the week alone would', () => {
+    const days = runs(kind, 'blind').flatMap((r) => r.filter((d) => d.day > 2 && !d.supplierShort));
+    const perOrder = (d: DayStat) => d.asked / d.orders / weekFactor(d.day);
+    expect(mean(days.filter(town), perOrder)).toBeGreaterThan(mean(days.filter((d) => !d.town), perOrder) * 1.03);
+  });
+
+  it('is handled clearly better by a careful player, who reads the message and orders ahead: more clients pleased and in full', () => {
+    const blind = later(kind, 'blind').filter(town);
+    const careful = later(kind, 'careful').filter(town);
+    expect(careful.length).toBeGreaterThan(10);
+    expect(mean(careful, pleased)).toBeGreaterThan(mean(blind, pleased) + 0.2);
+    expect(mean(careful, inFull)).toBeGreaterThan(mean(blind, inFull) + 0.15);
+    expect(mean(careful, (d) => d.profit)).toBeGreaterThan(0);
+  });
+
+  it('does not make blind play collapse: it still pleases many of its clients and earns about what it does on any other day', () => {
+    const days = later(kind, 'blind');
+    expect(mean(days.filter(town), pleased)).toBeGreaterThan(0.35);
+    expect(mean(days.filter(town), pleased)).toBeGreaterThan(mean(days.filter(plainDay), pleased) - 0.2);
+    expect(mean(days.filter(town), (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
+  });
+
+  it('costs a careful player little', () => {
+    const days = later(kind, 'careful');
+    expect(mean(days.filter(plainDay), inFull) - mean(days.filter(town), inFull)).toBeLessThan(0.2);
+  });
+});
+
+describe.each(['small', 'big'] as const)('clients that are closed for a day, on the %s morning', (kind) => {
+  const closed = (d: DayStat) => d.closed > 0;
+
+  it('happen now and then, never on the first day, and never close more than one client in ten', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      const days = runs(kind, policy).flat();
+      expect(days.filter((d) => d.day <= 2 && d.closed > 0)).toHaveLength(0);
+      const share = days.filter((d) => d.day > 2 && closed(d)).length / days.filter((d) => d.day > 2).length;
+      expect(share).toBeGreaterThan(0.1);
+      expect(share).toBeLessThan(0.9);
+      for (const d of days) expect(d.closed).toBeLessThanOrEqual(Math.max(1, Math.floor((d.clients) / 10)));
+    }
+  });
+
+  it('are told the evening before, so a careful player is not left with stock nobody wants', () => {
+    const careful = later(kind, 'careful');
+    expect(mean(careful.filter(closed), pleased)).toBeGreaterThan(mean(careful.filter((d) => !closed(d)), pleased) - 0.1);
+    expect(mean(careful.filter(closed), (d) => d.profit)).toBeGreaterThan(0);
+    expect(summarise(runs(kind, 'careful'), FROM).spoiled).toBeLessThan(1);
+  });
+
+  it('do not make blind play collapse', () => {
+    const blind = later(kind, 'blind');
+    expect(mean(blind.filter(closed), pleased)).toBeGreaterThan(0.35);
+    expect(mean(blind.filter(closed), pleased)).toBeGreaterThan(mean(blind.filter((d) => !closed(d)), pleased) - 0.15);
+    expect(mean(blind.filter(closed), (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
   });
 });

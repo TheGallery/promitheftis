@@ -65,8 +65,10 @@ const FILL_ALL_TO = 1.15;
 export class Supply {
   readonly rows: SupplyRow[];
   readonly notes: Map<string, CallNote[]>;
-  /** What the notes on today's orders say about tomorrow. */
+  /** What the overnight messages and then the notes on today's orders say about tomorrow. */
   readonly ahead: Announced[];
+  /** The day of the run the order is made on; the order is for the day after. */
+  readonly day: number;
   private readonly capacity: Record<Kept, number>;
   private readonly amounts: number[];
   private readonly confirmed: boolean[];
@@ -74,7 +76,8 @@ export class Supply {
 
   constructor(morning: Morning, onHand: Record<string, number>, notes: Map<string, CallNote[]> = new Map()) {
     this.notes = notes;
-    this.ahead = announcedBy(morning.orders);
+    this.ahead = [...(morning.tomorrow ?? []), ...announcedBy(morning.orders)];
+    this.day = morning.day;
     this.capacity = morning.capacity;
     const asked = new Map<string, number>();
     for (const o of morning.orders) for (const l of o.lines) asked.set(l.item, (asked.get(l.item) ?? 0) + l.asked);

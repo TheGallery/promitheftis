@@ -1,12 +1,13 @@
 import { breakdownFor } from './breakdown';
 import type { CallKind } from './calls';
-import { itemWeight } from './clients';
+import { clientWeight, itemWeight } from './clients';
 import { formatTime } from './clock';
+import { closedIn, isBusyWeekday, isTownEvent, tomorrowFor, weekFactor } from './daysize';
 import { swings } from './demand';
 import { plainName } from './headsup';
 import { arrivalTime, generateLines, ITEM_LIST } from './morning';
 import { moodEffect } from './moods';
-import { below, pick, type Random } from './random';
+import { below, mulberry32, pick, type Random } from './random';
 import { rushFor, rushNote } from './rush';
 import { shortNotes } from './shortfall';
 import { KEPT_ORDER } from './supply';
@@ -23,6 +24,8 @@ const TIME_CHANCE = 0.3;
 const ASKED_TIMES = [8 * 60, 9 * 60, 10 * 60, 11 * 60];
 /** Orders may fill this share of all the truck space together, so a careful player can load them. */
 export const TRUCK_SHARE = 0.85;
+/** On a busy day the orders may fill this much more of the truck space, so that the trucks are pressed a little. */
+const BUSY_ROOM = 0.08;
 /** Each item's total for the day is its usual amount, give or take this share. */
 const JITTER = 0.05;
 
@@ -122,11 +125,14 @@ function apportion(total: number, weights: readonly number[]): number[] {
 
 /**
  * Turns the clients' made-up lines into the day's demand: each item is asked for about its usual amount, give or take a
- * little, shared between the clients that ask for it in the proportions they drew. Then what the notes of the day before
- * announced is added to (or taken from) the clients they were about, and a client let down yesterday asks for less.
+ * little, shared between the clients that ask for it in the proportions they drew. The weekday makes the whole day
+ * smaller or bigger, and a day with clients closed asks for what the others' share comes to. Then what the notes of
+ * the day before announced is added to (or taken from) the clients they were about, and a client let down yesterday asks for less.
  */
 function shapeDemand(made: readonly Asking[], run: RunState, random: Random): void {
   const clients = made.length;
+  const open = clientWeight(made.map((m) => m.client)) / Math.max(1e-9, clientWeight(run.clients));
+  const day = weekFactor(run.day) * open;
   const minAskers = Math.max(1, Math.ceil(clients / 4));
   for (const item of ITEM_LIST) {
     const askers = made.filter((m) => m.lines.some((l) => l.item === item.id));
@@ -135,13 +141,13 @@ function shapeDemand(made: readonly Asking[], run: RunState, random: Random): vo
       const chosen = without.splice(below(random, without.length), 1)[0] as Asking;
       chosen.lines.push({ item: item.id, asked: 1 });
     }
-    const target = Math.max(1, Math.round((run.usual[item.id] ?? 0) * (1 + (random() * 2 - 1) * JITTER)));
+    const target = Math.max(1, Math.round((run.usual[item.id] ?? 0) * day * (1 + (random() * 2 - 1) * JITTER)));
     const lines = made.flatMap((m) => m.lines.filter((l) => l.item === item.id).map((line) => ({ line, weight: line.asked * itemWeight(m.client, item.kept) })));
     if (lines.length === 0) continue;
     const shares = apportion(target, lines.map((l) => l.weight));
     lines.forEach((l, i) => (l.line.asked = Math.max(1, shares[i] as number)));
   }
-  for (const swing of swings(run.ahead, run.usual, clients)) {
+  for (const swing of swings(run.ahead, run.usual, run.clients.length)) {
     const m = made.find((x) => x.client.name === swing.client);
     if (!m) continue;
     const line = m.lines.find((l) => l.item === swing.item);
@@ -151,10 +157,15 @@ function shapeDemand(made: readonly Asking[], run: RunState, random: Random): vo
   for (const m of made) m.lines = scaled(m.lines, moodEffect(run.moods[m.client.name]).scale);
 }
 
+/** Whether the day is a busy one: a busy day of the week, or a town event the night before said so. */
+function busyDay(run: RunState): boolean {
+  return isBusyWeekday(run.day) || run.ahead.some((a) => isTownEvent(a.event));
+}
+
 /** Brings all the amounts down together if the orders would not fit on the trucks with room to spare. */
 function fitToTrucks(orders: ReadonlyArray<{ lines: OrderLine[] }>, run: RunState): void {
   const size = new Map(ITEM_LIST.map((i) => [i.id, i.size]));
-  const room = run.trucks.reduce((sum, t) => sum + t.capacity, 0) * TRUCK_SHARE;
+  const room = run.trucks.reduce((sum, t) => sum + t.capacity, 0) * (TRUCK_SHARE + (busyDay(run) ? BUSY_ROOM : 0));
   for (let round = 0; round < 4; round++) {
     const total = orders.reduce((sum, o) => sum + o.lines.reduce((n, l) => n + l.asked * (size.get(l.item) ?? 1), 0), 0);
     if (total <= room) return;
@@ -223,17 +234,21 @@ export function generateDay(run: RunState, random: Random): Morning {
     const note = noteFor(client, run, { ...(before != null ? { before } : {}), ...(noteRoll < NOTE_CHANCE ? { note: noteText } : {}) });
     return { client, lines, note, before };
   });
-  shapeDemand(made, run, random);
-  fitToTrucks(made, run);
-  for (const m of made) addPromises(m.lines, m.client, run);
+  const closed = closedIn(run.ahead);
+  // A client that is closed sends no order, and the rest share what is asked for; the business never has nobody to order from.
+  const asking = made.filter((m) => !closed.has(m.client.name));
+  const sent = asking.length > 0 ? asking : made;
+  shapeDemand(sent, run, random);
+  fitToTrucks(sent, run);
+  for (const m of sent) addPromises(m.lines, m.client, run);
 
-  const orders: Order[] = made.map((m, index) => {
+  const orders: Order[] = sent.map((m, index) => {
     const order: Order = {
       id: index + 1,
       client: m.client.name,
       place: m.client.place,
       contact: m.client.contact,
-      leftAt: arrivalTime(index, made.length),
+      leftAt: arrivalTime(index, sent.length),
       lines: m.lines,
     };
     if (m.note) order.note = m.note;
@@ -253,6 +268,9 @@ export function generateDay(run: RunState, random: Random): Morning {
   // The rush order is drawn after that, so it moves nothing either.
   const rush = rushFor(run, orders, random);
   if (rush) messages.push(rushNote(rush, run.crews[0]?.names[0] ?? 'Joe'));
+  // Drawn after those, from a source of its own, so that what the night says about tomorrow moves nothing else that chance decides.
+  const tomorrow = tomorrowFor(run, orders, mulberry32(Math.floor(random() * 4294967296)), SUPPLIER_FIRST, SUPPLIER_LAST);
+  messages.push(...tomorrow.notes);
   messages.sort((a, b) => a.at - b.at);
 
   return {
@@ -273,5 +291,6 @@ export function generateDay(run: RunState, random: Random): Morning {
     ...(run.short.length > 0 ? { short: run.short.map((s) => ({ ...s })) } : {}),
     ...(breakdown ? { garage: breakdown.garage } : {}),
     ...(rush ? { rush } : {}),
+    ...(tomorrow.ahead.length > 0 ? { tomorrow: tomorrow.ahead } : {}),
   };
 }
