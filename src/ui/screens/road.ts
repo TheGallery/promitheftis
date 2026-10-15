@@ -113,5 +113,5 @@ export function roadScreen(app: App): Line[] {
     : over
       ? [['ENTER', 'see how it went']]
       : [['SPACE', 'skip ahead'], ['ENTER', 'skip ahead']];
-  return layout(top, body, [rule(), status, keyBar([...keys, ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([...keys, ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

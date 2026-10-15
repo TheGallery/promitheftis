@@ -97,8 +97,8 @@ export function sheetsScreen(app: App): Line[] {
     loading,
     status,
     keyBar([
-      ['↑↓', 'truck'], ['ENTER', 'open / close'], ['+ -', 'open / close all'], ['P', 'print sheets'],
-      ['ESC', 'desk'], ['F9', 'send the trucks'], ['F2', 'colours'], ['F4', 'sound'],
+      ['↑↓', 'truck'], ['ENTER', 'open/close'], ['+ -', 'open/close all'], ['P', 'print'],
+      ['ESC', 'desk'], ['F9', 'send trucks'], ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound'],
     ]),
   ];
   return layout(top, body, footer);

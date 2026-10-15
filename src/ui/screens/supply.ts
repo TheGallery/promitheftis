@@ -141,7 +141,7 @@ export function supplyScreen(app: App): Line[] {
     ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc')
     : s(` Tomorrow's order: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')}. Stock arrives the next morning.`, 'd');
   const keys: Array<readonly [string, string]> = [
-    ['↑↓', 'move'], ['0-9', 'amount'], ['←→', '±1'], ['ENTER', 'next row'], ['U', 'fill row'], ['A', 'fill all'], ['F9', 'place order'], ['ESC', 'back'],
+    ['↑↓', 'move'], ['0-9 ←→', 'amount'], ['ENTER', 'next row'], ['U', 'fill row'], ['A', 'fill all'], ['F9', 'order'], ['ESC', 'back'],
   ];
-  return layout(top, body, [rule(), status, keyBar([...keys, ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([...keys, ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

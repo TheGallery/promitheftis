@@ -3,6 +3,7 @@ import { toHtml, type Line } from './grid';
 import { dayScreen } from './screens/day';
 import { deskScreen } from './screens/desk';
 import { growthScreen } from './screens/growth';
+import { helpScreen } from './screens/help';
 import { messagesScreen } from './screens/messages';
 import { roadScreen } from './screens/road';
 import { resultScreen } from './screens/result';
@@ -12,6 +13,7 @@ import { supplyScreen } from './screens/supply';
 
 /** The lines of whichever screen the app is on. */
 export function screenLines(app: App): Line[] {
+  if (app.helpOpen) return helpScreen(app);
   switch (app.screen) {
     case 'start':
       return startScreen(app);

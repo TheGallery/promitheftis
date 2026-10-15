@@ -29,6 +29,6 @@ export function startScreen(app: App): Line[] {
     ...rows,
   ];
   const status = newRunPrompt(app) ?? (app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : []);
-  const keys = keyBar([['↑↓', 'pick one'], ['ENTER', 'go (hold for a new run)'], ['C', 'continue'], ['S', 'small morning'], ['B', 'big morning'], ['F2', 'colours'], ['F4', 'sound']]);
+  const keys = keyBar([['↑↓', 'pick one'], ['ENTER', 'go (hold: new run)'], ['C', 'continue'], ['S', 'small morning'], ['B', 'big morning'], ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']]);
   return layout(top, body, [rule(), status, keys]);
 }

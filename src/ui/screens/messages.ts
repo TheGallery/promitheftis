@@ -70,6 +70,6 @@ export function messagesScreen(app: App): Line[] {
       ? [['B S', 'big / small morning']]
       : app.morning.id === 'small' ? [['B', 'big morning (9 trucks, 38 orders)']] : [['S', 'small morning (2 trucks, 7 orders)']];
   const status = newRunPrompt(app) ?? (app.status ? s(` ${app.status}`, app.tone === 'warn' ? 'w' : 'acc') : []);
-  const footer = [rule(), status, keyBar([['↑↓', 'message'], ['SPACE', 'start the morning'], ...other, ['F2', 'colours'], ['F4', 'sound']])];
+  const footer = [rule(), status, keyBar([['↑↓', 'message'], ['SPACE', 'start the morning'], ...other, ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }
