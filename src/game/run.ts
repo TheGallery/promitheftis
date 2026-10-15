@@ -1,6 +1,7 @@
 import type { DaySummary } from './day';
 import type { Call } from './calls';
-import { usualWith } from './clients';
+import { settle, type Notice, type Standings } from './churn';
+import { usualWith, usualWithout } from './clients';
 import { closedIn } from './daysize';
 import type { Announced } from './demand';
 import { BIG_TRUCKS, ITEM_LIST } from './morning';
@@ -79,6 +80,12 @@ export interface RunState {
   short: Short[];
   /** The cash in the bank when the day begins; below zero when the business owes money. */
   cash: number;
+  /** How many days running each client has been let down, and any break they are on; a client with nothing to say has no entry. */
+  standing: Standings;
+  /** What clients have to say this morning about taking a break or leaving. */
+  news: Notice[];
+  /** The names of the clients who have gone for good, so that a new client never takes one. */
+  lost: string[];
 }
 
 /** What the day that has just ended hands on to the next one. */
@@ -118,6 +125,9 @@ export function runFromMorning(m: Morning): RunState {
     ahead: [],
     short: [],
     cash: STARTING_CASH,
+    standing: {},
+    news: [],
+    lost: [],
   };
 }
 
@@ -210,18 +220,27 @@ export function nextDay(run: RunState, outcome: DayOutcome, seed?: number): RunS
   // A client that was closed today sent no order, so nothing was said of how it went or what was promised it: that waits for its next order.
   const closed = closedIn(run.ahead);
   const { stock, spoiled } = settleRooms(run, { ...outcome, ordered: delivered }, capacity);
+  const settled = settle(run.clients, run.standing, outcome.moods, run.day, seed);
+  const gone = new Set(settled.gone);
+  // A client who has gone, or is on a break, is not remembered by what they left behind: they come back, if they do, with a clean slate.
+  const out = (name: string) => gone.has(name) || (settled.standing[name]?.away ?? 0) > 0;
+  let usual = { ...run.usual };
+  for (const name of settled.gone) {
+    const leaving = run.clients.find((c) => c.name === name);
+    if (leaving) usual = usualWithout(usual, run.clients, leaving);
+  }
   const next: RunState = {
     ...run,
     day: run.day + 1,
     stock,
-    usual: { ...run.usual },
+    usual,
     trucks: run.trucks.map((t) => ({ ...t })),
     crews: run.crews.map((c) => ({ names: [...c.names], trucks: [...c.trucks] })),
     capacity,
-    clients: run.clients.map((c) => ({ ...c })),
-    moods: { ...Object.fromEntries(Object.entries(run.moods).filter(([name]) => closed.has(name))), ...outcome.moods },
-    history: remember(run.history, outcome.today),
-    promises: [...run.promises.filter((p) => closed.has(p.client)), ...outcome.promises].map((p) => ({ ...p })),
+    clients: run.clients.filter((c) => !gone.has(c.name)).map((c) => ({ ...c })),
+    moods: Object.fromEntries(Object.entries({ ...Object.fromEntries(Object.entries(run.moods).filter(([name]) => closed.has(name))), ...outcome.moods }).filter(([name]) => !out(name))),
+    history: Object.fromEntries(Object.entries(remember(run.history, outcome.today)).filter(([name]) => !out(name))),
+    promises: [...run.promises.filter((p) => closed.has(p.client)), ...outcome.promises].filter((p) => !out(p.client)).map((p) => ({ ...p })),
     delivery: {
       items: Object.values(delivered).filter((n) => n > 0).length,
       units: Object.values(delivered).reduce((sum, n) => sum + n, 0),
@@ -230,6 +249,9 @@ export function nextDay(run: RunState, outcome: DayOutcome, seed?: number): RunS
     ahead: (outcome.ahead ?? []).map((a) => ({ ...a })),
     short,
     cash: run.cash + outcome.earned + creditFor(short) - (outcome.growth ? growthPrice(outcome.growth, run.clients.length, run.trucks.length) : 0),
+    standing: settled.standing,
+    news: settled.news,
+    lost: [...run.lost, ...settled.gone],
   };
   grow(next, outcome.growth);
   return next;

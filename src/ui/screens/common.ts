@@ -1,6 +1,7 @@
 import { dateLabel, DEPART_MINUTE, formatTime } from '../../game/clock';
 import { plainName } from '../../game/headsup';
 import { formatMoney } from '../../game/money';
+import { isWarned, warnNote } from '../../game/churn';
 import { shortNotes } from '../../game/history';
 import type { App } from '../app';
 import { cat, clip, s, wrapText, type Line } from '../grid';
@@ -33,12 +34,14 @@ export function otherMornings(app: App): ReadonlyArray<readonly [string, string]
 }
 
 /**
- * What the client of the current order went short of in its last two days, in the warning colour: each
- * day's text wraps onto an indented second line and is cut with "…" if it needs more than `rows` lines.
+ * What to say of the client of the current order, in the warning colour: that they have been let down two days running,
+ * then what they went short of in their last two days. Each text wraps onto an indented second line and is cut with "…" if it
+ * needs more than `rows` lines; `named` leads the warning with the client's name.
  */
-export function shortfallLines(app: App, client: string, wide: number, named: number, rows = 2): Line[] {
+export function shortfallLines(app: App, client: string, wide: number, named: number, rows = 2, withName = false): Line[] {
   const nameOf = (id: string): string => plainName(app.desk.item(id).name);
-  return shortNotes(app.run.history[client], nameOf, named).flatMap((note) => {
+  const warned = isWarned(app.run.standing, client) ? [warnNote(client, withName)] : [];
+  return [...warned, ...shortNotes(app.run.history[client], nameOf, named)].flatMap((note) => {
     const wrapped = wrapText(note, wide - 3);
     const kept = wrapped.length > rows ? [...wrapped.slice(0, rows - 1), clip(wrapped.slice(rows - 1).join(' '), wide - 3)] : wrapped;
     return kept.map((row, i) => s(i === 0 ? ` ${row}` : `   ${row}`, 'w'));

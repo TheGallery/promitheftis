@@ -1,5 +1,6 @@
 import { breakdownFor } from './breakdown';
 import type { CallKind } from './calls';
+import { BACK_NOTE, isAway, isBack, noticeNotes, WARY_SCALE } from './churn';
 import { clientWeight, itemWeight } from './clients';
 import { formatTime } from './clock';
 import { closedIn, isBusyWeekday, isTownEvent, tomorrowFor, weekFactor } from './daysize';
@@ -85,11 +86,12 @@ function addPromises(lines: OrderLine[], client: RunClient, run: RunState): void
   }
 }
 
-/** The note on an order, most important first: what was promised, how the client feels, then the rest, while it all still shows. */
+/** The note on an order, most important first: a client back from a break, what was promised, how the client feels, then the rest, while it all still shows. */
 function noteFor(client: RunClient, run: RunState, ask: { before?: number; note?: string }): string | undefined {
   const promised = run.promises.filter((p) => p.client === client.name);
   const names = new Map(ITEM_LIST.map((i) => [i.id, plainName(i.name)]));
   const parts: string[] = [];
+  if (isBack(run.standing, client.name)) parts.push(BACK_NOTE);
   if (promised.length > 0) parts.push(`As promised: ${promised.map((p) => `${p.qty} ${names.get(p.item) ?? p.item}`).join(', ')}.`);
   const mood = moodEffect(run.moods[client.name]).note;
   if (mood) parts.push(mood);
@@ -127,7 +129,8 @@ function apportion(total: number, weights: readonly number[]): number[] {
  * Turns the clients' made-up lines into the day's demand: each item is asked for about its usual amount, give or take a
  * little, shared between the clients that ask for it in the proportions they drew. The weekday makes the whole day
  * smaller or bigger, and a day with clients closed asks for what the others' share comes to. Then what the notes of
- * the day before announced is added to (or taken from) the clients they were about, and a client let down yesterday asks for less.
+ * the day before announced is added to (or taken from) the clients they were about, and a client let down yesterday, or
+ * just back from a break, asks for less.
  */
 function shapeDemand(made: readonly Asking[], run: RunState, random: Random): void {
   const clients = made.length;
@@ -154,7 +157,7 @@ function shapeDemand(made: readonly Asking[], run: RunState, random: Random): vo
     if (line) line.asked = Math.max(1, line.asked + swing.units);
     else if (swing.units > 0) m.lines.push({ item: swing.item, asked: swing.units });
   }
-  for (const m of made) m.lines = scaled(m.lines, moodEffect(run.moods[m.client.name]).scale);
+  for (const m of made) m.lines = scaled(m.lines, moodEffect(run.moods[m.client.name]).scale * (isBack(run.standing, m.client.name) ? WARY_SCALE : 1));
 }
 
 /** Whether the day is a busy one: a busy day of the week, or a town event the night before said so. */
@@ -239,16 +242,18 @@ export function generateDay(run: RunState, random: Random): Morning {
   const asking = made.filter((m) => !closed.has(m.client.name));
   const sent = asking.length > 0 ? asking : made;
   shapeDemand(sent, run, random);
-  fitToTrucks(sent, run);
-  for (const m of sent) addPromises(m.lines, m.client, run);
+  // A client on a break sends nothing, but the others still ask for what they would have: the break costs only that client's orders.
+  const sending = sent.filter((m) => !isAway(run.standing, m.client.name));
+  fitToTrucks(sending, run);
+  for (const m of sending) addPromises(m.lines, m.client, run);
 
-  const orders: Order[] = sent.map((m, index) => {
+  const orders: Order[] = sending.map((m, index) => {
     const order: Order = {
       id: index + 1,
       client: m.client.name,
       place: m.client.place,
       contact: m.client.contact,
-      leftAt: arrivalTime(index, sent.length),
+      leftAt: arrivalTime(index, sending.length),
       lines: m.lines,
     };
     if (m.note) order.note = m.note;
@@ -259,6 +264,8 @@ export function generateDay(run: RunState, random: Random): Morning {
   const messages: Message[] = [
     ...orders.map((o): Message => ({ kind: 'order', orderId: o.id, at: o.leftAt })),
     ...overnightNotes(run, random),
+    // What clients say about a break or a farewell has its own times, so it moves nothing that chance decides.
+    ...noticeNotes(run.news),
   ];
   const callKinds = callKindsFor(orders.length, random);
   const callSalt = below(random, 1000);

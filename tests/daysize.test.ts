@@ -240,7 +240,7 @@ describe('a town event', () => {
   });
 
   it('needs no new save version: a run saved before reads as it did, and one saved with news in it reads back whole', () => {
-    expect(SAVE_VERSION).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
     const run = runOf(5);
     expect(decodeRun(encodeRun(run, 9))).toEqual({ run, daySeed: 9 });
     const told: Announced[] = [{ client: run.clients[0]!.name, event: 'match' }, { client: run.clients[1]!.name, event: 'closed' }];

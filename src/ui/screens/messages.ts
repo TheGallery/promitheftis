@@ -1,4 +1,5 @@
 import { garageNotice } from '../../game/breakdown';
+import { warnMarker } from '../../game/churn';
 import { formatTime } from '../../game/clock';
 import { shortMarker } from '../../game/history';
 import { place } from '../../game/places';
@@ -25,7 +26,7 @@ function messageRow(app: App, i: number): Line {
     where = place(o.place).name;
     what = `order · ${plural(o.lines.length, 'line')}`;
     if (o.note) extra = '+ note';
-    marker = shortMarker(app.run.history[o.client]);
+    marker = shortMarker(app.run.history[o.client]) + warnMarker(app.run.standing, o.client);
   } else {
     from = m.from;
     where = m.kind;
@@ -48,7 +49,7 @@ function detail(app: App): Line[] {
       .map((l) => `${l.asked} × ${app.desk.item(l.item).name}`)
       .join(' · ');
     for (const row of wrapText(items, 116).slice(0, 2)) out.push(s(` ${row}`, 'd'));
-    out.push(...shortfallLines(app, o.client, 118, 3));
+    out.push(...shortfallLines(app, o.client, 118, 3, 2, true));
     return out;
   }
   const out: Line[] = [cat(s(` ${m.from.toUpperCase()}`, 'b'), s(` · ${m.kind} · ${left(m.at)}`, 'd'))];

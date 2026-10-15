@@ -7,7 +7,7 @@ const TEXT_W = 114;
 /** Rows for a page's text: the screen less the header (2), the footer (3) and the page names with a blank row under them (2). */
 export const HELP_ROOM = ROWS - 2 - 3 - 2;
 
-/** A paragraph as lines, with each {KEY} set apart in the accent colour (the warning colour for a ! marker) and the braces left off. */
+/** A paragraph as lines, with each {KEY} set apart in the accent colour (the warning colour for a ! or ▼ marker) and the braces left off. */
 function paragraph(text: string): Line[] {
   return wrapText(text, TEXT_W).map((row) =>
     cat(
@@ -15,7 +15,7 @@ function paragraph(text: string): Line[] {
       ...row
         .split(/(\{[^}]+\})/)
         .filter(Boolean)
-        .map((part): Line => (part.startsWith('{') ? s(part.slice(1, -1), part.startsWith('{!') ? 'w b' : 'acc') : s(part))),
+        .map((part): Line => (part.startsWith('{') ? s(part.slice(1, -1), part.startsWith('{!') || part.startsWith('{▼') ? 'w b' : 'acc') : s(part))),
     ),
   );
 }

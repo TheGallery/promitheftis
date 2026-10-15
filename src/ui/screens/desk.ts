@@ -1,4 +1,5 @@
 import { shortReason } from '../../game/breakdown';
+import { WARN_MARK, warnMarker } from '../../game/churn';
 import { place, PLACES, type PlaceId } from '../../game/places';
 import { plainName, shortItems } from '../../game/headsup';
 import { shortMarker } from '../../game/history';
@@ -18,6 +19,7 @@ function paneTitle(name: string, lit: boolean, rest: Line): Line {
 }
 
 const LEGEND = ['! went short lately', '!! short two days running'];
+const WARN_LEGEND = `${WARN_MARK} let down two days running`;
 
 function ordersPane(app: App): Line[] {
   const d = app.desk;
@@ -26,7 +28,7 @@ function ordersPane(app: App): Line[] {
     paneTitle('ORDERS', lit, s(`  ${app.orderSel + 1} of ${d.orderCount}`, 'd')),
     s(`   ${''.padEnd(17)}${'PLACE'.padEnd(11)}TRK`, 'd'),
   ];
-  const markers = d.morning.orders.map((o) => shortMarker(app.run.history[o.client]));
+  const markers = d.morning.orders.map((o) => shortMarker(app.run.history[o.client]) + warnMarker(app.run.standing, o.client));
   const rows: Line[] = d.morning.orders.map((o, i) => {
     const current = i === app.orderSel;
     const mark = current ? '▶' : d.isFinished(i) ? '✓' : ' ';
@@ -41,7 +43,7 @@ function ordersPane(app: App): Line[] {
       s(`${clip(place(o.place).name, 10).padEnd(11)}${truck ?? ''}`, base),
     );
   });
-  const legend = markers.some(Boolean) ? LEGEND.map((text) => s(` ${text}`, 'w')) : [];
+  const legend = [...(markers.some((m) => m.includes('!')) ? LEGEND : []), ...(markers.some((m) => m.includes(WARN_MARK)) ? [WARN_LEGEND] : [])].map((text) => s(` ${text}`, 'w'));
   out.push(...scrollRows(rows, app.orderSel, BODY_ROWS - out.length - legend.length), ...legend);
   return out;
 }

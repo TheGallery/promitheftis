@@ -592,8 +592,8 @@ describe('cash in the save', () => {
   });
 
   it('writes the new version, which the old one was not', () => {
-    expect(SAVE_VERSION).toBe(5);
-    expect(JSON.parse(encodeRun(runFromMorning(smallMorning()), 0)).version).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
+    expect(JSON.parse(encodeRun(runFromMorning(smallMorning()), 0)).version).toBe(6);
   });
 
   it.each([
@@ -1031,7 +1031,7 @@ describe('the end-of-day breakdown', () => {
 
 describe('saves from before the prices of each item', () => {
   it('still load: the saved run holds no prices, so an older save is read as before', () => {
-    expect(SAVE_VERSION).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
     const run = { ...runFromMorning(smallMorning()), day: 4, cash: 1888 };
     const text = JSON.stringify({ version: 2, daySeed: 99, run });
     const decoded = decodeRun(text);

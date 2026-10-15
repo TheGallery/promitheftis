@@ -1174,7 +1174,7 @@ export class App {
     this.growthOpen = false;
     this.growthSel = 0;
     this.growth = null;
-    this.newClient = newClientFor(this.run.clients.map((c) => c.name), randomFrom(this.luck.client));
+    this.newClient = newClientFor([...this.run.clients.map((c) => c.name), ...this.run.lost], randomFrom(this.luck.client));
     this.screen = 'day';
     this.say(`Order placed for tomorrow: ${plural(supply.ordered().length, 'item')}, ${plural(supply.total(), 'unit')} in all.`);
     this.sound('finish');

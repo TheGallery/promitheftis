@@ -1,4 +1,5 @@
 import type { Call } from '../src/game/calls';
+import { isAway, isBack, isWarned } from '../src/game/churn';
 import { DEPART_MINUTE, START_MINUTE, weekdayOf } from '../src/game/clock';
 import { usualWith } from '../src/game/clients';
 import { isTownEvent, weekFactor } from '../src/game/daysize';
@@ -35,7 +36,9 @@ import { fakeEffects, hold } from './helpers';
  *   a bigger room when the rooms are costing sales, otherwise the new client.
  * Blind play uses `first` and careful play `screen`, unless the run says otherwise.
  * On a morning with a truck at the garage the blind desk meets the warning and moves down a truck, and the careful desk plans
- * on the trucks that are there, trimming the orders the others cannot carry. Everything chance decides comes from the seed, so the same seed always plays the same days.
+ * on the trucks that are there, trimming the orders the others cannot carry. A client let down two days running is marked on the
+ * desk: blind play does not look, and a careful player serves those clients first, from the scarce stock and on the trucks that
+ * reach them in time, and sends a truck for their rush order even at a loss. Everything chance decides comes from the seed, so the same seed always plays the same days.
  */
 export type Policy = 'blind' | 'careful';
 export type GrowthRule = 'first' | 'client' | 'truck' | 'screen';
@@ -85,6 +88,14 @@ export interface DayStat {
   closed: number;
   clients: number;
   trucksOwned: number;
+  /** Orders that morning from a client let down two days running, and how many of those ended the day pleased. */
+  warned: number;
+  warnedPleased: number;
+  /** Clients who began a break, and who went for good, on that morning; and how many sent no order, and how many were back. */
+  breaks: number;
+  gone: number;
+  away: number;
+  back: number;
   /** What a truck and a room would have cost that evening. */
   truckPrice: number;
   roomPrice: number;
@@ -99,6 +110,8 @@ const RESERVE = 0.15;
 const ROOM_FULL = 0.9;
 /** A careful player orders this much more than the notes say, where the rooms have space, so a small surprise leaves nobody short. */
 const BUFFER = 0.1;
+/** A careful player counts a late truck for a client let down two days running this many times as dear. */
+const WARNED_LATE = 6;
 /** A careful player looks over the plan this many times, moving an order to a better truck. */
 const ROUNDS = 2;
 
@@ -126,7 +139,11 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   const spoiled = app.run.spoiled.reduce((sum, s) => sum + s.units, 0);
   const supplierShort = app.run.short.length > 0;
   const town = app.run.ahead.some((a) => isTownEvent(a.event));
-  const closed = app.run.clients.length - app.morning.orders.length;
+  const { standing, news } = app.run;
+  const away = app.run.clients.filter((c) => isAway(standing, c.name)).length;
+  const back = app.run.clients.filter((c) => isBack(standing, c.name)).length;
+  const closed = app.run.clients.length - away - app.morning.orders.length;
+  const warned = app.morning.orders.filter((o) => isWarned(standing, o.client)).map((o) => o.client);
   if (app.screen === 'messages') press(' ');
   if (policy === 'blind') blindDesk(app, press);
   else carefulDesk(app, press);
@@ -140,7 +157,7 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   hold(app, ' ');
   for (let n = 0; n < 100 && !app.roadOver; n++) {
     const call = app.roadCall;
-    if (call && policy === 'careful') press(...Array(carefulAnswer(call)).fill('ArrowDown'));
+    if (call && policy === 'careful') press(...Array(carefulAnswer(call, isWarned(app.run.standing, call.client))).fill('ArrowDown'));
     press(call ? 'Enter' : ' ');
   }
   press(' ', ' ');
@@ -183,6 +200,12 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
     closed,
     clients: app.run.clients.length,
     trucksOwned: app.run.trucks.length,
+    warned: warned.length,
+    warnedPleased: summary.orders.filter((o) => warned.includes(o.client) && o.mood === 'pleased').length,
+    breaks: news.filter((n) => n.kind === 'break').length,
+    gone: news.filter((n) => n.kind === 'gone').length,
+    away,
+    back,
     truckPrice: truck?.price ?? 0,
     roomPrice: room?.price ?? 0,
     grew,
@@ -199,13 +222,18 @@ function rushOutcome(app: App): DayStat['rush'] {
   return trip ? (trip.late ? 'late' : 'on time') : 'turned down';
 }
 
-/** The answer on the phone that earns most: for a rush order, the truck whose trip pays most over what it costs, or no if none pays. */
-function carefulAnswer(call: Call): number {
+/**
+ * The answer on the phone that earns most: for a rush order, the truck whose trip pays most over what it costs, or no if none pays.
+ * A client let down two days running is sent a truck that gets there in time even at a loss, since a no or a late truck would
+ * let them down a third day.
+ */
+function carefulAnswer(call: Call, warned: boolean): number {
   if (call.kind !== 'rush') return 0;
   const net = (o: Call['options'][number]) => (o.rush ? o.rush.paid - o.rush.cost : 0);
+  const onTime = (o: Call['options'][number]) => (warned && o.rush && !o.rush.late ? 1 : 0);
   let best = call.options.length - 1;
   call.options.forEach((o, i) => {
-    if (net(o) > net(call.options[best]!)) best = i;
+    if (onTime(o) > onTime(call.options[best]!) || (onTime(o) === onTime(call.options[best]!) && net(o) > net(call.options[best]!))) best = i;
   });
   return best;
 }
@@ -252,7 +280,10 @@ function pickTruck(app: App, press: Press, truckId: number): void {
   press(...Array(app.morning.trucks.length).fill('ArrowUp'), ...Array(at).fill('ArrowDown'), 'Enter');
 }
 
-/** What to give on every line: as asked, except that a short item goes whole to as few clients as can be, those short before first. */
+/**
+ * What to give on every line: as asked, except that a short item goes whole to as few clients as can be, those promised it
+ * first, then those let down two days running, then those short before.
+ */
 function shareOut(app: App): number[][] {
   const { orders, stock, rush } = app.morning;
   const gives = orders.map((o) => o.lines.map((l) => l.asked));
@@ -262,8 +293,9 @@ function shareOut(app: App): number[][] {
     let left = Math.max(0, (stock[item.id] ?? 0) - (rush?.item === item.id ? rush.qty : 0));
     if (askers.reduce((sum, a) => sum + a.asked, 0) <= left) continue;
     const promised = (oi: number) => (app.run.promises.some((p) => p.client === orders[oi]!.client && p.item === item.id) ? 0 : 1);
+    const warned = (oi: number) => (isWarned(app.run.standing, orders[oi]!.client) ? 0 : 1);
     const before = (oi: number) => (shortYesterday(app.run.history[orders[oi]!.client]) ? 0 : 1);
-    askers.sort((a, b) => promised(a.oi) - promised(b.oi) || before(a.oi) - before(b.oi) || a.asked - b.asked || a.oi - b.oi);
+    askers.sort((a, b) => promised(a.oi) - promised(b.oi) || warned(a.oi) - warned(b.oi) || before(a.oi) - before(b.oi) || a.asked - b.asked || a.oi - b.oi);
     for (const a of askers) {
       const give = Math.min(a.asked, left);
       gives[a.oi]![a.li] = give;
@@ -298,7 +330,8 @@ function carefulDesk(app: App, press: Press): void {
     for (const visit of planRoute(all, departAt).visits) {
       for (const stop of visit.stops) {
         const before = orders[stop.orderId]!.before;
-        if (before != null && stop.arriveAt > before) total += worth(stop.orderId) * (1 - LATE_PAYS);
+        // A client let down two days running is not made late: a third bad day costs their orders for days.
+        if (before != null && stop.arriveAt > before) total += worth(stop.orderId) * (1 - LATE_PAYS) * (isWarned(app.run.standing, orders[stop.orderId]!.client) ? WARNED_LATE : 1);
       }
     }
     return total;
