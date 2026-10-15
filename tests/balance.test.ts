@@ -149,9 +149,9 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
   });
 });
 
-/** Averages of one figure over the days where a truck was at the garage, or over the days where none was. */
+/** Averages of one figure over the days where a truck was at the garage, or over the days where none was, leaving out the days the supplier was short so that one event does not blur the other. */
 const onDays = (days: DayStat[], garage: boolean, figure: (d: DayStat) => number) => {
-  const picked = days.filter((d) => d.garage === garage);
+  const picked = days.filter((d) => d.garage === garage && !d.supplierShort);
   return picked.reduce((sum, d) => sum + figure(d), 0) / picked.length;
 };
 const inFull = (d: DayStat) => d.inFull / d.orders;
