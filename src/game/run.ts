@@ -2,6 +2,7 @@ import type { DaySummary } from './day';
 import type { Call } from './calls';
 import { BIG_TRUCKS } from './morning';
 import type { Growth } from './growth';
+import { growthPrice, STARTING_CASH } from './money';
 import { clientDay, remember, type ClientDay, type History } from './history';
 import type { Mood } from './moods';
 import type { PlaceId } from './places';
@@ -56,6 +57,8 @@ export interface RunState {
   promises: Promised[];
   /** What came in overnight from the supplier. */
   delivery: Delivery;
+  /** The cash in the bank when the day begins; below zero when the business owes money. */
+  cash: number;
 }
 
 /** What the day that has just ended hands on to the next one. */
@@ -69,6 +72,8 @@ export interface DayOutcome {
   today: Record<string, ClientDay>;
   promises: Promised[];
   growth: Growth | null;
+  /** What the day came to: taken in, less the supplier order and the trucks. */
+  earned: number;
 }
 
 /** The state a run starts from: the fixed morning, with its clients, stock, trucks and rooms. */
@@ -87,6 +92,7 @@ export function runFromMorning(m: Morning): RunState {
     history: {},
     promises: [],
     delivery: { items: 0, units: 0 },
+    cash: STARTING_CASH,
   };
 }
 
@@ -115,6 +121,7 @@ export function outcomeOf(
     today: Object.fromEntries(day.orders.map((o) => [o.client, clientDay(o)])),
     promises: promisesFrom(calls, answers),
     growth,
+    earned: day.money.total,
   };
 }
 
@@ -139,7 +146,10 @@ export function newTruck(id: number, drivers: Iterable<string> = []): Truck {
   return { ...model, id, driver };
 }
 
-/** The state of the next morning: yesterday's stock with the supplier's delivery on top, and the growth put to work. */
+/**
+ * The state of the next morning: yesterday's stock with the supplier's delivery on top, the cash with the day's
+ * money settled and any growth paid for, and the growth put to work.
+ */
 export function nextDay(run: RunState, outcome: DayOutcome): RunState {
   const stock: Record<string, number> = {};
   for (const id of new Set([...Object.keys(run.stock), ...Object.keys(outcome.left), ...Object.keys(outcome.ordered)])) {
@@ -161,6 +171,7 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
       items: Object.values(outcome.ordered).filter((n) => n > 0).length,
       units: Object.values(outcome.ordered).reduce((sum, n) => sum + n, 0),
     },
+    cash: run.cash + outcome.earned - (outcome.growth ? growthPrice(outcome.growth, run.clients.length) : 0),
   };
   grow(next, outcome.growth);
   return next;

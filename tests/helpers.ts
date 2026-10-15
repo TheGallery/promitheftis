@@ -64,8 +64,10 @@ export function toDay(
   cues: string[] = [],
   random: () => number = () => 0,
   store: Store = memoryStore(),
+  cash?: number,
 ) {
   const app = new App(fakeEffects(cues, random, store), () => {}, morning);
+  if (cash != null) app.run.cash = cash;
   const press = (...keys: string[]) => keys.forEach((key) => app.press({ key }));
   press(' ');
   if (morning === 'small') {
@@ -135,8 +137,9 @@ export function toNextMorning(
   answer = 0,
   random: () => number = () => 0,
   store: Store = memoryStore(),
+  cash?: number,
 ) {
-  const day = toDay(answer, morning, ['a'], [], random, store);
+  const day = toDay(answer, morning, ['a'], [], random, store, cash);
   day.press('Enter', growth, 'Enter', 'Enter');
   return day;
 }

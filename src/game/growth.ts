@@ -1,4 +1,5 @@
 import type { DayRoom, DaySummary } from './day';
+import { canAfford, growthPrice } from './money';
 import { place, type PlaceId } from './places';
 import type { Kept } from './types';
 
@@ -24,8 +25,12 @@ export interface GrowthOption {
   title: string;
   /** What it gives. */
   gain: string;
-  /** The extra work it brings, since nothing is paid for; a clause that follows "The extra work:". */
+  /** The extra work it brings, besides what it costs; a clause that follows "The extra work:". */
   work: string;
+  /** What it costs, in pounds; a new client is free. */
+  price: number;
+  /** False when the cash in the bank is less than the price, and the option cannot be picked. */
+  affordable: boolean;
 }
 
 const ROOM_NAME: Record<Kept, string> = { freezer: 'freezer', fridge: 'fridge', dry: 'dry store' };
@@ -70,11 +75,14 @@ export function newClientFor(taken: readonly string[], random: () => number): Ne
   return pool[at] as NewClient;
 }
 
-/** The three things the day can end by growing, in the order they are listed; `client` is the restaurant that asks to join. */
-export function growthOptions(day: DaySummary, client: NewClient): GrowthOption[] {
+/**
+ * The three things the day can end by growing, in the order they are listed; `client` is the restaurant that asks to
+ * join, and `clients` is how many the business serves now, which sets what a truck or a room costs.
+ */
+export function growthOptions(day: DaySummary, client: NewClient, clients: number): GrowthOption[] {
   const tight = tightestRoom(day.rooms);
   const room = ROOM_NAME[tight.kept];
-  return [
+  const options: Array<Omit<GrowthOption, 'price' | 'affordable'>> = [
     {
       growth: { kind: 'truck' },
       title: 'Another truck',
@@ -94,4 +102,8 @@ export function growthOptions(day: DaySummary, client: NewClient): GrowthOption[
       work: 'more orders to hand out, and more to juggle between the trucks.',
     },
   ];
+  return options.map((o) => {
+    const price = growthPrice(o.growth, clients);
+    return { ...o, price, affordable: canAfford(day.money.cash, price) };
+  });
 }

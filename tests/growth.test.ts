@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bigMorning, smallMorning } from '../src/game/morning';
 import { growthOptions, NEW_CLIENTS, newClientFor, tightestRoom, type NewClient } from '../src/game/growth';
+import { formatMoney } from '../src/game/money';
 import { PLACES } from '../src/game/places';
 import { plain, ROWS } from '../src/ui/grid';
 import { screenLines } from '../src/ui/view';
@@ -42,7 +43,7 @@ describe('the tightest room', () => {
 describe('the three growth options', () => {
   it('lists another truck, a bigger room and a new client, in that order', () => {
     const { day } = summary(0, [], { chips: 40 });
-    const options = growthOptions(day, CLIENT);
+    const options = growthOptions(day, CLIENT, 7);
     expect(options.map((o) => o.growth.kind)).toEqual(['truck', 'room', 'client']);
     expect(options[0]!.title).toBe('Another truck');
     for (const o of options) {
@@ -60,7 +61,7 @@ describe('the three growth options', () => {
     ] as const;
     for (const [amounts, room, title] of cases) {
       const { day } = summary(0, [], amounts);
-      const option = growthOptions(day, CLIENT)[1]!;
+      const option = growthOptions(day, CLIENT, 7)[1]!;
       expect(option.title).toBe(title);
       expect(option.growth).toEqual({ kind: 'room', room });
       expect(option.gain).toContain(`${tightestRoom(day.rooms).space.pct}% full tomorrow`);
@@ -69,7 +70,7 @@ describe('the three growth options', () => {
 
   it('offers the restaurant it is given, with its square and contact', () => {
     const { day } = summary(0);
-    const option = growthOptions(day, CLIENT)[2]!;
+    const option = growthOptions(day, CLIENT, 7)[2]!;
     expect(option.growth).toEqual({ kind: 'client', client: CLIENT });
     expect(option.title).toBe('A new client: The Salt Cellar');
     expect(option.gain).toContain('The Salt Cellar in Saltmarket');
@@ -158,7 +159,7 @@ describe('choosing what to grow', () => {
   });
 
   it('records the choice as plain state when ENTER confirms, and the arrows and numbers leave it alone', () => {
-    const { app, press } = toDay(0, 'small', ['9', '9', '9']);
+    const { app, press } = toDay(0, 'small', ['9', '9', '9'], [], undefined, undefined, 99999);
     press('Enter', '2', 'Enter');
     expect(app.growth).toEqual({ kind: 'room', room: tightestRoom(app.day!.rooms).kept });
     expect(app.status).toContain('Chosen: A bigger');
@@ -341,7 +342,7 @@ describe('the new client in the game', () => {
 
 describe('the growth screen', () => {
   it('shows the three options and what today showed, 120 columns by 30 rows', () => {
-    const { app, press } = toDay(0, 'small', ['9', '9', '9']);
+    const { app, press } = toDay(0, 'small', ['9', '9', '9'], [], undefined, undefined, 99999);
     press('Enter');
     const text = screen(app).join('\n');
     expect(text).toContain('END OF THE DAY');
@@ -357,7 +358,8 @@ describe('the growth screen', () => {
     expect(text).toContain('the tightest');
     expect(text).toContain('It takes effect tomorrow');
     expect(text).not.toContain('…');
-    expect(text).not.toMatch(/[$£€]|money|price|cost|profit/i);
+    expect(text).toContain('The bank holds');
+    for (const o of app.growthOptions) expect(text).toContain(o.price > 0 ? formatMoney(o.price) : 'free');
   });
 
   it('highlights the picked option and moves the highlight with the keys', () => {

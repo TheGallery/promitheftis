@@ -254,7 +254,7 @@ describe('on the screens', () => {
   });
 
   it('keeps the stock notes on the order desk when a long shortfall detail would not fit', () => {
-    const { app, press } = toNextMorning('1', 'big');
+    const { app, press } = toNextMorning('1', 'big', 0, undefined, undefined, 99999);
     press(' ', 'Tab');
     const stock = app.desk.morning.stock as Record<string, number>;
     for (const item of Object.keys(stock)) stock[item] = 0;
@@ -310,7 +310,7 @@ describe('on the screens', () => {
   });
 
   it('plays the big morning to day 2 with the markers in 120 columns, in both colour schemes', () => {
-    const { app, press } = toNextMorning('1', 'big');
+    const { app, press } = toNextMorning('1', 'big', 0, undefined, undefined, 99999);
     expect(Object.keys(app.run.history).length).toBe(38);
     screen(app);
     press('F2');

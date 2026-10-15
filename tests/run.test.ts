@@ -11,7 +11,7 @@ import type { Morning } from '../src/game/types';
 import { App } from '../src/ui/app';
 import { fakeEffects, holdNewRun, playToSupply, screen, toDay, toNextMorning } from './helpers';
 
-const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, ...over });
+const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, earned: 0, ...over });
 const smallRun = (): RunState => runFromMorning(smallMorning());
 const bigRun = (): RunState => runFromMorning(bigMorning());
 const total = (m: Morning, client: string) => m.orders.find((o) => o.client === client)!.lines.reduce((sum, l) => sum + l.asked, 0);
@@ -428,7 +428,7 @@ describe('the next morning in the game', () => {
   });
 
   it('puts one more truck on the big morning too, past nine, and still fits the screens', () => {
-    const { app, press } = toNextMorning('1', 'big');
+    const { app, press } = toNextMorning('1', 'big', 0, undefined, undefined, 99999);
     expect(app.morning.trucks).toHaveLength(10);
     press(' ');
     screen(app);
@@ -440,7 +440,7 @@ describe('the next morning in the game', () => {
   });
 
   it('plays the big morning\'s second day with ten trucks to the end of the day, in 120 columns', () => {
-    const { app, press } = toNextMorning('1', 'big');
+    const { app, press } = toNextMorning('1', 'big', 0, undefined, undefined, 99999);
     playToSupply(app, press);
     expect(app.result!.trucks).toHaveLength(10);
     screen(app);
@@ -462,7 +462,7 @@ describe('the next morning in the game', () => {
   });
 
   it('shows the bigger room on the supplier screen', () => {
-    const { app, press } = toDay(0, 'small', ['9', '9', '9']);
+    const { app, press } = toDay(0, 'small', ['9', '9', '9'], [], undefined, undefined, 99999);
     const room = app.growthOptions[1]!.growth as { kind: 'room'; room: 'freezer' | 'fridge' | 'dry' };
     press('Enter', '2', 'Enter', 'Enter');
     expect(app.morning.capacity[room.room]).toBe(ROOM_CAPACITY[room.room] + ROOM_GROWTH[room.room]);

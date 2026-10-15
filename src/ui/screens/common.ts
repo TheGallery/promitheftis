@@ -1,13 +1,23 @@
 import { dateLabel, DEPART_MINUTE, formatTime } from '../../game/clock';
 import { plainName } from '../../game/headsup';
+import { formatMoney } from '../../game/money';
 import { shortNotes } from '../../game/history';
 import type { App } from '../app';
 import { bar, cat, clip, s, wrapText, type Line } from '../grid';
 
-/** Date of the day, clock and the time the trucks leave, shown at the right of every header. */
-export function clockLine(day: number, minute: number, trucksWaiting = false): Line {
+/** An amount of money, in the warning colour when it is below zero. */
+export function moneySeg(amount: number, text = formatMoney(amount), extra = ''): Line {
+  return s(text, amount < 0 ? `w ${extra}`.trim() : extra);
+}
+
+/**
+ * Date of the day, clock and the time the trucks leave, shown at the right of every header; with `cash`, the
+ * cash in the bank comes first.
+ */
+export function clockLine(day: number, minute: number, trucksWaiting = false, cash?: number): Line {
   const late = trucksWaiting && minute > DEPART_MINUTE;
   return cat(
+    cash == null ? [] : cat(s('CASH ', 'd'), moneySeg(cash, undefined, 'b'), s('  ')),
     s(`${dateLabel(day)}  ${formatTime(minute)}  `),
     s(`TRUCKS ${formatTime(DEPART_MINUTE)} `, late ? 'w b' : 'b'),
   );
