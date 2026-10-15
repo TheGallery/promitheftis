@@ -9,8 +9,9 @@ import { clientDay, remember, type ClientDay, type History } from './history';
 import type { Mood } from './moods';
 import type { PlaceId } from './places';
 import { fitRoom, ROOM_GROWTH } from './rooms';
+import { creditFor, deliveredOf, shortfallFor } from './shortfall';
 import { KEPT_ORDER, type Supply } from './supply';
-import type { Crew, Kept, Morning, Truck } from './types';
+import type { Crew, Kept, Morning, Short, Truck } from './types';
 
 /** A restaurant that sends orders. */
 export interface RunClient {
@@ -73,6 +74,8 @@ export interface RunState {
   spoiled: Spoiled[];
   /** What the notes on yesterday's orders announced for today. */
   ahead: Announced[];
+  /** What the supplier left behind of last night's delivery; the stock holds only what came, and the rest was not charged for. */
+  short: Short[];
   /** The cash in the bank when the day begins; below zero when the business owes money. */
   cash: number;
 }
@@ -112,6 +115,7 @@ export function runFromMorning(m: Morning): RunState {
     delivery: { items: 0, units: 0 },
     spoiled: [],
     ahead: [],
+    short: [],
     cash: STARTING_CASH,
   };
 }
@@ -193,12 +197,16 @@ function settleRooms(
 
 /**
  * The state of the next morning: yesterday's stock with the supplier's delivery on top, the cash with the day's
- * money settled and any growth paid for, and the growth put to work.
+ * money settled and any growth paid for, and the growth put to work. `seed` is the one that makes up the next morning;
+ * with it the supplier may leave part of the order behind, and the cash gets back what was paid for that part.
+ * Without one the whole order arrives.
  */
-export function nextDay(run: RunState, outcome: DayOutcome): RunState {
+export function nextDay(run: RunState, outcome: DayOutcome, seed?: number): RunState {
   const capacity = { ...run.capacity };
   if (outcome.growth?.kind === 'room') capacity[outcome.growth.room] += ROOM_GROWTH[outcome.growth.room];
-  const { stock, spoiled } = settleRooms(run, outcome, capacity);
+  const short = seed == null ? [] : shortfallFor(outcome.ordered, seed);
+  const delivered = deliveredOf(outcome.ordered, short);
+  const { stock, spoiled } = settleRooms(run, { ...outcome, ordered: delivered }, capacity);
   const next: RunState = {
     ...run,
     day: run.day + 1,
@@ -212,12 +220,13 @@ export function nextDay(run: RunState, outcome: DayOutcome): RunState {
     history: remember(run.history, outcome.today),
     promises: outcome.promises.map((p) => ({ ...p })),
     delivery: {
-      items: Object.values(outcome.ordered).filter((n) => n > 0).length,
-      units: Object.values(outcome.ordered).reduce((sum, n) => sum + n, 0),
+      items: Object.values(delivered).filter((n) => n > 0).length,
+      units: Object.values(delivered).reduce((sum, n) => sum + n, 0),
     },
     spoiled,
     ahead: (outcome.ahead ?? []).map((a) => ({ ...a })),
-    cash: run.cash + outcome.earned - (outcome.growth ? growthPrice(outcome.growth, run.clients.length, run.trucks.length) : 0),
+    short,
+    cash: run.cash + outcome.earned + creditFor(short) - (outcome.growth ? growthPrice(outcome.growth, run.clients.length, run.trucks.length) : 0),
   };
   grow(next, outcome.growth);
   return next;

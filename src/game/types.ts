@@ -43,6 +43,13 @@ export type Message =
   | { kind: 'order'; orderId: number; at: number }
   | { kind: 'supplier' | 'staff'; from: string; text: string; at: number };
 
+/** An item the supplier delivered less of than was ordered: `came` of the `ordered` units arrived. */
+export interface Short {
+  item: string;
+  ordered: number;
+  came: number;
+}
+
 export interface Crew {
   names: string[];
   trucks: number[];
@@ -69,4 +76,6 @@ export interface Morning {
   callKinds?: CallKind[];
   /** Varies which item a client forgets, so the same client does not forget the same thing every day. */
   callSalt?: number;
+  /** The items the supplier delivered less of overnight than was ordered; the stock already holds only what came. */
+  short?: Short[];
 }

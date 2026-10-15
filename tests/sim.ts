@@ -18,7 +18,8 @@ import { fakeEffects, hold } from './helpers';
  *
  * - `blind` presses ENTER and SPACE everywhere: every line as asked, the truck the cursor is on (one step down when it
  *   is too full), the first answer to every call, and A on the supplier order.
- * - `careful` does the same work with its head: it shares a short item out so that as few clients as possible go short,
+ * - `careful` does the same work with its head: it shares a short item out (whatever made it short: a big day, or a supplier
+ *   that left part of the order behind) so that as few clients as possible go short, those promised it on the phone first,
  *   plans the trucks against the times clients asked for (each order goes on the truck where it adds least to the road and
  *   to what coming late takes off, and the plan is looked over again), orders what the notes say tomorrow will need and no more
  *   than the rooms hold or the bank can pay for, and buys a room when the rooms are costing it sales.
@@ -60,6 +61,8 @@ export interface DayStat {
   load: number;
   /** Units that spoiled in the rooms overnight, at the start of this day. */
   spoiled: number;
+  /** True when the supplier left part of the night's delivery behind, so that the morning began with an item short. */
+  supplierShort: boolean;
   clients: number;
   trucksOwned: number;
   /** What a truck and a room would have cost that evening. */
@@ -101,6 +104,7 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   const press: Press = (...keys) => keys.forEach((key) => app.press({ key }));
   const day = app.morning.day;
   const spoiled = app.run.spoiled.reduce((sum, s) => sum + s.units, 0);
+  const supplierShort = app.run.short.length > 0;
   if (app.screen === 'messages') press(' ');
   if (policy === 'blind') blindDesk(app, press);
   else carefulDesk(app, press);
@@ -139,6 +143,7 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
     squares: summary.money.squares,
     load,
     spoiled,
+    supplierShort,
     clients: app.run.clients.length,
     trucksOwned: app.run.trucks.length,
     truckPrice: truck?.price ?? 0,
@@ -200,8 +205,9 @@ function shareOut(app: App): number[][] {
     const askers = orders.flatMap((o, oi) => o.lines.flatMap((l, li) => (l.item === item.id ? [{ oi, li, asked: l.asked }] : [])));
     let left = stock[item.id] ?? 0;
     if (askers.reduce((sum, a) => sum + a.asked, 0) <= left) continue;
+    const promised = (oi: number) => (app.run.promises.some((p) => p.client === orders[oi]!.client && p.item === item.id) ? 0 : 1);
     const before = (oi: number) => (shortYesterday(app.run.history[orders[oi]!.client]) ? 0 : 1);
-    askers.sort((a, b) => before(a.oi) - before(b.oi) || a.asked - b.asked || a.oi - b.oi);
+    askers.sort((a, b) => promised(a.oi) - promised(b.oi) || before(a.oi) - before(b.oi) || a.asked - b.asked || a.oi - b.oi);
     for (const a of askers) {
       const give = Math.min(a.asked, left);
       gives[a.oi]![a.li] = give;
@@ -420,9 +426,9 @@ const mean = (xs: number[]) => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b,
 /** The median of a list of numbers. */
 export const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
 
-/** Averages over all the runs, from day `from` of each on (the first day is 1). */
-export function summarise(runs: DayStat[][], from = 1): Summary {
-  const all = runs.flatMap((r) => r.filter((d) => d.day >= from));
+/** Averages over all the runs, from day `from` of each on (the first day is 1), over the days `only` takes if it is given. */
+export function summarise(runs: DayStat[][], from = 1, only: (d: DayStat) => boolean = () => true): Summary {
+  const all = runs.flatMap((r) => r.filter((d) => d.day >= from && only(d)));
   return {
     profit: mean(all.map((d) => d.profit)),
     cash: mean(runs.map((r) => r.at(-1)!.cash)),
