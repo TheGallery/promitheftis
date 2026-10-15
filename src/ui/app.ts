@@ -594,7 +594,7 @@ export class App {
   /** The next morning: the stock left plus the supplier's delivery, the growth at work, and a made-up day of orders. */
   private nextMorning(day: DaySummary, supply: Supply): void {
     const left = stockAfterDeliveries(this.desk);
-    this.run = nextDay(this.run, outcomeOf(left, supply, day, this.calls, this.answers, this.growth));
+    this.run = nextDay(this.run, outcomeOf(left, supply, day, this.calls, this.answers, this.growth), this.luck.seed);
     this.daySeed = this.luck.seed;
     this.startDay(generateDay(this.run, mulberry32(this.daySeed)));
     this.saveRun();

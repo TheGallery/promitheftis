@@ -103,6 +103,12 @@ export const HELP_PAGES: readonly HelpPage[] = [
           'so much. What does not fit spoils overnight, and is paid for all the same: the bar turns amber and says how many units will spoil, ' +
           'and the store room tells you in the morning. A bigger room is one of the things you can grow.',
       },
+      {
+        head: 'WHEN THE SUPPLIER COMES UP SHORT',
+        text:
+          'Now and then an item you ordered arrives only in part. An overnight note says how much came and that the rest is not charged for; ' +
+          'when today\'s orders need more than is on hand, HEADS UP names it. Decide who gets it: a client you promised it to, one let down yesterday, or the most clients in full.',
+      },
     ],
   },
   {

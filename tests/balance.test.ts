@@ -114,6 +114,36 @@ describe.each(['small', 'big'] as const)('the %s morning', (kind) => {
     expect(first('careful').trucks).toBeLessThan(first('blind').trucks);
   });
 
+  it('leaves the supplier short on about one day in four or five, for both players alike, and never on the first morning', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      const days = runs(kind, policy).flat();
+      expect(days.filter((d) => d.day === 1 && d.supplierShort)).toHaveLength(0);
+      const share = days.filter((d) => d.day > 1 && d.supplierShort).length / days.filter((d) => d.day > 1).length;
+      expect(share).toBeGreaterThan(0.15);
+      expect(share).toBeLessThan(0.3);
+    }
+    expect(runs(kind, 'blind').map((r) => r.map((d) => d.supplierShort))).toEqual(runs(kind, 'careful').map((r) => r.map((d) => d.supplierShort)));
+  });
+
+  it('pays a careful player clearly more than a blind one on a day the supplier is short: sharing the scarce stock out keeps clients pleased', () => {
+    const short = (d: DayStat) => d.supplierShort;
+    const blind = summarise(runs(kind, 'blind'), FROM, short);
+    const careful = summarise(runs(kind, 'careful'), FROM, short);
+    expect(careful.profit).toBeGreaterThan(0);
+    expect(careful.pleased).toBeGreaterThan(0.8);
+    expect(careful.pleased).toBeGreaterThan(blind.pleased + 0.25);
+    expect(careful.inFull).toBeGreaterThan(blind.inFull + 0.15);
+    expect(blind.profit).toBeLessThan(careful.profit * 0.5);
+  });
+
+  it('keeps blind play calm on a short day: it costs a little, and does not turn the clients against it any further', () => {
+    const short = summarise(runs(kind, 'blind'), FROM, (d) => d.supplierShort);
+    const usual = summarise(runs(kind, 'blind'), FROM, (d) => !d.supplierShort);
+    expect(short.pleased).toBeGreaterThan(0.4);
+    expect(short.pleased).toBeGreaterThan(usual.pleased - 0.15);
+    expect(short.profit).toBeGreaterThan(-STARTING_CASH / 10);
+  });
+
   it('plays the same days again for the same seed', () => {
     expect(playRun(kind, 'careful', SEEDS[0]!, 6)).toEqual(runs(kind, 'careful')[0]!.slice(0, 6));
   });

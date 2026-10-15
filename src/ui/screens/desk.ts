@@ -230,7 +230,7 @@ function headsUp(app: App): Line {
   let text = '';
   let shown = 0;
   for (const it of items) {
-    const part = `${plainName(it.name)}: ${it.asked} asked today, ${it.onHand} on hand`;
+    const part = `${plainName(it.name)}: ${it.asked} asked today, ${it.onHand} on hand${it.sent ? ` (supplier sent ${it.sent.came} of ${it.sent.ordered})` : ''}`;
     const next = text ? `${text} · ${part}` : part;
     if (next.length > 120 - 11 - 14 && shown > 0) break;
     text = next;

@@ -6,6 +6,7 @@ import { plainName } from './headsup';
 import { arrivalTime, generateLines, ITEM_LIST } from './morning';
 import { moodEffect } from './moods';
 import { below, pick, type Random } from './random';
+import { shortNotes } from './shortfall';
 import { KEPT_ORDER } from './supply';
 import type { RunClient, RunState } from './run';
 import type { Kept, Message, Morning, Order, OrderLine } from './types';
@@ -194,7 +195,10 @@ function overnightNotes(run: RunState, random: Random): Message[] {
     const units = `${run.delivery.units} ${run.delivery.units === 1 ? 'unit' : 'units'}`;
     notes.push({ kind: 'supplier', from: 'Hartley', text: `Your order is in: ${items}, ${units}.` });
   }
-  notes.push(...spoilNotes(run), pick(random, STAFF_NOTES), pick(random, SUPPLIER_NOTES));
+  const left = shortNotes(run.short).map((n): Omit<Note, 'at'> => ({ kind: 'supplier', ...n }));
+  // A supplier that has just said part of the order did not come does not also say all is well.
+  const calm = SUPPLIER_NOTES.filter((n) => !left.some((l) => l.from === n.from));
+  notes.push(...left, ...spoilNotes(run), pick(random, STAFF_NOTES), pick(random, calm));
   const slots = Math.max(4, notes.length);
   const times = Array.from({ length: slots }, (_, i) => SUPPLIER_FIRST + Math.round((i * (SUPPLIER_LAST - SUPPLIER_FIRST)) / (slots - 1)));
   return shuffled(random, times).slice(0, notes.length).sort((a, b) => a - b).map((at, i) => ({ ...(notes[i] as Omit<Note, 'at'>), at }));
@@ -255,5 +259,6 @@ export function generateDay(run: RunState, random: Random): Morning {
     storeRoom: [...run.storeRoom],
     callKinds: callKindsFor(orders.length, random),
     callSalt: below(random, 1000),
+    ...(run.short.length > 0 ? { short: run.short.map((s) => ({ ...s })) } : {}),
   };
 }

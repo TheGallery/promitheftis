@@ -5,6 +5,8 @@ export interface ShortItem {
   name: string;
   asked: number;
   onHand: number;
+  /** What the supplier delivered of it overnight when that was less than was ordered. */
+  sent?: { came: number; ordered: number };
 }
 
 /** Items that today's orders ask for more of than there is on hand, worst first. */
@@ -16,9 +18,10 @@ export function shortItems(morning: Morning): ShortItem[] {
       0,
     );
     const onHand = morning.stock[item.id] ?? 0;
-    if (asked > onHand) out.push({ item: item.id, name: item.name, asked, onHand });
+    const short = morning.short?.find((s) => s.item === item.id);
+    if (asked > onHand) out.push({ item: item.id, name: item.name, asked, onHand, ...(short ? { sent: { came: short.came, ordered: short.ordered } } : {}) });
   }
-  return out.sort((a, b) => a.onHand / a.asked - b.onHand / b.asked);
+  return out.sort((a, b) => Number(!!b.sent) - Number(!!a.sent) || a.onHand / a.asked - b.onHand / b.asked);
 }
 
 /** The short item's name without its unit: "Ketchup, bottle" becomes "ketchup". */
