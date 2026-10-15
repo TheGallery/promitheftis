@@ -1,3 +1,4 @@
+import type { Call } from '../src/game/calls';
 import { DEPART_MINUTE, START_MINUTE } from '../src/game/clock';
 import { usualWith } from '../src/game/clients';
 import { swings } from '../src/game/demand';
@@ -22,7 +23,9 @@ import { fakeEffects, hold } from './helpers';
  *   that left part of the order behind) so that as few clients as possible go short, those promised it on the phone first,
  *   plans the trucks against the times clients asked for (each order goes on the truck where it adds least to the road and
  *   to what coming late takes off, and the plan is looked over again), orders what the notes say tomorrow will need and no more
- *   than the rooms hold or the bank can pay for, and buys a room when the rooms are costing it sales.
+ *   than the rooms hold or the bank can pay for, and buys a room when the rooms are costing it sales. When the overnight
+ *   notes say a client may ring for a rush order it keeps that much of the item back at the desk, and on the phone sends the
+ *   truck that earns most (what the order pays less what the trip costs), or says no when none would.
  *
  * What to grow is a separate rule, so that the rules can be set against each other with the same careful desk:
  * - `first` presses ENTER on whatever is highlighted: the truck, and when it cannot be paid for the next one down.
@@ -66,6 +69,11 @@ export interface DayStat {
   spoiled: number;
   /** True when the supplier left part of the night's delivery behind, so that the morning began with an item short. */
   supplierShort: boolean;
+  /** How a rush order went: `none` on a morning with no rush, otherwise whether a truck took it in time, late, or none did. */
+  rush: 'none' | 'on time' | 'late' | 'turned down';
+  /** What the rush order paid, and what its trip cost; nothing when no truck took it. */
+  rushPaid: number;
+  rushCost: number;
   clients: number;
   trucksOwned: number;
   /** What a truck and a room would have cost that evening. */
@@ -119,7 +127,11 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   const garage = app.morning.garage != null;
   press(' ');
   hold(app, ' ');
-  for (let n = 0; n < 100 && !app.roadOver; n++) press(app.roadCall ? 'Enter' : ' ');
+  for (let n = 0; n < 100 && !app.roadOver; n++) {
+    const call = app.roadCall;
+    if (call && policy === 'careful') press(...Array(carefulAnswer(call)).fill('ArrowDown'));
+    press(call ? 'Enter' : ' ');
+  }
   press(' ', ' ');
 
   let needs: RoomNeeds | null = null;
@@ -151,6 +163,9 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
     garage,
     spoiled,
     supplierShort,
+    rush: rushOutcome(app),
+    rushPaid: result.rush?.paid ?? 0,
+    rushCost: result.rush?.cost ?? 0,
     clients: app.run.clients.length,
     trucksOwned: app.run.trucks.length,
     truckPrice: truck?.price ?? 0,
@@ -160,6 +175,24 @@ function playDay(app: App, policy: Policy, rule: GrowthRule): DayStat {
   hold(app, ' ');
   if (app.morning.day !== day + 1) throw new Error(`day ${day} did not end`);
   return stat;
+}
+
+/** How the morning's rush order went, by what the answer on the phone sent. */
+function rushOutcome(app: App): DayStat['rush'] {
+  if (!app.morning.rush) return 'none';
+  const trip = app.result?.rush;
+  return trip ? (trip.late ? 'late' : 'on time') : 'turned down';
+}
+
+/** The answer on the phone that earns most: for a rush order, the truck whose trip pays most over what it costs, or no if none pays. */
+function carefulAnswer(call: Call): number {
+  if (call.kind !== 'rush') return 0;
+  const net = (o: Call['options'][number]) => (o.rush ? o.rush.paid - o.rush.cost : 0);
+  let best = call.options.length - 1;
+  call.options.forEach((o, i) => {
+    if (net(o) > net(call.options[best]!)) best = i;
+  });
+  return best;
 }
 
 // ------------------------------------------------------------------ the desk
@@ -206,11 +239,12 @@ function pickTruck(app: App, press: Press, truckId: number): void {
 
 /** What to give on every line: as asked, except that a short item goes whole to as few clients as can be, those short before first. */
 function shareOut(app: App): number[][] {
-  const { orders, stock } = app.morning;
+  const { orders, stock, rush } = app.morning;
   const gives = orders.map((o) => o.lines.map((l) => l.asked));
   for (const item of app.morning.items) {
     const askers = orders.flatMap((o, oi) => o.lines.flatMap((l, li) => (l.item === item.id ? [{ oi, li, asked: l.asked }] : [])));
-    let left = stock[item.id] ?? 0;
+    // What a client may ring for in a rush is kept back first.
+    let left = Math.max(0, (stock[item.id] ?? 0) - (rush?.item === item.id ? rush.qty : 0));
     if (askers.reduce((sum, a) => sum + a.asked, 0) <= left) continue;
     const promised = (oi: number) => (app.run.promises.some((p) => p.client === orders[oi]!.client && p.item === item.id) ? 0 : 1);
     const before = (oi: number) => (shortYesterday(app.run.history[orders[oi]!.client]) ? 0 : 1);

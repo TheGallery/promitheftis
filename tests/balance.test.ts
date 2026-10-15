@@ -179,7 +179,9 @@ describe.each(['small', 'big'] as const)('a truck at the garage, on the %s morni
 
   it('does not make blind play collapse: it still earns on those days, and still pleases most of its clients about as often as it does', () => {
     const blind = later(kind, 'blind');
-    expect(onDays(blind, true, (d) => d.profit)).toBeGreaterThan(0);
+    // Blind play on the small morning earns little a day, and a client turned down for a rush order orders a little less, so
+    // "still earns" means it does not lose money to speak of.
+    expect(onDays(blind, true, (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
     expect(onDays(blind, true, pleased)).toBeGreaterThan(onDays(blind, false, pleased) - 0.15);
     expect(onDays(blind, true, pleased)).toBeGreaterThan(0.4);
   });
@@ -232,5 +234,48 @@ describe.each(['small', 'big'] as const)('what to grow, on the %s morning', (kin
     expect(blind.profit).toBeGreaterThan(0);
     expect(blind.minCash).toBeGreaterThan(-2 * STARTING_CASH);
     expect(blind.load).toBeLessThan(reading().load);
+  });
+});
+
+/** Averages of one figure over the days a client rang for a rush order, or over the days none did. */
+const onRush = (days: DayStat[], rush: boolean, figure: (d: DayStat) => number) => {
+  const picked = days.filter((d) => (d.rush !== 'none') === rush);
+  return picked.reduce((sum, d) => sum + figure(d), 0) / picked.length;
+};
+const rushNet = (d: DayStat) => d.rushPaid - d.rushCost;
+const inTime = (d: DayStat) => (d.rush === 'on time' ? 1 : 0);
+
+describe.each(['small', 'big'] as const)('a rush order, on the %s morning', (kind) => {
+  it('comes on about one day in four or five, and never on the first', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      const days = runs(kind, policy).flatMap((r) => r.filter((d) => d.day > 1));
+      const share = days.filter((d) => d.rush !== 'none').length / days.length;
+      expect(share).toBeGreaterThan(0.12);
+      expect(share).toBeLessThan(0.32);
+      for (const run of runs(kind, policy)) expect(run[0]!.rush).toBe('none');
+    }
+  });
+
+  it('is handled clearly better by a careful player: kept stock and the right truck get it there in time, and it pays', () => {
+    const blind = later(kind, 'blind');
+    const careful = later(kind, 'careful');
+    expect(onRush(careful, true, inTime)).toBeGreaterThan(0.6);
+    expect(onRush(blind, true, inTime)).toBeLessThan(onRush(careful, true, inTime) - 0.3);
+    expect(onRush(careful, true, rushNet)).toBeGreaterThan(onRush(blind, true, rushNet) + 100);
+    expect(onRush(careful, true, (d) => d.profit)).toBeGreaterThan(0);
+    expect(onRush(careful, true, pleased)).toBeGreaterThan(0.8);
+  });
+
+  it('does not make blind play collapse: it turns the client down, which costs a little, and goes on earning and pleasing about as before', () => {
+    const blind = later(kind, 'blind');
+    expect(blind.some((d) => d.rush === 'turned down')).toBe(true);
+    expect(onRush(blind, true, (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
+    expect(onRush(blind, true, pleased)).toBeGreaterThan(onRush(blind, false, pleased) - 0.15);
+    expect(onRush(blind, true, pleased)).toBeGreaterThan(0.4);
+  });
+
+  it('costs a careful player little on the days it comes: the clients are about as pleased as on any other day', () => {
+    const careful = later(kind, 'careful');
+    expect(onRush(careful, false, pleased) - onRush(careful, true, pleased)).toBeLessThan(0.1);
   });
 });

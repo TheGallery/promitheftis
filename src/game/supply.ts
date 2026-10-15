@@ -27,8 +27,8 @@ export interface CallNote {
   qty: number;
 }
 
-/** What is left of each item once the trucks have gone: the stock, less what the delivering orders were given. */
-export function stockAfterDeliveries(desk: Desk): Record<string, number> {
+/** What is left of each item once the trucks have gone: the stock, less what the delivering orders were given and what a rush order took. */
+export function stockAfterDeliveries(desk: Desk, rush?: { item: string; qty: number }): Record<string, number> {
   const left: Record<string, number> = { ...desk.morning.stock };
   desk.morning.orders.forEach((order, o) => {
     if (desk.truckFor(o) == null) return;
@@ -36,6 +36,7 @@ export function stockAfterDeliveries(desk: Desk): Record<string, number> {
       left[line.item] = Math.max(0, (left[line.item] ?? 0) - (desk.given(o, l) ?? 0));
     });
   });
+  if (rush) left[rush.item] = Math.max(0, (left[rush.item] ?? 0) - rush.qty);
   return left;
 }
 

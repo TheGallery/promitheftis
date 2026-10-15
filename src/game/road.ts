@@ -13,6 +13,7 @@ export type RoadEvent =
   | { at: number; truckId: number; kind: 'leave'; places: PlaceId[]; stops: number }
   | { at: number; truckId: number; kind: 'deliver'; orderIndex: number; client: string; place: PlaceId; items: number }
   | { at: number; truckId: number; kind: 'short'; lines: { name: string; given: number; asked: number }[] }
+  | { at: number; truckId: number; kind: 'rush'; client: string; place: PlaceId; units: number }
   | { at: number; truckId: number; kind: 'back' };
 
 export interface RoadStop {
