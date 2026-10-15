@@ -11,11 +11,13 @@ import type { Crew, Kept, Truck } from './types';
 /**
  * The version of the saved data. The first version, which had no cash, is still read, and a run saved by it starts
  * from the starting cash; the second, which did not say what spoiled or what the notes announced, is read too, with
- * nothing spoiled and nothing announced. A save with any other version is not read.
+ * nothing spoiled and nothing announced; so is the third, whose clients were all ordinary, none big or small and none
+ * heavy on a room. A save with any other version is not read.
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 const FIRST_VERSION = 1;
 const SECOND_VERSION = 2;
+const THIRD_VERSION = 3;
 
 /** The run, as it stood when a day began, with the seed that makes up that day (for day 1, the fixed morning, it is 0). */
 export interface SavedRun {
@@ -53,6 +55,11 @@ function isMoney(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && Math.abs(v) <= MOST_CASH;
 }
 
+/** How big a client's orders are next to an ordinary client's: more than nothing, and not past a few times as many. */
+function isSize(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 10;
+}
+
 function isText(v: unknown): v is string {
   return typeof v === 'string' && v.length <= 200;
 }
@@ -87,7 +94,16 @@ function crewOf(v: unknown): Crew | null {
 function clientOf(v: unknown): RunClient | null {
   if (!isObject(v) || !isText(v.name) || !PLACE_IDS.has(v.place as string) || !isText(v.contact)) return null;
   if (v.before !== undefined && !isCount(v.before)) return null;
-  return { name: v.name, place: v.place as PlaceId, contact: v.contact, ...(v.before !== undefined ? { before: v.before as number } : {}) };
+  if (v.size !== undefined && !isSize(v.size)) return null;
+  if (v.heavy !== undefined && !KEPT.includes(v.heavy as Kept)) return null;
+  return {
+    name: v.name,
+    place: v.place as PlaceId,
+    contact: v.contact,
+    ...(v.before !== undefined ? { before: v.before as number } : {}),
+    ...(v.size !== undefined ? { size: v.size as number } : {}),
+    ...(v.heavy !== undefined ? { heavy: v.heavy as Kept } : {}),
+  };
 }
 
 function promisedOf(v: unknown): Promised | null {
@@ -152,8 +168,8 @@ function runOf(v: unknown, version: number): RunState | null {
   const promises = mapped(v.promises, promisedOf);
   const delivery = v.delivery;
   // A run saved before the rooms could spoil stock, and before the notes were read, has neither to carry over.
-  const spoiled = version < SAVE_VERSION ? [] : mapped(v.spoiled, spoiledOf);
-  const ahead = version < SAVE_VERSION ? [] : mapped(v.ahead, announcedOf);
+  const spoiled = version < THIRD_VERSION ? [] : mapped(v.spoiled, spoiledOf);
+  const ahead = version < THIRD_VERSION ? [] : mapped(v.ahead, announcedOf);
   const cash = version === FIRST_VERSION ? STARTING_CASH : v.cash;
   if (!stock || !usual || !trucks || !crews || !storeRoom || !capacity || !clients || !moods || !history || !promises || !spoiled || !ahead) return null;
   if (trucks.length === 0 || clients.length === 0 || KEPT.some((k) => !((capacity[k] ?? 0) > 0))) return null;
@@ -183,7 +199,7 @@ function runOf(v: unknown, version: number): RunState | null {
 function parse(text: string): Json | null {
   try {
     const data: unknown = JSON.parse(text);
-    return isObject(data) && (data.version === FIRST_VERSION || data.version === SECOND_VERSION || data.version === SAVE_VERSION) ? data : null;
+    return isObject(data) && (data.version === FIRST_VERSION || data.version === SECOND_VERSION || data.version === THIRD_VERSION || data.version === SAVE_VERSION) ? data : null;
   } catch {
     return null;
   }

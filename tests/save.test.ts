@@ -32,7 +32,7 @@ function laterRun(): RunState {
     moods: { "Rosa's": 'pleased' },
     today: { "Rosa's": { percent: 100, late: false, lacked: [] } },
     promises: [],
-    growth: { kind: 'client', client: { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines' } },
+    growth: { kind: 'client', client: { name: 'The Salt Cellar', place: 'saltmarket', contact: 'Ines', shape: { size: 2, before: 540, heavy: 'fridge' } } },
     earned: -80,
   });
 }
@@ -56,6 +56,26 @@ describe('saving a run', () => {
 
   it('writes the version of the data', () => {
     expect(JSON.parse(encodeRun(laterRun(), 1)).version).toBe(SAVE_VERSION);
+  });
+
+  it('keeps a client\'s shape: its size, the time it always asks for, and the room it is heavy on', () => {
+    const run = laterRun();
+    const joined = run.clients.at(-1)!;
+    expect(joined).toMatchObject({ name: 'The Salt Cellar', size: 2, before: 540, heavy: 'fridge' });
+    expect(decodeRun(encodeRun(run, SEED))?.run.clients.at(-1)).toEqual(joined);
+  });
+
+  it('still reads a run saved before clients had a shape, with every client ordinary', () => {
+    const data = saved();
+    data.version = 3;
+    data.run.clients = data.run.clients.map(({ size, heavy, ...client }: Record<string, unknown>) => client);
+    const decoded = decodeRun(JSON.stringify(data));
+    expect(decoded).not.toBeNull();
+    for (const c of decoded!.run.clients) {
+      expect(c).not.toHaveProperty('size');
+      expect(c).not.toHaveProperty('heavy');
+    }
+    expect(decoded!.run.day).toBe(laterRun().day);
   });
 
   it('leaves out what a run does not hold', () => {
@@ -88,6 +108,10 @@ describe('saving a run', () => {
     ['negative stock', () => JSON.stringify({ ...saved(), run: { ...saved().run, stock: { chips: -3 } } })],
     ['no trucks', () => JSON.stringify({ ...saved(), run: { ...saved().run, trucks: [] } })],
     ['a truck with no driver', () => JSON.stringify({ ...saved(), run: { ...saved().run, trucks: [{ id: 1, kind: 'van', capacity: 5 }] } })],
+    ['a client of size zero', () => JSON.stringify({ ...saved(), run: { ...saved().run, clients: [{ name: 'A', place: 'docks', contact: 'B', size: 0 }] } })],
+    ['a client of a size in words', () => JSON.stringify({ ...saved(), run: { ...saved().run, clients: [{ name: 'A', place: 'docks', contact: 'B', size: 'big' }] } })],
+    ['a client of a size beyond reason', () => JSON.stringify({ ...saved(), run: { ...saved().run, clients: [{ name: 'A', place: 'docks', contact: 'B', size: 1e6 }] } })],
+    ['a client heavy on an unknown room', () => JSON.stringify({ ...saved(), run: { ...saved().run, clients: [{ name: 'A', place: 'docks', contact: 'B', heavy: 'cellar' }] } })],
     ['no clients', () => JSON.stringify({ ...saved(), run: { ...saved().run, clients: [] } })],
     ['a client in an unknown place', () => JSON.stringify({ ...saved(), run: { ...saved().run, clients: [{ name: 'A', place: 'mars', contact: 'B' }] } })],
     ['an unknown mood', () => JSON.stringify({ ...saved(), run: { ...saved().run, moods: { "Rosa's": 'furious' } } })],

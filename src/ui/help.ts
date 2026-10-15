@@ -133,9 +133,9 @@ export const HELP_PAGES: readonly HelpPage[] = [
         head: 'WHAT TO GROW',
         text:
           '{SPACE} on the end of the day opens one last choice: another truck, a bigger room (the tightest one tomorrow) or a new client. Pick ' +
-          'with {↑↓} or {1}-{3}, and {ENTER} chooses it. A truck or a bigger room cost money, with the price shown; one you cannot afford ' +
-          'cannot be picked. A new client is free. {U} takes the choice back, with the money. Hold {SPACE} to start the next morning, and ' +
-          'from then on the choice is final.',
+          'with {↑↓} or {1}-{3}, and {ENTER} chooses it. A truck or a room costs money; a client is free. The screen shows how full the ' +
+          'trucks were: one more only helps once they are nearly full, and each costs more than the last. A new client is big or small, ' +
+          'near or far, always early, or heavy on one room. {U} takes the choice back. Hold {SPACE} for the next morning; then it is final.',
       },
     ],
   },

@@ -28,6 +28,9 @@ export interface DayTruck {
   /** Squares of the map it drove, and what that cost; nothing for a truck that stayed in the yard. */
   squares: number;
   cost: number;
+  /** The space it was loaded with, and the space it has. */
+  load: number;
+  capacity: number;
 }
 
 export interface DayCall {
@@ -107,6 +110,8 @@ export function buildDay(
     lateTo: result.orders.filter((o) => o.truckId === t.truckId && o.lateForAsk).map((o) => o.client),
     squares: t.squares,
     cost: costs.get(t.truckId) ?? 0,
+    load: t.load,
+    capacity: t.capacity,
   }));
   const answered = calls.filter((c) => answers.has(c.id));
   const rooms = KEPT_ORDER.map((kept): DayRoom => ({ kept, space: supply.roomSpace(kept) }));

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { beforeTime, buildCalls } from '../src/game/calls';
 import { DEPART_MINUTE, LAST_DAY, dateLabel, formatTime } from '../src/game/clock';
 import { Desk } from '../src/game/desk';
-import { NEW_CLIENTS } from '../src/game/growth';
 import { bigMorning } from '../src/game/morning';
 import { buildResult } from '../src/game/results';
 import { buildRoad } from '../src/game/road';
@@ -122,16 +121,27 @@ describe('calls about the time', () => {
 });
 
 describe('the new client offered at the end of the day', () => {
-  it.each(NEW_CLIENTS.map((c, i) => [c.name, i] as const))('%s fits the screen once chosen and once the choice moves on', (name, i) => {
-    const { app, press } = toDay(0, 'small', ['a'], [], () => (i + 0.5) / NEW_CLIENTS.length);
-    const offered = (app.growthOptions[2]!.growth as { client: { name: string } }).client.name;
-    expect(offered).toBe(name);
-    press(' ', '3', 'Enter');
-    expect(app.growth).not.toBeNull();
-    expect(text(app)).toContain('chosen');
-    press('ArrowUp');
-    expect(text(app)).toContain('Chosen');
-    expect(lastLine(app)).toContain('hold: next morning');
+  it('fits the screen, in whole, once chosen and once the choice moves on, whoever it is', () => {
+    const kinds = new Set<string>();
+    const seen = new Set<string>();
+    for (let i = 0; i < 120; i++) {
+      const { app, press } = toDay(0, i % 2 === 0 ? 'small' : 'big', ['a'], [], () => (i + 0.5) / 120);
+      const client = (app.growthOptions[2]!.growth as { client: { name: string; shape: { size: number; before?: number; heavy?: string } } }).client;
+      seen.add(client.name);
+      kinds.add(`${client.shape.size}/${client.shape.before ?? ''}/${client.shape.heavy ?? ''}`);
+      press(' ');
+      expect(text(app)).toContain(`A new client: ${client.name}`);
+      expect(text(app)).toContain('Rooms tomorrow');
+      press('3', 'Enter');
+      expect(app.growth).not.toBeNull();
+      expect(text(app)).toContain('chosen');
+      expect(text(app)).toContain('Rooms tomorrow');
+      press('ArrowUp');
+      expect(text(app)).toContain('Chosen');
+      expect(lastLine(app)).toContain('hold: next morning');
+    }
+    expect(seen.size).toBeGreaterThan(60);
+    expect(kinds.size).toBeGreaterThanOrEqual(5);
   });
 });
 

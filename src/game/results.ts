@@ -7,6 +7,9 @@ export interface TruckResult {
   places: PlaceId[];
   stops: number;
   fullness: number;
+  /** The space the truck is loaded with, and the space it has. */
+  load: number;
+  capacity: number;
   departAt: number;
   backAt: number | null;
   /** Squares of the map the truck drives; none for a truck that stays in the yard. */
@@ -67,6 +70,8 @@ export function buildResult(desk: Desk, departAt: number): MorningResult {
       places: route.visits.map((v) => v.place),
       stops: stops.length,
       fullness: desk.fullness(t.id),
+      load: desk.load(t.id),
+      capacity: t.capacity,
       departAt,
       backAt: stops.length === 0 ? null : route.backAt,
       squares: stops.length === 0 ? 0 : route.squares,

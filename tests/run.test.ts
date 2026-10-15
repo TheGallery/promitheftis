@@ -5,7 +5,7 @@ import { BIG_TRUCKS, bigMorning, smallMorning } from '../src/game/morning';
 import { mulberry32 } from '../src/game/random';
 import { ROOM_CAPACITY, ROOM_GROWTH, SMALL_ROOM_CAPACITY } from '../src/game/rooms';
 import { EXTRA_DRIVERS, nextDay, newTruck, promisesFrom, runFromMorning, type DayOutcome, type RunState } from '../src/game/run';
-import { NEW_CLIENTS } from '../src/game/growth';
+import type { ClientShape, NewClient } from '../src/game/clients';
 import { stockAfterDeliveries } from '../src/game/supply';
 import type { Morning } from '../src/game/types';
 import { App } from '../src/ui/app';
@@ -14,6 +14,8 @@ import { fakeEffects, hold, holdNewRun, playToSupply, screen, toDay, toNextMorni
 const outcome = (over: Partial<DayOutcome> = {}): DayOutcome => ({ left: {}, ordered: {}, moods: {}, today: {}, promises: [], growth: null, earned: 0, ...over });
 const smallRun = (): RunState => runFromMorning(smallMorning());
 const bigRun = (): RunState => runFromMorning(bigMorning());
+/** A restaurant that asks to join, of the given kind. */
+const newcomer = (shape: ClientShape = { size: 1 }, place: NewClient['place'] = 'ashby'): NewClient => ({ name: 'Elm Street Grill', place, contact: 'Fern', shape });
 const total = (m: Morning, client: string) => m.orders.find((o) => o.client === client)!.lines.reduce((sum, l) => sum + l.asked, 0);
 const spaceOf = (m: Morning, lines: Array<{ item: string; asked: number }>) =>
   lines.reduce((sum, l) => sum + l.asked * m.items.find((i) => i.id === l.item)!.size, 0);
@@ -134,11 +136,20 @@ describe('growing', () => {
   });
 
   it('a new client joins the clients', () => {
-    const client = NEW_CLIENTS[0]!;
+    const client = newcomer();
     const next = nextDay(smallRun(), outcome({ growth: { kind: 'client', client } }));
     expect(next.clients).toHaveLength(8);
-    expect(next.clients.at(-1)).toEqual(client);
+    expect(next.clients.at(-1)).toEqual({ name: client.name, place: client.place, contact: client.contact });
     expect(nextDay(next, outcome({ growth: { kind: 'client', client } })).clients).toHaveLength(8);
+  });
+
+  it('a new client keeps its shape: how big, the time it always asks for, and the room it is heavy on', () => {
+    const grow = (shape: ClientShape) => nextDay(smallRun(), outcome({ growth: { kind: 'client', client: newcomer(shape) } })).clients.at(-1);
+    expect(grow({ size: 2 })).toMatchObject({ size: 2 });
+    expect(grow({ size: 0.5 })).toMatchObject({ size: 0.5 });
+    expect(grow({ size: 1, before: 9 * 60 })).toMatchObject({ before: 9 * 60 });
+    expect(grow({ size: 1, heavy: 'dry' })).toMatchObject({ heavy: 'dry' });
+    expect(grow({ size: 1 })).not.toHaveProperty('size');
   });
 
   it.each([
@@ -165,10 +176,29 @@ describe('growing', () => {
   it('a new client raises each usual amount by the average share of one client', () => {
     const run = smallRun();
     const clients = run.clients.length;
-    const next = nextDay(run, outcome({ growth: { kind: 'client', client: NEW_CLIENTS[0]! } }));
+    const next = nextDay(run, outcome({ growth: { kind: 'client', client: newcomer() } }));
     for (const [item, n] of Object.entries(run.usual)) expect(next.usual[item]).toBe(n + Math.round(n / clients));
-    const again = nextDay(next, outcome({ growth: { kind: 'client', client: NEW_CLIENTS[0]! } }));
+    const again = nextDay(next, outcome({ growth: { kind: 'client', client: newcomer() } }));
     expect(again.usual).toEqual(next.usual);
+  });
+
+  it('a big client raises the usual amounts by twice the share of an ordinary one, and a small client by half', () => {
+    const run = smallRun();
+    const clients = run.clients.length;
+    const big = nextDay(run, outcome({ growth: { kind: 'client', client: newcomer({ size: 2 }) } }));
+    const small = nextDay(run, outcome({ growth: { kind: 'client', client: newcomer({ size: 0.5 }) } }));
+    for (const [item, n] of Object.entries(run.usual)) {
+      expect(big.usual[item]).toBe(n + Math.round((2 * n) / clients));
+      expect(small.usual[item]).toBe(n + Math.round(n / 2 / clients));
+    }
+  });
+
+  it('shares the usual amounts out by size: a client after a big one adds less than it would after an ordinary one', () => {
+    const afterBig = nextDay(nextDay(smallRun(), outcome({ growth: { kind: 'client', client: newcomer({ size: 2 }) } })), outcome({ growth: { kind: 'client', client: { ...newcomer(), name: 'Second' } } }));
+    const afterOrdinary = nextDay(nextDay(smallRun(), outcome({ growth: { kind: 'client', client: newcomer() } })), outcome({ growth: { kind: 'client', client: { ...newcomer(), name: 'Second' } } }));
+    const base = smallRun().usual;
+    const gained = (run: RunState) => Object.keys(base).reduce((sum, item) => sum + (run.usual[item]! - base[item]!), 0);
+    expect(gained(afterBig)).toBeGreaterThan(gained(afterOrdinary));
   });
 
   it('another truck or a bigger room leaves the usual amounts as they were', () => {
@@ -322,13 +352,57 @@ describe('a made-up day', () => {
   });
 
   it('has a new client sending orders from its first morning', () => {
-    const client = NEW_CLIENTS[4]!;
+    const client = newcomer();
     const run = nextDay(smallRun(), outcome({ growth: { kind: 'client', client } }));
     const m = generateDay(run, mulberry32(2));
     expect(m.orders).toHaveLength(8);
     const order = m.orders.find((o) => o.client === client.name)!;
     expect([order.place, order.contact]).toEqual([client.place, client.contact]);
     expect(order.lines.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('has a client that is always early ask for its time every day', () => {
+    const run = nextDay(smallRun(), outcome({ growth: { kind: 'client', client: newcomer({ size: 1, before: 9 * 60 }) } }));
+    for (let seed = 1; seed <= 20; seed++) {
+      const order = generateDay(run, mulberry32(seed)).orders.find((o) => o.client === 'Elm Street Grill')!;
+      expect(order.before).toBe(9 * 60);
+    }
+  });
+
+  it('has a big client order more than an ordinary one, and a small client less, over many days', () => {
+    const spaceOfClient = (shape: ClientShape) => {
+      const run = nextDay(smallRun(), outcome({ growth: { kind: 'client', client: newcomer(shape) } }));
+      let sum = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        const m = generateDay(run, mulberry32(seed));
+        sum += spaceOf(m, m.orders.find((o) => o.client === 'Elm Street Grill')!.lines);
+      }
+      return sum / 40;
+    };
+    const ordinary = spaceOfClient({ size: 1 });
+    expect(spaceOfClient({ size: 2 })).toBeGreaterThan(ordinary * 1.4);
+    expect(spaceOfClient({ size: 0.5 })).toBeLessThan(ordinary * 0.75);
+  });
+
+  it('has a client heavy on a room take more of that room than an ordinary client does', () => {
+    const roomShare = (heavy: 'freezer' | 'fridge' | 'dry' | undefined) => {
+      const run = nextDay(smallRun(), outcome({ growth: { kind: 'client', client: newcomer({ size: 1, ...(heavy ? { heavy } : {}) }) } }));
+      let mine = 0;
+      let all = 0;
+      for (let seed = 1; seed <= 60; seed++) {
+        const m = generateDay(run, mulberry32(seed));
+        for (const o of m.orders) {
+          for (const l of o.lines) {
+            if (m.items.find((i) => i.id === l.item)!.kept !== 'freezer') continue;
+            all += l.asked;
+            if (o.client === 'Elm Street Grill') mine += l.asked;
+          }
+        }
+      }
+      return mine / all;
+    };
+    expect(roomShare('freezer')).toBeGreaterThan(roomShare(undefined) * 1.3);
+    expect(roomShare('dry')).toBeLessThan(roomShare(undefined));
   });
 
   it('has one more truck, and a bigger room, when they were grown', () => {
