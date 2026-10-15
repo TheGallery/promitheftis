@@ -381,7 +381,7 @@ describe('the growth screen', () => {
     const { app, press } = toDay();
     press('Enter');
     const pending = screen(app);
-    for (const word of ['pick one', 'choose it', 'back to the day', 'play again', 'big morning', 'colours', 'sound']) expect(pending[ROWS - 1]).toContain(word);
+    for (const word of ['pick one', 'choose it', 'back', 'play again', 'big morning', 'colours', 'sound']) expect(pending[ROWS - 1]).toContain(word);
     press('3', 'Enter');
     const lines = screen(app);
     const text = lines.join('\n');
@@ -391,7 +391,7 @@ describe('the growth screen', () => {
     expect(text).toContain('chosen');
     expect(text).toContain('It takes effect tomorrow');
     expect(lines[ROWS - 1]).toContain('next morning');
-    expect(lines[ROWS - 1]).toContain('back to the day');
+    expect(lines[ROWS - 1]).toContain('back');
     expect(lines[ROWS - 1]).not.toContain('choose it');
     expect(lines[ROWS - 1]).not.toContain('1-3');
   });

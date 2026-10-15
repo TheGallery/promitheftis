@@ -28,7 +28,7 @@ export function clockLine(day: number, minute: number, trucksWaiting = false, ca
  * that is not being played is offered; from the second day on, both are.
  */
 export function otherMornings(app: App): ReadonlyArray<readonly [string, string]> {
-  if (app.morning.day > 1) return [['B S', 'big / small morning']];
+  if (app.morning.day > 1) return [['B S', 'big / small']];
   return app.morning.id === 'small' ? [['B', 'big morning']] : [['S', 'small morning']];
 }
 

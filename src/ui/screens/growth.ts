@@ -74,8 +74,8 @@ export function growthScreen(app: App): Line[] {
       ];
   const body: Line[] = [...intro, [], ...optionRows(app, options), ...todayRows(app)];
   const keys = chosen
-    ? ([['ENTER', 'next morning'], ['U', 'change choice'], ['ESC', 'back to the day']] as const)
-    : ([['↑↓ 1-3', 'pick one'], ['ENTER', 'choose it'], ['ESC', 'back to the day']] as const);
+    ? ([['ENTER', 'next morning'], ['U', 'change choice'], ['ESC', 'back']] as const)
+    : ([['↑↓ 1-3', 'pick one'], ['ENTER', 'choose it'], ['ESC', 'back']] as const);
   const status =
     newRunPrompt(app) ??
     (app.status
@@ -83,5 +83,5 @@ export function growthScreen(app: App): Line[] {
       : chosen
         ? s(` Chosen: ${chosen.title}. It takes effect tomorrow. ENTER starts the next morning, U changes the choice.`, 'acc')
         : []);
-  return layout(top, body, [rule(), status, keyBar([...keys, ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])]);
+  return layout(top, body, [rule(), status, keyBar([...keys, ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])]);
 }

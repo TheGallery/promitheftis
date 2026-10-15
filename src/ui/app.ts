@@ -15,6 +15,7 @@ import { callNotes, stockAfterDeliveries, Supply } from '../game/supply';
 import type { Morning } from '../game/types';
 import type { CueArg, Moment } from './cues';
 import { plural } from './format';
+import { helpPageFor, HELP_PAGES } from './help';
 import type { Store } from './store';
 
 export type Screen = 'start' | 'messages' | 'desk' | 'sheets' | 'road' | 'result' | 'supply' | 'day';
@@ -99,6 +100,12 @@ export class App {
   private spentKey: string | null = null;
   /** The sound this key press makes: the last one asked for wins. Null is silence. */
   private heard: { moment: Moment; arg?: CueArg } | null = null;
+
+  /** True while the how-to-play screen is over whichever screen it was asked for from; nothing under it changes. */
+  helpOpen = false;
+  helpPage = 0;
+  /** The message that was showing when how to play was opened, put back when it closes. */
+  private helpBack: { status: string; tone: Tone } | null = null;
 
   sheetSel = 0;
   sheetOpen = new Set<number>();
@@ -216,6 +223,11 @@ export class App {
       this.changed();
       return true;
     }
+    if (this.helpOpen || (key0 === 'h' && !repeat)) {
+      const used = this.helpKey(key, repeat);
+      this.changed();
+      return used;
+    }
     const wasConfirming = this.confirmEnd;
     this.confirmEnd = false;
     this.status = '';
@@ -231,6 +243,60 @@ export class App {
     }
     this.changed();
     return handled;
+  }
+
+  /**
+   * How to play: H opens it from any screen and H or ESC closes it, back at exactly the screen and state it was
+   * opened from. While it is open no key reaches the game under it, the road's clock waits, and the message that was
+   * showing is kept for when it closes. The page turns with the arrows and PgUp / PgDn.
+   */
+  private helpKey(key: string, repeat: boolean): boolean {
+    const key0 = key.toLowerCase();
+    if (!this.helpOpen) {
+      this.helpOpen = true;
+      this.helpPage = helpPageFor(this.screen);
+      this.helpBack = { status: this.status, tone: this.tone };
+      this.status = '';
+      this.tone = 'info';
+      this.roadJob++;
+      this.effects.cue('confirm');
+      return true;
+    }
+    if (key === 'F2' || key === 'F4') {
+      this.status = '';
+      this.tone = 'info';
+      this.heard = null;
+      this.route(key, false, repeat, false);
+      return this.cueHeard();
+    }
+    if (key0 === 'h' || key === 'Escape') {
+      if (repeat) return true;
+      this.helpOpen = false;
+      this.status = this.helpBack?.status ?? '';
+      this.tone = this.helpBack?.tone ?? 'info';
+      this.helpBack = null;
+      this.effects.cue('confirm');
+      this.resumeRoad();
+      return true;
+    }
+    const step = key === 'ArrowRight' || key === 'PageDown' ? 1 : key === 'ArrowLeft' || key === 'PageUp' ? -1 : 0;
+    if (step === 0) return false;
+    const before = this.helpPage;
+    this.helpPage = Math.max(0, Math.min(HELP_PAGES.length - 1, before + step));
+    if (this.helpPage !== before) this.effects.cue('move');
+    return true;
+  }
+
+  /** Plays the sound a key press asked for; true so a handler can end with it. */
+  private cueHeard(): boolean {
+    const heard = this.heardNow();
+    if (heard) this.effects.cue(heard.moment, heard.arg);
+    return true;
+  }
+
+  /** Back on the road after how to play: the clock goes on from where it stood, a tick later. */
+  private resumeRoad(): void {
+    if (this.screen === 'road' && this.road && !this.roadOver && !this.roadCall) this.scheduleTick(++this.roadJob);
   }
 
   private heardNow(): { moment: Moment; arg?: CueArg } | null {

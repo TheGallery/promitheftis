@@ -598,16 +598,16 @@ describe('the next morning in the game', () => {
     expect(screen(first.app).at(-1)).toContain('big morning');
     expect(screen(first.app).at(-1)).not.toContain('small morning');
     const { app, press } = toNextMorning('1');
-    expect(screen(app).at(-1)).toContain('big / small morning');
+    expect(screen(app).at(-1)).toContain('big / small');
     playToSupply(app, press);
     press('Escape');
     expect(app.screen).toBe('result');
-    expect(screen(app).at(-1)).toContain('big / small morning');
+    expect(screen(app).at(-1)).toContain('big / small');
     press('Enter', 'a', 'F9');
     expect(app.screen).toBe('day');
-    expect(screen(app).at(-1)).toContain('big / small morning');
+    expect(screen(app).at(-1)).toContain('big / small');
     press('Enter');
-    expect(screen(app).at(-1)).toContain('big / small morning');
+    expect(screen(app).at(-1)).toContain('big / small');
   });
 
   it('shows every screen of day 2 in 120 columns by 30 rows, in both colour schemes', () => {

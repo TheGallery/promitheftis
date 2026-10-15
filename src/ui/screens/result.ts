@@ -123,6 +123,6 @@ export function resultScreen(app: App): Line[] {
             s(r.lastBack != null ? ` · last truck back at ${formatTime(r.lastBack)}` : ''),
           )
         : []);
-  const footer = [rule(), summary, keyBar([['↑↓', 'look through the orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...otherMornings(app), ['F2', 'colours'], ['F4', 'sound']])];
+  const footer = [rule(), summary, keyBar([['↑↓', 'orders'], ['ENTER', 'supplier order'], ['R', 'play again'], ...otherMornings(app), ['H', 'how to play'], ['F2', 'colours'], ['F4', 'sound']])];
   return layout(top, body, footer);
 }
