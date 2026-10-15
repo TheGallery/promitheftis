@@ -99,8 +99,8 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'DEMAND SWINGS',
         text:
-          'Clients ask for about the usual amount, so {A} is a good start and not the whole answer. Monday is quiet, Friday and Saturday are busy, ' +
-          'and the line under the list says which tomorrow is. A note on an order or an overnight message is a hint too: a wedding, a quiz night or a ' +
+          'Clients ask for about the usual amount, so {A} is a good start and not the whole answer. Sunday and Monday are quiet, Friday and Saturday are busy, ' +
+          'as the line under the list says. A note on an order or an overnight message is a hint too: a wedding, a quiz night or a ' +
           'match day means clients ask for more of some items; "keep it simple", or a client who rang to say it is closed, means less (the hospital ' +
           'and the schools never close). An arrow beside what was asked says tomorrow is busier (↑) or quieter (↓) for that item; select the row to see who said so.',
       },

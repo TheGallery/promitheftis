@@ -6,7 +6,7 @@ import type { RunState } from './run';
 import type { Message } from './types';
 
 /**
- * How much clients ask for on each day of the week, from Sunday to Saturday: a quiet Monday, a busy Friday and an even
+ * How much clients ask for on each day of the week, from Sunday to Saturday: a quiet Sunday and Monday, a busy Friday and an even
  * busier Saturday. Over a week they come to the usual amount.
  */
 const WEEK: readonly number[] = [0.9, 0.85, 0.95, 1, 1, 1.1, 1.2];
@@ -133,14 +133,14 @@ export function tomorrowFor(
   }
 
   if (eventRoll < TOWN_CHANCE) {
-    const here = PLACES.filter((p) => orders.some((o) => o.place === p.id)).map((p) => p.id);
+    const here = PLACES.filter((p) => run.clients.some((c) => c.place === p.id)).map((p) => p.id);
     const kinds = TOWN.filter((t) => (t.places ?? here).some((p) => here.includes(p)));
     const event = kinds.length > 0 ? choose(kinds, eventPick) : null;
     if (event) {
       const area = event.places ?? [choose(here, placePick)];
-      const named = orders.filter((o) => area.includes(o.place) && !closing.some((c) => c.client.name === o.client)).slice(0, MOST_NAMED);
+      const named = run.clients.filter((c) => area.includes(c.place) && !closing.some((t) => t.client.name === c.name)).slice(0, MOST_NAMED);
       if (named.length > 0) {
-        for (const o of named) out.ahead.push({ client: o.client, event: event.id });
+        for (const c of named) out.ahead.push({ client: c.name, event: event.id });
         out.notes.push({ kind: 'staff', from: lead, text: event.news(place(area[0] as PlaceId).name, when), at: eventAt });
       }
     }

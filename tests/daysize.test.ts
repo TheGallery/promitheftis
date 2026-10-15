@@ -248,9 +248,26 @@ describe('a town event', () => {
     expect(decodeRun(encodeRun(withNews, 9))).toEqual({ run: withNews, daySeed: 9 });
   });
 
+  it('names every client in its part of town, also one that is closed today and so sent no order', () => {
+    const run = runOf(4, 'small');
+    const today = generateDay(run, mulberry32(1)).orders;
+    const away = run.clients.find((c) => c.before == null && run.clients.some((o) => o !== c && o.place === c.place));
+    if (!away) throw new Error('no two clients share a place');
+    const orders = today.filter((o) => o.client !== away.name);
+    let checked = 0;
+    for (let seed = 1; seed <= 3000; seed++) {
+      const town = tomorrowFor(run, orders, mulberry32(seed), 0, 10).ahead.filter((a) => isTownEvent(a.event));
+      const places = new Set(town.map((a) => run.clients.find((c) => c.name === a.client)?.place));
+      if (!places.has(away.place)) continue;
+      expect(town.map((a) => a.client)).toContain(away.name);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it('is told in the how-to-play', () => {
     const text = HELP_PAGES.flatMap((p) => p.blocks.map((b) => b.text)).join(' ');
-    expect(text).toContain('quiet');
+    expect(text).toContain('Sunday and Monday are quiet');
     expect(text).toContain('match day');
     expect(text).toContain('closed');
   });
