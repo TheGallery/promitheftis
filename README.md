@@ -57,25 +57,25 @@ Left out on purpose: new clients ringing, answers that change anything beyond a 
 
 *The morning starts with the overnight messages: orders from clients, plus a note from a staff member and one from a supplier.*
 
-![The order desk: a list of orders, the lines of the current order with what was asked and what is on hand, two trucks and the nine squares of the island](docs/screens/order-desk.png)
+![The order desk: cash in the bank at the top, a list of orders, the lines of the current order with what was asked and what is on hand, two trucks and the nine squares of the island](docs/screens/order-desk.png)
 
-*The order desk: for each line you decide how much to give, and the stock on hand (here, no ketchup left) shows when someone will get less.*
+*The order desk, with the cash in the bank at the top: for each line you decide how much to give, and the stock on hand (here, no ketchup left) shows when someone will get less.*
 
 ![The truck sheets in office blue, with truck 1 open to show its four orders and its route around the island](docs/screens/truck-sheets-blue.png)
 
 *The truck sheets, here in office blue (F2): each truck's orders, its route and when it is back at the depot.*
 
-![The end of the day: how each client's order went on the left, the trucks, calls and tomorrow's order with how full each room will be on the right](docs/screens/end-of-day.png)
+![The end of the day: how each client's order went on the left, the trucks, calls, money and tomorrow's order with how full each room will be on the right](docs/screens/end-of-day.png)
 
-*The end of the day at 18:00: each client's mood, when the trucks got back, the phone calls and how full each store room will be tomorrow.*
+*The end of the day at 18:00: each client's mood, when the trucks got back, the phone calls, the money (taken in, the supplier order, the trucks, today's total and the cash now) and how full each store room will be tomorrow.*
 
-![The choice of what to grow: another truck, a bigger freezer or a new client, with the freezer highlighted](docs/screens/growth-choice.png)
+![The choice of what to grow: another truck and a bigger freezer at £630 each, or a new client for free, with the freezer highlighted](docs/screens/growth-choice.png)
 
-*Then one thing to grow: another truck, a bigger room (here the freezer, the tightest) or a new client.*
+*Then one thing to grow: another truck or a bigger room (here the freezer, the tightest), each paid for from the bank, or a new client, which is free.*
 
-![The growth choice made, in office blue: the bigger freezer is shown as chosen, taking effect tomorrow](docs/screens/growth-chosen-blue.png)
+![The growth choice made, in office blue: the bigger freezer is shown as chosen, £630 paid and the cash down to £854, taking effect tomorrow](docs/screens/growth-chosen-blue.png)
 
-*Once chosen, it is shown with a note that it takes effect tomorrow; ENTER starts the next morning.*
+*Once chosen, it is shown with the money paid and a note that it takes effect tomorrow; U takes it back with the money, ENTER starts the next morning.*
 
 ![The next morning, day 2: the date a day on, ten messages including the supplier's note that the order is in, and a client's order with the note "As promised: 4 frozen chips." and a warning marker and note that it went short yesterday](docs/screens/next-morning.png)
 
