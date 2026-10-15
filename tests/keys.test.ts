@@ -334,7 +334,8 @@ describe('the hold box', () => {
     const boxes: Array<[string, App, number]> = [
       ['send with a warning', warned.app, BOX_ROWS_WARNED],
       ['newRun', fresh.app, BOX_ROWS_WARNED],
-      ...(['send', 'order', 'morning', 'again'] as const).map((step): [string, App, number] => [step, asking[step]!(), BOX_ROWS]),
+      ['again', asking.again!(), BOX_ROWS_WARNED],
+      ...(['send', 'order', 'morning'] as const).map((step): [string, App, number] => [step, asking[step]!(), BOX_ROWS]),
     ];
     for (const [name, app, rows] of boxes) {
       const box = holdBox(app);
@@ -345,7 +346,16 @@ describe('the hold box', () => {
       const text = plain(box!).join('\n');
       expect(text, name).toContain('Let go or ESC to cancel');
     }
-    expect(holdBox(warned.app)!.length).toBeGreaterThan(holdBox(boxes[2]![1])!.length);
+    expect(holdBox(warned.app)!.length).toBeGreaterThan(holdBox(boxes[3]![1])!.length);
+  });
+
+  it('warns in the box for R that what was done since the trucks left is dropped', () => {
+    const box = holdBox(asking.again!())!;
+    const text = plain(box);
+    expect(text.join('\n')).toContain('HOLD R TO PLAY THE DAY AGAIN');
+    expect(text.filter((l) => l.includes('Drops all you did since the trucks left.'))).toHaveLength(1);
+    expect(box.length).toBeLessThanOrEqual(BOX_ROWS_WARNED);
+    for (const line of text) expect([...line]).toHaveLength(BOX_W);
   });
 
   it('shows the key, a bar that fills while it is held, and what letting go or ESC does, over any screen', () => {

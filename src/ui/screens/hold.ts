@@ -43,6 +43,7 @@ function words(app: App): Words | null {
     case 'again':
       return {
         title: `HOLD ${key} TO PLAY THE DAY AGAIN`,
+        warn: 'Drops all you did since the trucks left.',
       };
   }
 }
