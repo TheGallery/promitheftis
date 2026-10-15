@@ -1,3 +1,4 @@
+import { formatTime } from '../game/clock';
 import { place, type PlaceId } from '../game/places';
 import type { RoomSpace } from '../game/rooms';
 
@@ -28,4 +29,23 @@ export function plural(n: number, one: string, many = one + 's'): string {
 /** What a room says about what will not fit: the units that will spoil, or nothing when it all fits. */
 export function spoilText(space: RoomSpace): string {
   return space.spoils > 0 ? `${space.spoils} will spoil` : '';
+}
+
+/** When a truck reaches a client, and, if the client asked for a time, whether that is in time. */
+export interface Arrival {
+  text: string;
+  late: boolean;
+  /** Minutes after the time asked; zero when in time or when no time was asked. */
+  minutes: number;
+}
+
+/**
+ * "~07:20 ✓" when the truck gets there by the time asked, "~09:10 ✗ 70 min late" when it does not, and the bare time
+ * when no time was asked. The "~" says the time is an estimate.
+ */
+export function arrivalText(arriveAt: number, before: number | undefined | null): Arrival {
+  const at = `~${formatTime(arriveAt)}`;
+  if (before == null) return { text: at, late: false, minutes: 0 };
+  const minutes = Math.max(0, arriveAt - before);
+  return minutes > 0 ? { text: `${at} ✗ ${minutes} min late`, late: true, minutes } : { text: `${at} ✓`, late: false, minutes: 0 };
 }

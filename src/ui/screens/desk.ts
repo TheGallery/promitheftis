@@ -1,7 +1,8 @@
 import { place, PLACES, type PlaceId } from '../../game/places';
 import { plainName, shortItems } from '../../game/headsup';
 import { shortMarker } from '../../game/history';
-import { placesLabel } from '../format';
+import { formatTime } from '../../game/clock';
+import { arrivalText, placesLabel } from '../format';
 import type { App } from '../app';
 import { bar, cat, clip, cols, header, keyBar, layout, pad, rule, s, scrollRows, wrapText, type Line } from '../grid';
 import { clockLine, shortfallLines } from './common';
@@ -139,6 +140,63 @@ export function nineSquares(app: App): Line[] {
   return out;
 }
 
+/** Where the highlighted order would be reached: on the truck under the cursor while picking, on its own truck otherwise. */
+function previewTruck(app: App): number | null {
+  if (app.pane === 'trucks') return app.morning.trucks[app.truckSel]?.id ?? null;
+  return app.desk.truckFor(app.orderSel);
+}
+
+/**
+ * The clients who asked for a time, against when their trucks are expected to get there: the highlighted order first,
+ * as it would be on the truck being picked, then the other clients on a truck who would be late. Shows what fits in
+ * `room` lines, the most useful first.
+ */
+function deadlineRows(app: App, room: number): Line[] {
+  const d = app.desk;
+  const departAt = d.projectedDeparture();
+  const current = d.order(app.orderSel);
+  const late: Array<{ client: string; arriveAt: number; minutes: number }> = [];
+  let placed = 0;
+  d.morning.orders.forEach((order, i) => {
+    const truck = d.truckFor(i);
+    if (order.before == null || truck == null) return;
+    const arriveAt = d.arrivalOn(i, truck, departAt);
+    if (arriveAt == null) return;
+    placed++;
+    const { minutes } = arrivalText(arriveAt, order.before);
+    if (minutes > 0 && i !== app.orderSel) late.push({ client: order.client, arriveAt, minutes });
+  });
+  late.sort((a, b) => b.minutes - a.minutes);
+
+  const mine: Line[] = [];
+  let mineLate = false;
+  if (current.before != null) {
+    mine.push(cat(s(` ${clip(current.client, 22)}`, 'b'), s(` before ${formatTime(current.before)}`)));
+    const truck = previewTruck(app);
+    const arriveAt = truck == null ? null : d.arrivalOn(app.orderSel, truck, departAt);
+    if (truck == null || arriveAt == null) mine.push(s('   pick a truck to see when it gets there', 'd'));
+    else {
+      const arrival = arrivalText(arriveAt, current.before);
+      mineLate = arrival.late;
+      mine.push(cat(s(`   on truck ${truck}: `, 'd'), s(arrival.text, arrival.late ? 'w' : 'acc')));
+    }
+  }
+  const lateCount = late.length + (mineLate && d.truckFor(app.orderSel) != null ? 1 : 0);
+  const head = cat(
+    s(' DEADLINES', 'b'),
+    s(placed === 0 ? '  none on a truck yet' : `  ${placed} timed on trucks`, 'd'),
+    placed > 0 ? s(lateCount > 0 ? ` · ${lateCount} late` : ' · none late', lateCount > 0 ? 'w' : 'acc') : [],
+  );
+  if (room < 1) return [];
+  if (room < 3) return mine.length > 0 ? mine.slice(-room) : [head];
+  const spare = room - 1 - mine.length;
+  const rows = late.map((l): Line => s(` ✗ ${clip(l.client, 14).padEnd(14)} ~${formatTime(l.arriveAt)} · ${l.minutes} min late`, 'w'));
+  // What does not fit is counted, unless only one line is left, which then names the worst.
+  const keep = Math.max(0, spare === 1 ? 1 : spare - 1);
+  const shown = rows.length > spare ? [...rows.slice(0, keep), ...(spare > 1 ? [s(` + ${rows.length - keep} more late`, 'd')] : [])] : rows;
+  return [head, ...mine, ...shown.slice(0, Math.max(0, spare))];
+}
+
 function trucksPane(app: App): Line[] {
   const d = app.desk;
   const lit = app.pane === 'trucks';
@@ -161,6 +219,7 @@ function trucksPane(app: App): Line[] {
   });
   out.push([]);
   out.push(...nineSquares(app).map((l) => cat(s(' '), l)));
+  out.push(...deadlineRows(app, BODY_ROWS - out.length));
   return out;
 }
 

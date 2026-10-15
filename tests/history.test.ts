@@ -230,7 +230,9 @@ describe('on the screens', () => {
     expect(row).toBeGreaterThan(0);
     // The wrapped second line is indented under the first.
     expect(lines[row + 1]).toMatch(/│ {3}\S/);
-    expect(`${lines[row]} ${lines[row + 1]}`.replace(/│/g, ' ').replace(/\s+/g, ' ')).toContain('short of frozen chips (4 of 8).');
+    // The middle pane only: the trucks pane beside it has lines of its own.
+    const pane = (l: string) => l.split('│')[1] ?? '';
+    expect(`${pane(lines[row]!)} ${pane(lines[row + 1]!)}`.replace(/\s+/g, ' ')).toContain('short of frozen chips (4 of 8).');
   });
 
   it('shows no detail for an order from a client who was not short', () => {
