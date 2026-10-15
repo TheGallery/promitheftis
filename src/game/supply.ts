@@ -1,7 +1,8 @@
 import type { Call } from './calls';
 import type { Desk } from './desk';
+import { announcedBy, hintsFor, type Announced, type ItemHint } from './demand';
 import { shortBy, supplierPrice } from './money';
-import { roomSpace, spaceOf, type RoomSpace } from './rooms';
+import { fitRoom, roomSpace, spaceOf, type RoomSpace } from './rooms';
 import type { Item, Kept, Morning } from './types';
 
 /** The rooms in the order the screen lists them. */
@@ -16,6 +17,8 @@ export interface SupplyRow {
   /** What is left after today's deliveries. */
   onHand: number;
   usual: number;
+  /** What the day's orders asked for, whatever was given. */
+  asked: number;
 }
 
 /** A client who was promised, on the phone, a number of an item on tomorrow's order. */
@@ -51,6 +54,9 @@ export function callNotes(calls: readonly Call[], answers: ReadonlyMap<number, n
   return notes;
 }
 
+/** A fills a room to this much of its space, a little over, so the warning is still there to be read. */
+const FILL_ALL_TO = 1.15;
+
 /**
  * Tomorrow's order to the supplier: an amount for every item, grouped by where
  * it is kept. Rows are numbered in the order they are listed on the screen.
@@ -58,6 +64,8 @@ export function callNotes(calls: readonly Call[], answers: ReadonlyMap<number, n
 export class Supply {
   readonly rows: SupplyRow[];
   readonly notes: Map<string, CallNote[]>;
+  /** What the notes on today's orders say about tomorrow. */
+  readonly ahead: Announced[];
   private readonly capacity: Record<Kept, number>;
   private readonly amounts: number[];
   private readonly confirmed: boolean[];
@@ -65,11 +73,14 @@ export class Supply {
 
   constructor(morning: Morning, onHand: Record<string, number>, notes: Map<string, CallNote[]> = new Map()) {
     this.notes = notes;
+    this.ahead = announcedBy(morning.orders);
     this.capacity = morning.capacity;
+    const asked = new Map<string, number>();
+    for (const o of morning.orders) for (const l of o.lines) asked.set(l.item, (asked.get(l.item) ?? 0) + l.asked);
     this.rows = KEPT_ORDER.flatMap((kept) =>
       morning.items
         .filter((item) => item.kept === kept)
-        .map((item) => ({ item, kept, onHand: onHand[item.id] ?? 0, usual: morning.usual[item.id] ?? 0 })),
+        .map((item) => ({ item, kept, onHand: onHand[item.id] ?? 0, usual: morning.usual[item.id] ?? 0, asked: asked.get(item.id) ?? 0 })),
     );
     this.amounts = this.rows.map(() => 0);
     this.confirmed = this.rows.map(() => false);
@@ -91,6 +102,12 @@ export class Supply {
   price(r: number): number {
     const row = this.rows[r];
     return row ? supplierPrice(row.item.id) : 0;
+  }
+
+  /** What the notes on today's orders say about tomorrow for a row's item. */
+  hints(r: number): ItemHint[] {
+    const row = this.rows[r];
+    return row ? hintsFor(this.ahead, row.item.id) : [];
   }
 
   /** What a row's amount costs: the amount times the price of one unit. */
@@ -136,11 +153,37 @@ export class Supply {
     return this.set(r, this.gap(r));
   }
 
+  /**
+   * Fills every row at zero up to its gap, but no further than its room can hold: where the gaps together would not
+   * fit, each is cut by the same share. A row with an amount is left as it is, and takes its space first.
+   */
   fillAll(): void {
-    for (let r = 0; r < this.count; r++) this.fillRow(r);
+    const rooms = new Set(this.rows.map((row) => row.kept));
+    for (const kept of rooms) {
+      const empty: number[] = [];
+      let free = this.capacity[kept] * FILL_ALL_TO;
+      let need = 0;
+      this.rows.forEach((row, r) => {
+        if (row.kept !== kept) return;
+        const space = spaceOf(row.item.id);
+        free -= (row.onHand + this.amount(r)) * space;
+        if (this.amount(r) === 0) {
+          empty.push(r);
+          need += this.gap(r) * space;
+        }
+      });
+      const share = need > free ? Math.max(0, free) / need : 1;
+      for (const r of empty) this.set(r, Math.floor(this.gap(r) * share));
+    }
   }
 
-  /** How full a room will be tomorrow. */
+  /** How many units of each item in a room will spoil tomorrow because the room has no space for them. */
+  spoilage(kept: Kept): Map<string, number> {
+    const entries = this.rows.flatMap((row, r) => (row.kept === kept ? [{ item: row.item.id, inStore: row.onHand, ordered: this.amount(r) }] : []));
+    return new Map(fitRoom(this.capacity[kept], entries).filter((f) => f.spoils > 0).map((f) => [f.item, f.spoils]));
+  }
+
+  /** How full a room will be tomorrow, and how many units of what is in it will spoil. */
   roomSpace(kept: Kept): RoomSpace {
     let inStore = 0;
     let ordered = 0;
@@ -150,7 +193,8 @@ export class Supply {
       inStore += row.onHand * space;
       ordered += this.amount(r) * space;
     });
-    return roomSpace(this.capacity[kept], inStore, ordered);
+    const spoils = [...this.spoilage(kept).values()].reduce((sum, n) => sum + n, 0);
+    return roomSpace(this.capacity[kept], inStore, ordered, spoils);
   }
 
   /** The items with something to order, in the order listed. */

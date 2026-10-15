@@ -3,7 +3,7 @@ import { dateLabel } from '../src/game/clock';
 import { generateDay } from '../src/game/generate';
 import { BIG_TRUCKS, bigMorning, smallMorning } from '../src/game/morning';
 import { mulberry32 } from '../src/game/random';
-import { ROOM_CAPACITY, ROOM_GROWTH } from '../src/game/rooms';
+import { ROOM_CAPACITY, ROOM_GROWTH, SMALL_ROOM_CAPACITY } from '../src/game/rooms';
 import { EXTRA_DRIVERS, nextDay, newTruck, promisesFrom, runFromMorning, type DayOutcome, type RunState } from '../src/game/run';
 import { NEW_CLIENTS } from '../src/game/growth';
 import { stockAfterDeliveries } from '../src/game/supply';
@@ -40,7 +40,7 @@ describe('the state a run starts from', () => {
     expect(run.day).toBe(1);
     expect(run.stock).toEqual(m.stock);
     expect(run.trucks).toEqual(m.trucks);
-    expect(run.capacity).toEqual(ROOM_CAPACITY);
+    expect(run.capacity).toEqual(id === 'small' ? SMALL_ROOM_CAPACITY : ROOM_CAPACITY);
     expect(run.clients.map((c) => c.name)).toEqual(m.orders.map((o) => o.client));
     expect(run.moods).toEqual({});
     expect(run.promises).toEqual([]);
@@ -128,9 +128,9 @@ describe('growing', () => {
 
   it.each(['freezer', 'fridge', 'dry'] as const)('a bigger %s adds space to that room only', (room) => {
     const next = nextDay(smallRun(), outcome({ growth: { kind: 'room', room } }));
-    expect(next.capacity[room]).toBe(ROOM_CAPACITY[room] + ROOM_GROWTH[room]);
-    for (const other of (['freezer', 'fridge', 'dry'] as const).filter((r) => r !== room)) expect(next.capacity[other]).toBe(ROOM_CAPACITY[other]);
-    expect(nextDay(next, outcome({ growth: { kind: 'room', room } })).capacity[room]).toBe(ROOM_CAPACITY[room] + 2 * ROOM_GROWTH[room]);
+    expect(next.capacity[room]).toBe(SMALL_ROOM_CAPACITY[room] + ROOM_GROWTH[room]);
+    for (const other of (['freezer', 'fridge', 'dry'] as const).filter((r) => r !== room)) expect(next.capacity[other]).toBe(SMALL_ROOM_CAPACITY[other]);
+    expect(nextDay(next, outcome({ growth: { kind: 'room', room } })).capacity[room]).toBe(SMALL_ROOM_CAPACITY[room] + 2 * ROOM_GROWTH[room]);
   });
 
   it('a new client joins the clients', () => {
@@ -211,7 +211,7 @@ describe('a made-up day', () => {
           expect(Number.isInteger(l.asked)).toBe(true);
           expect(l.asked).toBeGreaterThan(0);
         }
-        expect(spaceOf(m, o.lines)).toBeLessThan(Math.min(...m.trucks.map((t) => t.capacity)));
+        expect(spaceOf(m, o.lines)).toBeLessThan(Math.max(...m.trucks.map((t) => t.capacity)));
         const place = run.clients.find((c) => c.name === o.client)!;
         expect([o.place, o.contact]).toEqual([place.place, place.contact]);
       }
@@ -226,19 +226,21 @@ describe('a made-up day', () => {
     }
   });
 
-  it.each(runs)('stays sensible for the %s run: no item asked for beyond its usual amount, and room on the trucks', (_name, make) => {
+  it.each(runs)('stays sensible for the %s run: items asked for around their usual amount, and room on the trucks', (_name, make) => {
     for (let seed = 1; seed <= 25; seed++) {
       const run = make();
       const m = generateDay(run, mulberry32(seed));
       for (const item of m.items) {
         const asked = m.orders.reduce((sum, o) => sum + o.lines.filter((l) => l.item === item.id).reduce((s, l) => s + l.asked, 0), 0);
-        // A line is never below one, so a very small usual amount can be passed by a unit or two.
-        expect(asked).toBeLessThanOrEqual((run.usual[item.id] ?? 0) + m.orders.length);
+        // Around the usual amount, within the most the notes of the day before and the chances can move it.
+        const usual = run.usual[item.id] ?? 0;
+        expect(asked).toBeGreaterThanOrEqual(usual * 0.6);
+        expect(asked).toBeLessThanOrEqual(usual * 1.5 + m.orders.length);
       }
       const space = m.orders.reduce((sum, o) => sum + spaceOf(m, o.lines), 0);
       const capacity = m.trucks.reduce((sum, t) => sum + t.capacity, 0);
       expect(space / capacity).toBeGreaterThan(0.3);
-      expect(space / capacity).toBeLessThan(0.8);
+      expect(space / capacity).toBeLessThan(0.92);
     }
   });
 
@@ -333,8 +335,8 @@ describe('a made-up day', () => {
     const grown = nextDay(nextDay(smallRun(), outcome({ growth: { kind: 'truck' } })), outcome({ growth: { kind: 'room', room: 'fridge' } }));
     const m = generateDay(grown, mulberry32(2));
     expect(m.trucks).toHaveLength(3);
-    expect(m.capacity.fridge).toBe(ROOM_CAPACITY.fridge + ROOM_GROWTH.fridge);
-    expect(m.capacity.freezer).toBe(ROOM_CAPACITY.freezer);
+    expect(m.capacity.fridge).toBe(SMALL_ROOM_CAPACITY.fridge + ROOM_GROWTH.fridge);
+    expect(m.capacity.freezer).toBe(SMALL_ROOM_CAPACITY.freezer);
   });
 
   it('tells of the supplier\'s delivery in the overnight messages, only when there was one', () => {
@@ -473,12 +475,12 @@ describe('the next morning in the game', () => {
     const room = app.growthOptions[1]!.growth as { kind: 'room'; room: 'freezer' | 'fridge' | 'dry' };
     press(' ', '2', 'Enter');
     hold(app, ' ');
-    expect(app.morning.capacity[room.room]).toBe(ROOM_CAPACITY[room.room] + ROOM_GROWTH[room.room]);
+    expect(app.morning.capacity[room.room]).toBe(SMALL_ROOM_CAPACITY[room.room] + ROOM_GROWTH[room.room]);
     playToSupply(app, press);
     expect(app.screen).toBe('supply');
-    expect(app.supply!.roomSpace(room.room).capacity).toBe(ROOM_CAPACITY[room.room] + ROOM_GROWTH[room.room]);
+    expect(app.supply!.roomSpace(room.room).capacity).toBe(SMALL_ROOM_CAPACITY[room.room] + ROOM_GROWTH[room.room]);
     const other = (['freezer', 'fridge', 'dry'] as const).find((r) => r !== room.room)!;
-    expect(app.supply!.roomSpace(other).capacity).toBe(ROOM_CAPACITY[other]);
+    expect(app.supply!.roomSpace(other).capacity).toBe(SMALL_ROOM_CAPACITY[other]);
     // The same amounts fill the bigger room less than they would have filled the old one.
     press('a');
     const space = app.supply!.roomSpace(room.room);

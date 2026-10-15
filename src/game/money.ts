@@ -30,29 +30,29 @@ export const PRICES: Prices = {
    * shoulder costs more than eggs, and chips more than peas.
    */
   items: {
-    chips: { supplier: 12, client: 20 },
-    peas: { supplier: 9, client: 15 },
-    pork: { supplier: 9, client: 15 },
-    mozzarella: { supplier: 7, client: 12 },
-    eggs: { supplier: 4, client: 7 },
-    oil: { supplier: 4, client: 7 },
-    potatoes: { supplier: 3, client: 5 },
-    flour: { supplier: 3, client: 5 },
-    rice: { supplier: 3, client: 5 },
+    chips: { supplier: 15, client: 20 },
+    peas: { supplier: 11, client: 15 },
+    pork: { supplier: 11, client: 15 },
+    mozzarella: { supplier: 9, client: 12 },
+    eggs: { supplier: 5, client: 7 },
+    oil: { supplier: 5, client: 7 },
+    potatoes: { supplier: 4, client: 5 },
+    flour: { supplier: 4, client: 5 },
+    rice: { supplier: 4, client: 5 },
     gravy: { supplier: 2, client: 4 },
     ketchup: { supplier: 2, client: 4 },
     tomatoes: { supplier: 1, client: 2 },
   },
   /** The driver for one truck that goes out for the day; a truck that stays in the yard costs nothing. */
-  truckDriver: 15,
+  truckDriver: 30,
   /** The fuel and wear for each square a truck travels on the island map, out and back. */
-  truckPerSquare: 5,
+  truckPerSquare: 12,
   /**
    * Another truck, and a bigger room, for each client the business serves: the bigger the business, the more it
    * costs to grow it, so that either takes about the same number of good days whichever morning the run began with.
    */
-  truckPerClient: 90,
-  roomPerClient: 90,
+  truckPerClient: 75,
+  roomPerClient: 75,
 };
 
 /** The cash a run starts with. */

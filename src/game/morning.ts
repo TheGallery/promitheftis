@@ -1,6 +1,6 @@
 import type { PlaceId } from './places';
 import { mulberry32 } from './random';
-import { ROOM_CAPACITY } from './rooms';
+import { ROOM_CAPACITY, SMALL_ROOM_CAPACITY } from './rooms';
 import type { Crew, Item, Message, Morning, Order, OrderLine, Truck } from './types';
 
 export const ITEMS: readonly Item[] = [
@@ -217,7 +217,7 @@ export function smallMorning(): Morning {
     items: ITEM_LIST,
     stock: { ...SMALL_STOCK },
     usual: { ...SMALL_USUAL },
-    capacity: { ...ROOM_CAPACITY },
+    capacity: { ...SMALL_ROOM_CAPACITY },
     trucks: BIG_TRUCKS.slice(0, 2).map((t) => ({ ...t })),
     orders,
     messages: buildMessages(orders, 2),

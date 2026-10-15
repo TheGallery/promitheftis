@@ -216,10 +216,19 @@ describe('a promise through the whole game', () => {
 
 describe('a saved run from before', () => {
   it('still loads with its promises, and the promises are checked the morning they come due', () => {
-    expect(SAVE_VERSION).toBe(2);
-    const run = { ...runFromMorning(smallMorning()), day: 2, promises: [{ client: 'Café Lumen', item: 'peas', qty: 4 }] };
-    const text = JSON.stringify({ version: 2, daySeed: 7, run });
-    expect(decodeRun(text)).toEqual({ run, daySeed: 7 });
+    expect(SAVE_VERSION).toBe(3);
+    const run = {
+      ...runFromMorning(smallMorning()),
+      day: 2,
+      promises: [{ client: 'Café Lumen', item: 'peas', qty: 4 }],
+      ahead: [{ client: "Rosa's", event: 'halfterm' as const }],
+    };
+    const { spoiled, ahead, ...before } = run;
+    const text = JSON.stringify({ version: 2, daySeed: 7, run: before });
+    // A save from before the rooms could spoil stock has nothing spoiled and nothing announced.
+    expect(decodeRun(text)).toEqual({ run: { ...before, spoiled: [], ahead: [] }, daySeed: 7 });
+    expect(spoiled).toEqual([]);
+    expect(ahead.length).toBeGreaterThan(0);
     expect(decodeRun(encodeRun(run, 7))?.run.promises).toEqual(run.promises);
     const store = memoryStore({ 'promitheftis.run': text });
     const app = new App(fakeEffects([], () => 0, store), () => {}, 'small');

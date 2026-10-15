@@ -1,22 +1,26 @@
 import type { CallKind } from './calls';
 import { formatTime } from './clock';
+import { swings } from './demand';
 import { plainName } from './headsup';
 import { arrivalTime, generateLines, ITEM_LIST } from './morning';
 import { moodEffect } from './moods';
 import { below, pick, type Random } from './random';
+import { KEPT_ORDER } from './supply';
 import type { RunClient, RunState } from './run';
-import type { Message, Morning, Order, OrderLine } from './types';
+import type { Kept, Message, Morning, Order, OrderLine } from './types';
 
 /** Longest note shown whole on the order desk, in characters, once the contact's name is counted. */
 const NOTE_BUDGET = 58;
 /** The share of clients that add a note of their own to an order. */
-const NOTE_CHANCE = 0.25;
+const NOTE_CHANCE = 0.3;
 /** The share of clients that ask for a time on a day they do not always ask. */
 const TIME_CHANCE = 0.12;
 /** Times a client may ask to be reached by, in minutes since midnight. */
 const ASKED_TIMES = [8 * 60, 9 * 60, 10 * 60, 11 * 60];
 /** Orders may fill this share of all the truck space together, so a careful player can load them. */
-const TRUCK_SHARE = 0.7;
+const TRUCK_SHARE = 0.85;
+/** Each item's total for the day is its usual amount, give or take this share. */
+const JITTER = 0.05;
 
 const NOTES: readonly string[] = [
   'Quiz night on Friday.',
@@ -65,11 +69,6 @@ function scaled(lines: readonly OrderLine[], factor: number): OrderLine[] {
   return lines.map((l) => ({ item: l.item, asked: Math.max(1, Math.round(l.asked * factor)) }));
 }
 
-/** The lines one client asks for today: random items and amounts, a little less when yesterday left them let down. */
-function clientLines(client: RunClient, run: RunState, random: Random): OrderLine[] {
-  return scaled(generateLines(random), moodEffect(run.moods[client.name]).scale);
-}
-
 /** Adds what the client was promised on the phone: to the line for that item if there is one, as a new line if not. */
 function addPromises(lines: OrderLine[], client: RunClient, run: RunState): void {
   for (const p of run.promises.filter((x) => x.client === client.name)) {
@@ -96,15 +95,56 @@ function noteFor(client: RunClient, run: RunState, ask: { before?: number; note?
   return kept.length > 0 ? kept.join(' ') : undefined;
 }
 
-/** Brings the amounts down so each item is asked for no more than its usual daily amount. */
-function fitToUsual(orders: ReadonlyArray<{ lines: OrderLine[] }>, run: RunState): void {
-  const totals = new Map<string, number>();
-  for (const o of orders) for (const l of o.lines) totals.set(l.item, (totals.get(l.item) ?? 0) + l.asked);
-  for (const [item, total] of totals) {
-    const usual = run.usual[item] ?? 0;
-    if (usual <= 0 || total <= usual) continue;
-    for (const o of orders) for (const l of o.lines) if (l.item === item) l.asked = Math.max(1, Math.floor((l.asked * usual) / total));
+/** The orders' lines, with the client that asks, as `shapeDemand` works on them. */
+interface Asking {
+  client: RunClient;
+  lines: OrderLine[];
+}
+
+/** Whole numbers that add up to `total`, in the proportions of `weights`: the biggest remainders get the extra ones. */
+function apportion(total: number, weights: readonly number[]): number[] {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const exact = weights.map((w) => (sum > 0 ? (total * w) / sum : total / weights.length));
+  const out = exact.map(Math.floor);
+  let left = total - out.reduce((a, b) => a + b, 0);
+  const order = exact.map((x, i) => [x - Math.floor(x), i] as const).sort((p, q) => q[0] - p[0] || p[1] - q[1]);
+  for (const [, i] of order) {
+    if (left <= 0) break;
+    out[i] = (out[i] as number) + 1;
+    left--;
   }
+  return out;
+}
+
+/**
+ * Turns the clients' made-up lines into the day's demand: each item is asked for about its usual amount, give or take a
+ * little, shared between the clients that ask for it in the proportions they drew. Then what the notes of the day before
+ * announced is added to (or taken from) the clients they were about, and a client let down yesterday asks for less.
+ */
+function shapeDemand(made: readonly Asking[], run: RunState, random: Random): void {
+  const clients = made.length;
+  const minAskers = Math.max(1, Math.ceil(clients / 4));
+  for (const item of ITEM_LIST) {
+    const askers = made.filter((m) => m.lines.some((l) => l.item === item.id));
+    const without = made.filter((m) => !askers.includes(m));
+    for (let k = askers.length; k < minAskers && without.length > 0; k++) {
+      const chosen = without.splice(below(random, without.length), 1)[0] as Asking;
+      chosen.lines.push({ item: item.id, asked: 1 });
+    }
+    const target = Math.max(1, Math.round((run.usual[item.id] ?? 0) * (1 + (random() * 2 - 1) * JITTER)));
+    const lines = made.flatMap((m) => m.lines.filter((l) => l.item === item.id));
+    if (lines.length === 0) continue;
+    const shares = apportion(target, lines.map((l) => l.asked));
+    lines.forEach((l, i) => (l.asked = Math.max(1, shares[i] as number)));
+  }
+  for (const swing of swings(run.ahead, run.usual, clients)) {
+    const m = made.find((x) => x.client.name === swing.client);
+    if (!m) continue;
+    const line = m.lines.find((l) => l.item === swing.item);
+    if (line) line.asked = Math.max(1, line.asked + swing.units);
+    else if (swing.units > 0) m.lines.push({ item: swing.item, asked: swing.units });
+  }
+  for (const m of made) m.lines = scaled(m.lines, moodEffect(run.moods[m.client.name]).scale);
 }
 
 /** Brings all the amounts down together if the orders would not fit on the trucks with room to spare. */
@@ -127,15 +167,35 @@ function callKindsFor(orderCount: number, random: Random): CallKind[] {
   return shuffled(random, kinds);
 }
 
+const ROOM_WORD: Record<Kept, string> = { freezer: 'freezer', fridge: 'fridge', dry: 'dry store' };
+
+/** "8 frozen chips", "8 frozen chips and 5 frozen peas", "a, b and c". */
+function listed(entries: readonly string[]): string {
+  return entries.length < 2 ? entries.join('') : `${entries.slice(0, -1).join(', ')} and ${entries.at(-1)}`;
+}
+
+/** One note from the store room for each room where stock spoiled overnight. */
+function spoilNotes(run: RunState): Array<Omit<Note, 'at'>> {
+  const keptOf = new Map(ITEM_LIST.map((i) => [i.id, i.kept]));
+  const names = new Map(ITEM_LIST.map((i) => [i.id, plainName(i.name)]));
+  return KEPT_ORDER.flatMap((kept): Array<Omit<Note, 'at'>> => {
+    const lost = run.spoiled.filter((s) => keptOf.get(s.item) === kept && s.units > 0);
+    if (lost.length === 0) return [];
+    const what = listed(lost.map((s) => `${s.units} ${names.get(s.item) ?? s.item}`));
+    return [{ kind: 'staff', from: run.storeRoom[0] ?? 'Max', text: `${what} spoiled: the ${ROOM_WORD[kept]} was full.` }];
+  });
+}
+
 function overnightNotes(run: RunState, random: Random): Message[] {
-  const times = Array.from({ length: 4 }, (_, i) => SUPPLIER_FIRST + Math.round((i * (SUPPLIER_LAST - SUPPLIER_FIRST)) / 3));
   const notes: Array<Omit<Note, 'at'>> = [];
   if (run.delivery.units > 0) {
     const items = `${run.delivery.items} ${run.delivery.items === 1 ? 'item' : 'items'}`;
     const units = `${run.delivery.units} ${run.delivery.units === 1 ? 'unit' : 'units'}`;
     notes.push({ kind: 'supplier', from: 'Hartley', text: `Your order is in: ${items}, ${units}.` });
   }
-  notes.push(pick(random, STAFF_NOTES), pick(random, SUPPLIER_NOTES));
+  notes.push(...spoilNotes(run), pick(random, STAFF_NOTES), pick(random, SUPPLIER_NOTES));
+  const slots = Math.max(4, notes.length);
+  const times = Array.from({ length: slots }, (_, i) => SUPPLIER_FIRST + Math.round((i * (SUPPLIER_LAST - SUPPLIER_FIRST)) / (slots - 1)));
   return shuffled(random, times).slice(0, notes.length).sort((a, b) => a - b).map((at, i) => ({ ...(notes[i] as Omit<Note, 'at'>), at }));
 }
 
@@ -146,7 +206,7 @@ function overnightNotes(run: RunState, random: Random): Message[] {
  */
 export function generateDay(run: RunState, random: Random): Morning {
   const made = shuffled(random, run.clients).map((client) => {
-    const lines = clientLines(client, run, random);
+    const lines = generateLines(random);
     // Every client draws the same numbers whatever it does with them, so one client's choices do not move another's.
     const noteRoll = random();
     const noteText = pick(random, NOTES);
@@ -156,7 +216,7 @@ export function generateDay(run: RunState, random: Random): Morning {
     const note = noteFor(client, run, { ...(before != null ? { before } : {}), ...(noteRoll < NOTE_CHANCE ? { note: noteText } : {}) });
     return { client, lines, note, before };
   });
-  fitToUsual(made, run);
+  shapeDemand(made, run, random);
   fitToTrucks(made, run);
   for (const m of made) addPromises(m.lines, m.client, run);
 

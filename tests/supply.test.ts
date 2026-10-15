@@ -99,6 +99,17 @@ describe('the supplier order', () => {
     s.rows.forEach((row, r) => expect(s.amount(r)).toBe(Math.max(0, row.usual - row.onHand)));
   });
 
+  it('does not fill a room far past its space: when the usual amounts would not fit, every row in it is cut by the same share', () => {
+    const m = smallMorning();
+    const grown = { ...m, usual: Object.fromEntries(Object.entries(m.usual).map(([id, n]) => [id, n * 4])) };
+    const s = new Supply(grown, {});
+    s.fillAll();
+    for (const kept of KEPT_ORDER) expect(s.roomSpace(kept).pct).toBeLessThanOrEqual(115);
+    const cut = s.rows.map((_, r) => s.amount(r) / s.gap(r)).filter((share) => share < 1);
+    expect(cut.length).toBeGreaterThan(0);
+    expect(Math.max(...cut) - Math.min(...cut)).toBeLessThan(0.1);
+  });
+
   it('leaves a row that already has an amount alone when filling it', () => {
     const s = supply();
     s.set(0, 7);
@@ -247,7 +258,7 @@ describe('the supplier ordering screen', () => {
         expect(noteLines[0]).toContain(here[0]!.client);
         // Below the last bar, in the panel on the right, never on the item's own line.
         expect(lines.indexOf(noteLines[0]!)).toBeGreaterThan(bars(lines));
-        expect(noteLines[0]!.indexOf('←')).toBeGreaterThanOrEqual(56);
+        expect(noteLines[0]!.indexOf('←')).toBeGreaterThanOrEqual(63);
         expect(rowOf(lines, row.item.name)).not.toContain('promised');
       } else {
         expect(noteLines).toHaveLength(0);
@@ -392,14 +403,14 @@ describe('the supplier ordering screen', () => {
       for (const room of ['FREEZER', 'FRIDGE', 'DRY STORE']) {
         const line = heading(lines, room);
         const space = app.supply!.roomSpace(room === 'FREEZER' ? 'freezer' : room === 'FRIDGE' ? 'fridge' : 'dry');
-        expect(line).toMatch(/[█▓░]{26} +\d+%/);
+        expect(line).toMatch(/[█▓░]{18} +\d+%/);
         expect(line).toContain(`${space.pct}%`);
-        expect(line).not.toContain('over by');
+        expect(line).not.toContain('will spoil');
         // To the right of the item columns, and at least one empty line below the legend.
-        expect(line.indexOf('█') === -1 ? line.indexOf('░') : line.indexOf('█')).toBeGreaterThanOrEqual(56);
+        expect(line.indexOf('█') === -1 ? line.indexOf('░') : line.indexOf('█')).toBeGreaterThanOrEqual(63);
         expect(lines.indexOf(line)).toBeGreaterThan(legend + 1);
       }
-      expect(lines[legend + 1]!.slice(50).trim()).toBe('');
+      expect(lines[legend + 1]!.slice(67).trim()).toBe('');
     });
 
     it('update as an amount is typed, nudged or filled', () => {
@@ -409,7 +420,7 @@ describe('the supplier ordering screen', () => {
       const chips = app.supply!.rows.findIndex((r) => r.item.id === 'chips');
       const before = shades(freezer());
       expect(before['▓']).toBe(0);
-      press(...Array(chips).fill('ArrowDown'), '4');
+      press(...Array(chips).fill('ArrowDown'), '1');
       const typed = shades(freezer());
       expect(typed['▓']).toBeGreaterThan(0);
       expect(typed['░']).toBeLessThan(before['░']!);
@@ -436,14 +447,14 @@ describe('the supplier ordering screen', () => {
       expect(space.overPct).toBeGreaterThan(0);
       const lines = screen(app);
       const line = heading(lines, 'FREEZER');
-      expect(line).toContain(`over by ${space.overPct}%`);
+      expect(line).toContain(`${space.spoils} will spoil`);
       expect(line).toContain(`${space.pct}%`);
       expect(shades(line)['░']).toBe(0);
-      expect([...line].filter((c) => '█▓'.includes(c))).toHaveLength(26);
-      const amber = screenLines(app).find((l) => l.some(([t]) => t.includes('over by')));
-      expect(amber!.filter(([t]) => t.includes('over by') || /^ +\d+%$/.test(t)).every(([, cls]) => cls === 'w')).toBe(true);
+      expect([...line].filter((c) => '█▓'.includes(c))).toHaveLength(18);
+      const amber = screenLines(app).find((l) => l.some(([t]) => t.includes('will spoil')));
+      expect(amber!.filter(([t]) => t.includes('will spoil') || /^ +\d+%$/.test(t)).every(([, cls]) => cls === 'w')).toBe(true);
       // The other rooms are not over, so say nothing about them.
-      expect(lines.join('\n').match(/over by/g)).toHaveLength(1);
+      expect(lines.join('\n').match(/will spoil/g)?.length).toBeGreaterThanOrEqual(1);
       hold(app, ' ');
       expect(app.supply!.placed).toBe(true);
       expect(app.screen).toBe('day');
