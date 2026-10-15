@@ -93,6 +93,27 @@ describe('the three growth options', () => {
     expect(gain).toContain(`will cost ${formatMoney(truckPrice(BUSINESS.clients.length, BUSINESS.trucks.length + 1))}`);
   });
 
+  it('counts every truck the business owns against the new one on a garage day, but only the free ones in how full they were', () => {
+    const { day } = summary(0, ['Café Lumen']);
+    const broken = { ...day, trucks: day.trucks.map((t, i) => (i === 1 ? { ...t, garage: true, backAt: null, load: 0, squares: 0, cost: 0 } : t)) };
+    const owned = day.trucks.reduce((n, t) => n + t.capacity, 0);
+    const free = broken.trucks[0]!;
+    const fleet = fleetOf(broken);
+    expect(fleet).toMatchObject({ trucks: 2, garage: 1, space: free.capacity });
+    const gain = growthOptions(broken, CLIENT, BUSINESS)[0]!.gain.join(' ');
+    expect(gain).toContain(`on top of the ${owned.toLocaleString('en-GB')} your 2 trucks hold (1 at the garage today).`);
+    expect(gain).toContain(`today they were ${Math.round((free.load * 100) / free.capacity)}% full`);
+    expect(gain).not.toContain('1 truck hold');
+    expect(growthOptions(day, CLIENT, BUSINESS)[0]!.gain.join(' ')).not.toContain('at the garage');
+  });
+
+  it('says one truck holds, not hold', () => {
+    const { day } = summary(0, ['Café Lumen']);
+    const one = { ...day, trucks: day.trucks.slice(0, 1) };
+    const gain = growthOptions(one, CLIENT, BUSINESS)[0]!.gain.join(' ');
+    expect(gain).toContain(`your 1 truck holds.`);
+  });
+
   it('counts a truck that never left the yard, and says so', () => {
     const { day } = summary(0, ['Café Lumen']);
     const idle = { ...day, trucks: day.trucks.map((t, i) => (i === 1 ? { ...t, backAt: null, load: 0, squares: 0, cost: 0 } : t)) };

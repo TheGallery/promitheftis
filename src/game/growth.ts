@@ -76,9 +76,12 @@ const percent = (part: number, whole: number): number => (whole > 0 ? Math.round
 /** What the truck option says: the truck that would join, what the day showed about the trucks, and what the next one costs. */
 function truckGain(day: DaySummary, business: Business, next: Truck): string[] {
   const fleet = fleetOf(day);
+  const owned = day.trucks.reduce((n, t) => n + t.capacity, 0);
+  const verb = fleet.trucks === 1 ? 'holds' : 'hold';
+  const garage = fleet.garage > 0 ? ` (${fleet.garage} at the garage today)` : '';
   const yard = fleet.yard > 0 ? `, ${fleet.yard} stayed in the yard` : '';
   return [
-    `A ${next.kind} with room for ${next.capacity}, on top of the ${grouped(fleet.space)} your ${plural(fleet.trucks - fleet.garage, 'truck')} hold. Orders are planned to fill at most ${Math.round(TRUCK_SHARE * 100)}% of the trucks, ` +
+    `A ${next.kind} with room for ${next.capacity}, on top of the ${grouped(owned)} your ${plural(fleet.trucks, 'truck')} ${verb}${garage}. Orders are planned to fill at most ${Math.round(TRUCK_SHARE * 100)}% of the trucks, ` +
       `so it only helps once yours near that: today they were ${fleet.use}% full${yard}. ` +
       `The next truck after it will cost ${formatMoney(truckPrice(business.clients.length, business.trucks.length + 1))}.`,
   ];
