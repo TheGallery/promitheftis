@@ -687,6 +687,39 @@ describe('a new run on the opening screen has to be held down', () => {
     }
   });
 
+  it('is a menu: ENTER on Continue goes on, SPACE and C continue from any line, and ENTER on a new run only starts the hold', () => {
+    const onContinue = welcome();
+    onContinue.app.press({ key: 'Enter' });
+    expect(onContinue.app.screen).toBe('messages');
+    expect(onContinue.app.run.day).toBe(2);
+    for (const key of [' ', 'c', 'C']) {
+      for (const sel of [0, 1, 2]) {
+        const { app } = welcome();
+        app.press({ key: String(sel + 1) });
+        expect(app.startSel).toBe(sel);
+        app.press({ key });
+        expect(app.screen).toBe('messages');
+        expect(app.run.day).toBe(2);
+        expect(app.holding).toBe(false);
+      }
+    }
+    for (const [sel, kind] of [[1, 'small'], [2, 'big']] as const) {
+      const { app, store, text, wait } = welcome();
+      app.press({ key: String(sel + 1) });
+      app.press({ key: 'Enter' });
+      expect(app.screen).toBe('start');
+      expect(app.newRunAsk).toBe(kind);
+      expect(app.holding).toBe(true);
+      wait(HOLD_MS - 1);
+      expect(app.screen).toBe('start');
+      expect(store.data.get(RUN_KEY)).toBe(text);
+      wait(1);
+      expect(app.screen).toBe('messages');
+      expect(app.run.day).toBe(1);
+      expect(app.run.kind).toBe(kind);
+    }
+  });
+
   it('the screen stays 120 columns wide with the button on show', () => {
     const { app } = welcome();
     app.press({ key: 'b' });
