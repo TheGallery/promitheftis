@@ -55,6 +55,9 @@ export const PRICES: Prices = {
   roomPerClient: 75,
 };
 
+/** The share of an order's price a client pays when the truck reached them after the time they asked for. */
+export const LATE_PAYS = 0.5;
+
 /** The cash a run starts with. */
 export const STARTING_CASH = PRICES.startingCash;
 
@@ -85,8 +88,10 @@ export type RoomCosts = Record<Kept, number>;
 
 /** How a day's money worked out. */
 export interface DayMoney {
-  /** What the restaurants paid for what arrived. */
+  /** What the restaurants paid for what arrived, with half taken off each order that came after the time asked. */
   takenIn: number;
+  /** What those late orders paid less than they would have on time. */
+  lateCut: number;
   /** What the supplier order costs, and the share of it for each room. */
   supplier: number;
   supplierRooms: RoomCosts;
@@ -122,9 +127,16 @@ function priceOf(item: string): ItemPrice {
 const sum = (lines: readonly Units[], price: (item: string) => number): number =>
   lines.reduce((total, l) => total + l.units * price(l.item), 0);
 
-/** What the restaurants pay for the units that arrived: a short delivery pays less, a late one pays the same. */
+/** What the restaurants pay for the units that arrived, whenever they came: a short delivery pays less. */
 export function takenIn(delivered: readonly Units[]): number {
   return sum(delivered, clientPrice);
+}
+
+/** What one order pays: the price of what arrived, and half of it if the truck came after the time the client asked for. */
+export function orderPay(delivered: readonly Units[], late: boolean): { paid: number; cut: number } {
+  const full = takenIn(delivered);
+  const paid = late ? Math.round(full * LATE_PAYS) : full;
+  return { paid, cut: full - paid };
 }
 
 /** What the supplier order costs. */
@@ -149,15 +161,19 @@ export function tripCosts(trips: readonly Trip[]): TripCost[] {
   return trips.map((t) => ({ ...t, cost: truckCost(t.squares) }));
 }
 
-/** The money of one day: what came in, what went out, and where that leaves the cash. */
-export function dayMoney(before: number, delivered: readonly Units[], ordered: readonly Units[], trips: readonly Trip[]): DayMoney {
-  const income = takenIn(delivered);
+/**
+ * The money of one day: what came in, what went out, and where that leaves the cash. `lateCut` is what the orders that
+ * came after the time asked paid less, and is taken off what the units that arrived are worth.
+ */
+export function dayMoney(before: number, delivered: readonly Units[], ordered: readonly Units[], trips: readonly Trip[], lateCut = 0): DayMoney {
+  const income = takenIn(delivered) - lateCut;
   const supplier = supplierCost(ordered);
   const truckTrips = tripCosts(trips);
   const trucks = truckTrips.reduce((total, t) => total + t.cost, 0);
   const total = income - supplier - trucks;
   return {
     takenIn: income,
+    lateCut,
     supplier,
     supplierRooms: supplierRooms(ordered),
     trucksOut: truckTrips.length,
