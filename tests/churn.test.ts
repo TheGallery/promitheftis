@@ -252,6 +252,15 @@ describe('a client let down three days running', () => {
     }
   });
 
+  it('still has an order when the only client left ordering is closed that day', () => {
+    let run = runFromMorning(smallMorning());
+    const [only] = names(run) as [string];
+    run = endDay(run, [], 1);
+    const standing: Standings = Object.fromEntries(names(run).filter((n) => n !== only).map((n) => [n, { streak: 0, away: 2 }]));
+    const day = generateDay({ ...run, standing, ahead: [{ client: only, event: 'closed' }] }, mulberry32(4));
+    expect(day.orders.map((o) => o.client)).toEqual([only]);
+  });
+
   it('plays the same morning again for the same seed, break and all', () => {
     const run = letDownFor(runFromMorning(smallMorning()), ROSA, 3);
     expect(generateDay(run, mulberry32(99))).toEqual(generateDay(run, mulberry32(99)));

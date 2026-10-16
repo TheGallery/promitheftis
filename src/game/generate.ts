@@ -239,8 +239,9 @@ export function generateDay(run: RunState, random: Random): Morning {
   });
   const closed = closedIn(run.ahead);
   // A client that is closed sends no order, and the rest share what is asked for; the business never has nobody to order from.
+  // When every client left ordering is closed that day, they send their orders all the same.
   const asking = made.filter((m) => !closed.has(m.client.name));
-  const sent = asking.length > 0 ? asking : made;
+  const sent = asking.some((m) => !isAway(run.standing, m.client.name)) ? asking : made;
   shapeDemand(sent, run, random);
   // A client on a break sends nothing, but the others still ask for what they would have: the break costs only that client's orders.
   const sending = sent.filter((m) => !isAway(run.standing, m.client.name));
