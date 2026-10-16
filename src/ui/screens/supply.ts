@@ -1,4 +1,5 @@
 import { SUPPLIER_MINUTE } from '../../game/clock';
+import { weekLine, weekMark } from '../../game/daysize';
 import { formatMoney } from '../../game/money';
 import type { RoomSpace } from '../../game/rooms';
 import { KEPT_LABEL, KEPT_ORDER, type Supply } from '../../game/supply';
@@ -122,9 +123,14 @@ function noteLines(supply: Supply, r: number): Line[] {
   }
   const busy = supply.hints(r).filter((h) => h.busy);
   const quiet = supply.hints(r).filter((h) => !h.busy);
-  const phrase = (hints: typeof busy) => hints.map((h) => `${h.client} (${h.word})`);
-  if (busy.length > 0) out.push(...noted('↑', `Tomorrow: ${whoLine(phrase(busy))}, so more`, 'acc'));
-  if (quiet.length > 0) out.push(...noted('↓', `Tomorrow: ${whoLine(phrase(quiet))}, so less`, 'acc'));
+  // Clients with the same news are named together, so that a town event touching many of them does not hide the others.
+  const phrase = (hints: typeof busy) => {
+    const byWord = new Map<string, string[]>();
+    for (const h of hints) byWord.set(h.word, [...(byWord.get(h.word) ?? []), h.client]);
+    return [...byWord].map(([word, who]) => `${whoLine(who)} (${word})`);
+  };
+  if (busy.length > 0) out.push(...noted('↑', `Tomorrow: ${phrase(busy).join('; ')}, so more`, 'acc'));
+  if (quiet.length > 0) out.push(...noted('↓', `Tomorrow: ${phrase(quiet).join('; ')}, so less`, 'acc'));
   return out;
 }
 
@@ -181,6 +187,8 @@ function rows(app: App, supply: Supply): Line[] {
       costCell(supply, r, current ? (supply.cost(r) > 0 ? 'acc hl' : 'hl') : done || supply.cost(r) === 0 ? 'd' : 'acc'),
     ));
   });
+  const mark = weekMark(supply.day + 1);
+  out.push([], s(` ${mark ? `${mark} ` : ''}${weekLine(supply.day + 1)}`, mark ? 'acc' : 'd'));
   const side = panel(app, supply);
   while (out.length < side.length) out.push([]);
   return out.map((line, i) => (side[i] && side[i]!.length ? cat(padTo(line, PANEL_AT), side[i]!) : line));

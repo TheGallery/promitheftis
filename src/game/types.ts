@@ -1,4 +1,5 @@
 import type { CallKind } from './calls';
+import type { Announced } from './demand';
 import type { PlaceId } from './places';
 
 /** Where an item is kept: the freezer, the fridge or the dry store. */
@@ -104,4 +105,6 @@ export interface Morning {
   short?: Short[];
   /** The rush order that comes in by phone while the trucks are out; most mornings have none. */
   rush?: Rush;
+  /** What the overnight messages say about tomorrow: the clients a town event is about and the ones that are closed. */
+  tomorrow?: Announced[];
 }

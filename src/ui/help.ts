@@ -99,16 +99,17 @@ export const HELP_PAGES: readonly HelpPage[] = [
       {
         head: 'DEMAND SWINGS',
         text:
-          'Clients ask for about the usual amount, give or take, so {A} is a good start and not the whole answer. A note on an order is a hint ' +
-          'for tomorrow: a wedding or a quiz night means that client will ask for more of some items, and "keep it simple" means less. An ' +
-          'arrow beside what was asked says the notes expect tomorrow to be busier (↑) or quieter (↓) for that item; select the row to see who said so.',
+          'Clients ask for about the usual amount, so {A} is a good start and not the whole answer. Sunday and Monday are quiet, Friday and Saturday are busy, ' +
+          'as the line under the list says. A note on an order or an overnight message is a hint too: a wedding, a quiz night or a ' +
+          'match day means clients ask for more of some items; "keep it simple", or a client who rang to say it is closed, means less (the hospital ' +
+          'and the schools never close). An arrow beside what was asked says tomorrow is busier (↑) or quieter (↓) for that item; select the row to see who said so.',
       },
       {
         head: 'THE STORE ROOMS',
         text:
           'Each room has a bar showing how full it will be tomorrow: █ the stock now, ▓ what is ordered and ░ the space left. A room holds only ' +
           'so much. What does not fit spoils overnight, and is paid for all the same: the bar turns amber and says how many units will spoil, ' +
-          'and the store room tells you in the morning. A bigger room is one of the things you can grow.',
+          'and the store room tells you in the morning.',
       },
       {
         head: 'WHEN THE SUPPLIER COMES UP SHORT',

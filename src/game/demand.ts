@@ -1,3 +1,4 @@
+import { ITEM_LIST } from './morning';
 import type { Order } from './types';
 
 /**
@@ -13,6 +14,8 @@ export interface DemandEvent {
   items: readonly string[];
   /** How the supplier order names it: "Hotel Bellevue (a wedding)". */
   word: string;
+  /** True when the client is not there at all: the event takes away the whole share of the usual amount an average client has. */
+  closed?: boolean;
 }
 
 export const EVENTS: readonly DemandEvent[] = [
@@ -25,6 +28,12 @@ export const EVENTS: readonly DemandEvent[] = [
   { id: 'scones', phrase: 'scones', busy: true, items: ['flour', 'eggs'], word: 'scones' },
   { id: 'simple', phrase: 'keep it simple', busy: false, items: ['pork', 'mozzarella', 'oil', 'rice'], word: 'a simple menu' },
   { id: 'fridge', phrase: 'walk-in fridge', busy: false, items: ['pork', 'eggs', 'mozzarella'], word: 'the fridge being fixed' },
+  // The town's own events: told to the player in an overnight message, not in a client's note, so their phrases name no note.
+  { id: 'match', phrase: 'match day', busy: true, items: ['chips', 'ketchup', 'pork', 'gravy'], word: 'match day' },
+  { id: 'regatta', phrase: 'regatta', busy: true, items: ['chips', 'peas', 'ketchup', 'oil'], word: 'the regatta' },
+  { id: 'market', phrase: 'farmers\' market', busy: true, items: ['flour', 'eggs', 'potatoes', 'tomatoes'], word: 'the market' },
+  { id: 'fair', phrase: 'street fair', busy: true, items: ['chips', 'pork', 'ketchup', 'oil', 'rice'], word: 'the street fair' },
+  { id: 'closed', phrase: 'is closed', busy: false, items: ITEM_LIST.map((i) => i.id), word: 'closed', closed: true },
 ];
 
 /** A client whose note, on the day it was shown, said tomorrow would be different. */
@@ -57,7 +66,7 @@ const MOST = 0.3;
 
 /** The units one event adds to (or, if quiet, takes from) one item's total when the business has `clients` clients. */
 export function swingUnits(event: DemandEvent, usual: number, clients: number): number {
-  const units = Math.max(1, Math.round((usual * STRENGTH) / Math.sqrt(Math.max(1, clients))));
+  const units = Math.max(1, Math.round(event.closed ? usual / Math.max(1, clients) : (usual * STRENGTH) / Math.sqrt(Math.max(1, clients))));
   return event.busy ? units : -units;
 }
 

@@ -1,6 +1,7 @@
 import type { DaySummary } from './day';
 import type { Call } from './calls';
 import { usualWith } from './clients';
+import { closedIn } from './daysize';
 import type { Announced } from './demand';
 import { BIG_TRUCKS, ITEM_LIST } from './morning';
 import type { Growth } from './growth';
@@ -72,7 +73,7 @@ export interface RunState {
   delivery: Delivery;
   /** What spoiled overnight because its room was full; it was paid for all the same. */
   spoiled: Spoiled[];
-  /** What the notes on yesterday's orders announced for today. */
+  /** What yesterday's overnight messages and the notes on its orders announced for today: the clients a town event is about, the ones that are closed, and what a note said. */
   ahead: Announced[];
   /** What the supplier left behind of last night's delivery; the stock holds only what came, and the rest was not charged for. */
   short: Short[];
@@ -206,6 +207,8 @@ export function nextDay(run: RunState, outcome: DayOutcome, seed?: number): RunS
   if (outcome.growth?.kind === 'room') capacity[outcome.growth.room] += ROOM_GROWTH[outcome.growth.room];
   const short = seed == null ? [] : shortfallFor(outcome.ordered, seed);
   const delivered = deliveredOf(outcome.ordered, short);
+  // A client that was closed today sent no order, so nothing was said of how it went or what was promised it: that waits for its next order.
+  const closed = closedIn(run.ahead);
   const { stock, spoiled } = settleRooms(run, { ...outcome, ordered: delivered }, capacity);
   const next: RunState = {
     ...run,
@@ -216,9 +219,9 @@ export function nextDay(run: RunState, outcome: DayOutcome, seed?: number): RunS
     crews: run.crews.map((c) => ({ names: [...c.names], trucks: [...c.trucks] })),
     capacity,
     clients: run.clients.map((c) => ({ ...c })),
-    moods: { ...outcome.moods },
+    moods: { ...Object.fromEntries(Object.entries(run.moods).filter(([name]) => closed.has(name))), ...outcome.moods },
     history: remember(run.history, outcome.today),
-    promises: outcome.promises.map((p) => ({ ...p })),
+    promises: [...run.promises.filter((p) => closed.has(p.client)), ...outcome.promises].map((p) => ({ ...p })),
     delivery: {
       items: Object.values(delivered).filter((n) => n > 0).length,
       units: Object.values(delivered).reduce((sum, n) => sum + n, 0),
