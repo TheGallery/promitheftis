@@ -265,6 +265,21 @@ describe('a town event', () => {
     expect(checked).toBeGreaterThan(0);
   });
 
+  it('never names a client still on a break tomorrow, and names one that is back tomorrow', () => {
+    const base = runOf(4, 'small');
+    const [still, back] = base.clients;
+    if (!still || !back) throw new Error('too few clients');
+    const run: RunState = { ...base, standing: { [still.name]: { streak: 0, away: 2 }, [back.name]: { streak: 0, away: 1 } } };
+    const orders = generateDay(run, mulberry32(1)).orders;
+    let backNamed = 0;
+    for (let seed = 1; seed <= 3000; seed++) {
+      const named = tomorrowFor(run, orders, mulberry32(seed), 0, 10).ahead.filter((a) => isTownEvent(a.event)).map((a) => a.client);
+      expect(named).not.toContain(still.name);
+      if (named.includes(back.name)) backNamed++;
+    }
+    expect(backNamed).toBeGreaterThan(0);
+  });
+
   it('is told in the how-to-play', () => {
     const text = HELP_PAGES.flatMap((p) => p.blocks.map((b) => b.text)).join(' ');
     expect(text).toContain('Sunday and Monday are quiet');
