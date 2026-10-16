@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { weekFactor } from '../src/game/daysize';
 import { STARTING_CASH } from '../src/game/money';
 import { median, playRun, summarise, type DayStat, type GrowthRule, type Policy } from './sim';
@@ -13,6 +13,9 @@ const SEEDS = [1, 2, 3, 4, 5, 6];
 const DAYS = 24;
 /** The days from which the figures are taken: the first two are the fixed morning and its day after. */
 const FROM = 3;
+
+// A test that first asks for a policy plays its six runs through, which takes seconds on a slow machine.
+vi.setConfig({ testTimeout: 60_000 });
 
 const cache = new Map<string, DayStat[][]>();
 function runs(kind: 'small' | 'big', policy: Policy, rule: GrowthRule = policy === 'blind' ? 'first' : 'screen'): DayStat[][] {
