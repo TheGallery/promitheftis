@@ -120,7 +120,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
     ],
   },
   {
-    name: 'END OF THE DAY AND MONEY',
+    name: 'END OF DAY',
     blocks: [
       {
         head: 'THE END OF THE DAY',
@@ -158,36 +158,44 @@ export const HELP_PAGES: readonly HelpPage[] = [
     blocks: [
       {
         text:
-          'The game is a run of days. After the growth choice, holding {SPACE} goes on to the next morning, a day on. What carries over: ' +
-          'the stock, trucks, rooms, clients and how they felt, and promises.',
+          'The game is a run of days. After the growth choice, holding {SPACE} goes on to the next morning, at the overnight messages again, a day on. ' +
+          'What carries over: the stock in each room, the trucks, how big each room is, the clients and how each one felt, and what you ' +
+          'promised on the phone.',
       },
       {
         head: 'WHAT YOU FIND',
         text:
           'The supplier order is in the store rooms, on top of what was left, as much as each room holds; an item you did not order is as low as you left it. The first ' +
-          'day is a fixed morning; from day 2 on the orders, notes and calls are made up. A promise on the phone is on the ' +
-          'client\'s order ("As promised: 4 frozen peas"). ' +
-          'Now and then a staff note says a truck is at the garage for the day: it cannot be loaded and costs nothing, so spread its orders.',
+          'day is a fixed morning; from day 2 on the orders, notes and calls are made up, different every day. A promise on the phone is on the ' +
+          'client\'s order ("As promised: 4 frozen peas"). The growth choice is at work: the new truck, the bigger room, the new client. ' +
+          'Now and then a staff note says a truck is at the garage for the day: it cannot be loaded and costs nothing, so spread its orders over the others.',
       },
       {
         head: 'SHORT DELIVERIES ARE REMEMBERED',
         text:
           'A client who went short in the last two days gets a marker on the order desk and in the overnight messages: {!} for one short ' +
-          'day, {!!} for two days running; the lines below say what was short. A client who is short again is a little more let down. A full ' +
-          'delivery on time pleases them whatever came before.',
+          'day, {!!} for two days running. Select the order and the lines below say which day, how much came and what was short. A client ' +
+          'who is short again is a little more let down. A full delivery on time pleases them whatever came before, and the marker goes ' +
+          'once two days have passed.',
       },
+      {
+        head: 'PLAYING A DAY AGAIN',
+        text:
+          'Holding {R} plays the current day again from its overnight messages, with the same orders, the same stock, and the same new client ' +
+          'and next morning to come. It leaves the saved run alone. It drops what you did since the trucks left, so on the result, the end of the ' +
+          'day and the growth choice you hold {R} down like the other steps that cannot be taken back.',
+      },
+    ],
+  },
+  {
+    name: 'CLIENTS',
+    blocks: [
       {
         head: 'A CLIENT LET DOWN AGAIN AND AGAIN',
         text:
           'Let down, or a bit let down, three days running, and a client takes a break: a polite note, no orders for two or three days, then back, ' +
           'a little wary, ordering less for a day. {▼} marks two days running: the day to look after them. A second break soon after the first, ' +
           'and they go for good; the new-client offer can fill the gap. The hospital and the schools stay, and the last client is never lost.',
-      },
-      {
-        head: 'PLAYING A DAY AGAIN',
-        text:
-          'Holding {R} plays the current day again from its overnight messages: the same orders, stock, new client and next morning. It leaves ' +
-          'the saved run alone, and drops what you did since the trucks left.',
       },
     ],
   },
@@ -230,7 +238,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
 export function helpPageFor(screen: Screen): number {
   switch (screen) {
     case 'start':
-      return 5;
+      return 6;
     case 'messages':
     case 'desk':
     case 'sheets':

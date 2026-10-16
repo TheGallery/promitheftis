@@ -225,9 +225,12 @@ export function nextDay(run: RunState, outcome: DayOutcome, seed?: number): RunS
   // A client who has gone, or is on a break, is not remembered by what they left behind: they come back, if they do, with a clean slate.
   const out = (name: string) => gone.has(name) || (settled.standing[name]?.away ?? 0) > 0;
   let usual = { ...run.usual };
+  let staying = run.clients;
   for (const name of settled.gone) {
-    const leaving = run.clients.find((c) => c.name === name);
-    if (leaving) usual = usualWithout(usual, run.clients, leaving);
+    const leaving = staying.find((c) => c.name === name);
+    if (!leaving) continue;
+    usual = usualWithout(usual, staying, leaving);
+    staying = staying.filter((c) => c !== leaving);
   }
   const next: RunState = {
     ...run,

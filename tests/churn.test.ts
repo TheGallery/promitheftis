@@ -267,6 +267,17 @@ describe('what the clients who go for good take with them', () => {
     expect(less.pork).toBeLessThan(100);
     expect(usualWithout(usual, [], {})).toEqual(usual);
   });
+
+  it('takes each of two clients who go on the same day off against the clients still there', () => {
+    const run = bigRun();
+    const [a, b] = run.clients.filter((c) => c.name !== HOSPITAL && !/School/.test(c.name));
+    if (!a || !b) throw new Error('two clients wanted');
+    const standing = { [a.name]: { streak: 2, away: 0, lastBreak: run.day - 1 }, [b.name]: { streak: 2, away: 0, lastBreak: run.day - 1 } };
+    const next = endDay({ ...run, standing }, [a.name, b.name], 9);
+    expect(next.lost).toEqual([a.name, b.name]);
+    const rest = run.clients.filter((c) => c !== a);
+    expect(next.usual).toEqual(usualWithout(usualWithout(run.usual, run.clients, a), rest, b));
+  });
 });
 
 describe('on the screens', () => {

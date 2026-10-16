@@ -152,7 +152,7 @@ describe('how to play', () => {
   });
 
   it('opens on the page that goes with the screen it was asked for from', () => {
-    const wanted = [0, 0, 0, 1, 1, 2, 3, 3, 5];
+    const wanted = [0, 0, 0, 1, 1, 2, 3, 3, 6];
     SCREENS.forEach(([name, make], i) => {
       const { app, press } = make();
       press('h');
