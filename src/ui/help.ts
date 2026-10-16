@@ -120,7 +120,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
     ],
   },
   {
-    name: 'END OF THE DAY AND MONEY',
+    name: 'END OF DAY',
     blocks: [
       {
         head: 'THE END OF THE DAY',
@@ -188,6 +188,18 @@ export const HELP_PAGES: readonly HelpPage[] = [
     ],
   },
   {
+    name: 'CLIENTS',
+    blocks: [
+      {
+        head: 'A CLIENT LET DOWN AGAIN AND AGAIN',
+        text:
+          'Let down, or a bit let down, three days running, and a client takes a break: a polite note, no orders for two or three days, then back, ' +
+          'a little wary, ordering less for a day. {▼} marks two days running: the day to look after them. A second break soon after the first, ' +
+          'and they go for good; the new-client offer can fill the gap. The hospital and the schools stay, and the last client is never lost.',
+      },
+    ],
+  },
+  {
     name: 'SAVING',
     blocks: [
       {
@@ -226,7 +238,7 @@ export const HELP_PAGES: readonly HelpPage[] = [
 export function helpPageFor(screen: Screen): number {
   switch (screen) {
     case 'start':
-      return 5;
+      return 6;
     case 'messages':
     case 'desk':
     case 'sheets':

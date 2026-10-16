@@ -1,3 +1,4 @@
+import { AWAY_TO, type Notice, type Standing, type Standings } from './churn';
 import { LAST_DAY } from './clock';
 import { EVENTS, type Announced } from './demand';
 import { HISTORY_DAYS, type ClientDay, type History } from './history';
@@ -13,13 +14,15 @@ import type { Crew, Kept, Short, Truck } from './types';
  * from the starting cash; the second, which did not say what spoiled or what the notes announced, is read too, with
  * nothing spoiled and nothing announced; so is the third, whose clients were all ordinary, none big or small and none
  * heavy on a room; and the fourth, which did not say what the supplier left behind of a delivery, is read too, with
- * nothing left behind. A save with any other version is not read.
+ * nothing left behind; and the fifth, which did not say how many days running each client had been let down or which were on
+ * a break, is read too, with every client in good standing. A save with any other version is not read.
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 const FIRST_VERSION = 1;
 const SECOND_VERSION = 2;
 const THIRD_VERSION = 3;
 const FOURTH_VERSION = 4;
+const FIFTH_VERSION = 5;
 
 /** The run, as it stood when a day began, with the seed that makes up that day (for day 1, the fixed morning, it is 0). */
 export interface SavedRun {
@@ -130,6 +133,30 @@ function shortOf(v: unknown): Short | null {
   return { item: v.item as string, ordered: v.ordered, came: v.came };
 }
 
+function standingOf(v: unknown): Standing | null {
+  if (!isObject(v) || !isCount(v.streak) || !isCount(v.away) || v.away > AWAY_TO) return null;
+  if (v.back !== undefined && typeof v.back !== 'boolean') return null;
+  if (v.lastBreak !== undefined && !isCount(v.lastBreak)) return null;
+  return { streak: v.streak, away: v.away, ...(v.back ? { back: true } : {}), ...(v.lastBreak !== undefined ? { lastBreak: v.lastBreak as number } : {}) };
+}
+
+function standingsOf(v: unknown): Standings | null {
+  if (!isObject(v) || Object.keys(v).length > MOST) return null;
+  const out: Standings = {};
+  for (const [name, entry] of Object.entries(v)) {
+    const s = standingOf(entry);
+    if (!s) return null;
+    out[name] = s;
+  }
+  return out;
+}
+
+function noticeOf(v: unknown): Notice | null {
+  if (!isObject(v) || !isText(v.client) || !isText(v.contact) || (v.kind !== 'break' && v.kind !== 'gone')) return null;
+  if (v.plain !== undefined && typeof v.plain !== 'boolean') return null;
+  return { client: v.client, contact: v.contact, kind: v.kind, ...(v.plain ? { plain: true } : {}) };
+}
+
 function clientDayOf(v: unknown): ClientDay | null {
   if (!isObject(v) || !isCount(v.percent) || v.percent > 100 || typeof v.late !== 'boolean' || !Array.isArray(v.lacked) || v.lacked.length > MOST) return null;
   const lacked = [];
@@ -177,10 +204,16 @@ function runOf(v: unknown, version: number): RunState | null {
   // A run saved before the rooms could spoil stock, and before the notes were read, has neither to carry over.
   const spoiled = version < THIRD_VERSION ? [] : mapped(v.spoiled, spoiledOf);
   const ahead = version < THIRD_VERSION ? [] : mapped(v.ahead, announcedOf);
-  const short = version < SAVE_VERSION ? [] : mapped(v.short, shortOf);
+  const short = version < FIFTH_VERSION ? [] : mapped(v.short, shortOf);
+  // A run saved before clients could take a break has every client in good standing.
+  const standing = version < SAVE_VERSION ? {} : standingsOf(v.standing);
+  const news = version < SAVE_VERSION ? [] : mapped(v.news, noticeOf);
+  const lost = version < SAVE_VERSION ? [] : listOf(v.lost, isText);
   const cash = version === FIRST_VERSION ? STARTING_CASH : v.cash;
-  if (!stock || !usual || !trucks || !crews || !storeRoom || !capacity || !clients || !moods || !history || !promises || !spoiled || !ahead || !short) return null;
+  if (!stock || !usual || !trucks || !crews || !storeRoom || !capacity || !clients || !moods || !history || !promises || !spoiled || !ahead || !short || !standing || !news || !lost) return null;
   if (trucks.length === 0 || clients.length === 0 || KEPT.some((k) => !((capacity[k] ?? 0) > 0))) return null;
+  // A morning with every client on a break would have no orders.
+  if (clients.every((c) => (standing[c.name]?.away ?? 0) > 0)) return null;
   if (!isMoney(cash)) return null;
   if (!isObject(delivery) || !isCount(delivery.items) || !isCount(delivery.units)) return null;
   const sent: Delivery = { items: delivery.items, units: delivery.units };
@@ -202,13 +235,16 @@ function runOf(v: unknown, version: number): RunState | null {
     ahead,
     short,
     cash,
+    standing,
+    news,
+    lost: [...lost],
   };
 }
 
 function parse(text: string): Json | null {
   try {
     const data: unknown = JSON.parse(text);
-    return isObject(data) && (data.version === FIRST_VERSION || data.version === SECOND_VERSION || data.version === THIRD_VERSION || data.version === FOURTH_VERSION || data.version === SAVE_VERSION) ? data : null;
+    return isObject(data) && (data.version === FIRST_VERSION || data.version === SECOND_VERSION || data.version === THIRD_VERSION || data.version === FOURTH_VERSION || data.version === FIFTH_VERSION || data.version === SAVE_VERSION) ? data : null;
   } catch {
     return null;
   }

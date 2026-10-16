@@ -269,7 +269,7 @@ describe('a truck at the garage', () => {
   });
 
   it('needs no new save version: the saved data holds no garage, and a run saved before reads as it did', () => {
-    expect(SAVE_VERSION).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
     const run = runOf(3);
     const text = encodeRun(run, garageSeed(run));
     expect(text).not.toContain('garage');

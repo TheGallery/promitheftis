@@ -240,7 +240,7 @@ describe('a town event', () => {
   });
 
   it('needs no new save version: a run saved before reads as it did, and one saved with news in it reads back whole', () => {
-    expect(SAVE_VERSION).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
     const run = runOf(5);
     expect(decodeRun(encodeRun(run, 9))).toEqual({ run, daySeed: 9 });
     const told: Announced[] = [{ client: run.clients[0]!.name, event: 'match' }, { client: run.clients[1]!.name, event: 'closed' }];
@@ -263,6 +263,21 @@ describe('a town event', () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(0);
+  });
+
+  it('never names a client still on a break tomorrow, and names one that is back tomorrow', () => {
+    const base = runOf(4, 'small');
+    const [still, back] = base.clients;
+    if (!still || !back) throw new Error('too few clients');
+    const run: RunState = { ...base, standing: { [still.name]: { streak: 0, away: 2 }, [back.name]: { streak: 0, away: 1 } } };
+    const orders = generateDay(run, mulberry32(1)).orders;
+    let backNamed = 0;
+    for (let seed = 1; seed <= 3000; seed++) {
+      const named = tomorrowFor(run, orders, mulberry32(seed), 0, 10).ahead.filter((a) => isTownEvent(a.event)).map((a) => a.client);
+      expect(named).not.toContain(still.name);
+      if (named.includes(back.name)) backNamed++;
+    }
+    expect(backNamed).toBeGreaterThan(0);
   });
 
   it('is told in the how-to-play', () => {

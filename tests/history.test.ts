@@ -137,13 +137,13 @@ describe('across the days of a run', () => {
     for (const shortClient of ["Rosa's", 'The Anchor', 'Golden Dragon']) {
       const { day, supply, calls, answers } = dayWithout(shortClient);
       run = nextDay(run, outcomeOf({}, supply, day, calls, answers, null));
+      if (run.day === 3) expect(shortMarker(run.history['The Plough'])).toBe('!!');
     }
     expect(run.day).toBe(4);
     expect(run.history["Rosa's"]).toHaveLength(2);
     expect(shortCount(run.history["Rosa's"])).toBe(0);
     expect(shortMarker(run.history['The Anchor'])).toBe('!');
     expect(shortMarker(run.history['Golden Dragon'])).toBe('!');
-    expect(shortMarker(run.history['The Plough'])).toBe('!!');
   });
 
   it('has a new client with no history until it has had a day', () => {

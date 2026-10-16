@@ -182,10 +182,13 @@ describe.each(['small', 'big'] as const)('a truck at the garage, on the %s morni
   it('is handled clearly better by a careful player: the orders still go out, and blind play leaves more of them short', () => {
     const blind = later(kind, 'blind');
     const careful = later(kind, 'careful');
-    expect(onDays(careful, true, inFull)).toBeGreaterThan(onDays(blind, true, inFull) + 0.15);
-    expect(onDays(careful, true, pleased)).toBeGreaterThan(onDays(blind, true, pleased) + 0.2);
+    // Blind play loses clients after three bad days running, which lightens its trucks, so the gap is a little narrower.
+    expect(onDays(careful, true, inFull)).toBeGreaterThan(onDays(blind, true, inFull) + 0.1);
+    expect(onDays(careful, true, pleased)).toBeGreaterThan(onDays(blind, true, pleased) + 0.15);
     expect(onDays(careful, true, (d) => d.stranded)).toBeLessThan(0.5);
-    expect(onDays(blind, true, inFull)).toBeLessThan(onDays(blind, false, inFull));
+    // On the big morning those lighter trucks leave blind play stranding next to nothing on any day, garage or not.
+    if (kind === 'small') expect(onDays(blind, true, (d) => d.stranded)).toBeGreaterThan(onDays(blind, false, (d) => d.stranded));
+    else expect(onDays(blind, true, (d) => d.stranded)).toBeLessThan(0.1);
   });
 
   it('does not make blind play collapse: it still earns on those days, and still pleases most of its clients about as often as it does', () => {
@@ -301,7 +304,7 @@ describe.each(['small', 'big'] as const)('busy and quiet days of the week, on th
     for (const policy of ['blind', 'careful'] as const) {
       const days = later(kind, policy);
       expect(mean(days.filter(busy), (d) => d.asked / d.orders)).toBeGreaterThan(mean(days.filter(quiet), (d) => d.asked / d.orders) * 1.15);
-      for (const d of days) expect(d.orders).toBeGreaterThanOrEqual(Math.max(3, d.clients - Math.max(1, Math.floor(d.clients / 10))));
+      for (const d of days) expect(d.orders).toBeGreaterThanOrEqual(Math.max(3, d.clients - d.away - Math.max(1, Math.floor(d.clients / 10))));
     }
   });
 
@@ -396,5 +399,68 @@ describe.each(['small', 'big'] as const)('clients that are closed for a day, on 
     expect(mean(blind.filter(closed), pleased)).toBeGreaterThan(0.35);
     expect(mean(blind.filter(closed), pleased)).toBeGreaterThan(mean(blind.filter((d) => !closed(d)), pleased) - 0.15);
     expect(mean(blind.filter(closed), (d) => d.profit)).toBeGreaterThan(-STARTING_CASH / 10);
+  });
+});
+
+/** Averages of one figure over the days after the first, whichever player plays them. */
+const afterFirst = (kind: 'small' | 'big', policy: Policy) => runs(kind, policy).flatMap((r) => r.filter((d) => d.day > 1));
+const total = (days: DayStat[], figure: (d: DayStat) => number) => days.reduce((sum, d) => sum + figure(d), 0);
+/** The share of the clients, over all the mornings, that sent no order because they were on a break. */
+const awayShare = (days: DayStat[]) => total(days, (d) => d.away) / total(days, (d) => d.clients);
+
+describe.each(['small', 'big'] as const)('a client let down three days running, on the %s morning', (kind) => {
+  it('is never on the first three mornings, since it takes three bad days', () => {
+    for (const policy of ['blind', 'careful'] as const) {
+      for (const run of runs(kind, policy)) {
+        for (const d of run.filter((x) => x.day <= 3)) expect([d.breaks, d.gone, d.away, d.back]).toEqual([0, 0, 0, 0]);
+      }
+    }
+  });
+
+  it('is a few clients in a hundred for blind play, who lose some orders for a few days, and almost none for a careful player', () => {
+    const blind = awayShare(afterFirst(kind, 'blind'));
+    expect(blind).toBeGreaterThan(0.03);
+    expect(blind).toBeLessThan(0.15);
+    expect(awayShare(afterFirst(kind, 'careful'))).toBeLessThan(0.01);
+    const breaks = (policy: Policy) => total(afterFirst(kind, policy), (d) => d.breaks) / SEEDS.length;
+    expect(breaks('blind')).toBeGreaterThan(5);
+    expect(breaks('careful')).toBeLessThan(1);
+    expect(breaks('careful')).toBeLessThan(breaks('blind') / 10);
+  });
+
+  it('warns first: blind play meets clients let down two days running often, a careful player rarely', () => {
+    const warned = (policy: Policy) => total(afterFirst(kind, policy), (d) => d.warned) / afterFirst(kind, policy).length;
+    expect(warned('blind')).toBeGreaterThan(1);
+    expect(warned('careful')).toBeLessThan(0.2);
+  });
+
+  it('is handled clearly better by a careful player: the warned clients are served first and mostly pleased, so they stay', () => {
+    const pleasedOfWarned = (policy: Policy) => total(afterFirst(kind, policy), (d) => d.warnedPleased) / total(afterFirst(kind, policy), (d) => d.warned);
+    expect(pleasedOfWarned('careful')).toBeGreaterThan(0.75);
+    expect(pleasedOfWarned('blind')).toBeLessThan(0.65);
+    expect(pleasedOfWarned('careful')).toBeGreaterThan(pleasedOfWarned('blind') + 0.2);
+  });
+
+  it('does not make blind play collapse: it keeps most of its clients and still earns, and no run is ever left without one', () => {
+    const blind = summarise(runs(kind, 'blind'), FROM);
+    expect(blind.profit).toBeGreaterThan(0);
+    expect(blind.pleased).toBeGreaterThan(0.5);
+    expect(blind.minCash).toBeGreaterThan(-2 * STARTING_CASH);
+    const gone = total(afterFirst(kind, 'blind'), (d) => d.gone) / SEEDS.length;
+    expect(gone).toBeLessThan(6);
+    for (const run of runs(kind, 'blind')) {
+      for (const d of run) expect(d.clients - d.away).toBeGreaterThanOrEqual(1);
+      expect(run.some((d) => d.orders > 0)).toBe(true);
+    }
+  });
+
+  it('brings every client back from a break, a little wary, a day after the last morning without orders', () => {
+    for (const run of runs(kind, 'blind')) {
+      const breaks = total(run, (d) => d.breaks);
+      const back = total(run, (d) => d.back);
+      // A client who breaks late in a run may not have come back yet, and one who goes for good on their second break does not.
+      expect(back).toBeLessThanOrEqual(breaks);
+    }
+    expect(total(runs(kind, 'blind').flat(), (d) => d.back)).toBeGreaterThan(0);
   });
 });

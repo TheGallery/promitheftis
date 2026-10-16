@@ -49,7 +49,9 @@ export interface Garage {
 
 export type Message =
   | { kind: 'order'; orderId: number; at: number }
-  | { kind: 'supplier' | 'staff'; from: string; text: string; at: number };
+  | { kind: 'supplier' | 'staff'; from: string; text: string; at: number }
+  /** A note from a client, such as the one that says they are trying another supplier. */
+  | { kind: 'client'; from: string; text: string; at: number };
 
 /** An item the supplier delivered less of than was ordered: `came` of the `ordered` units arrived. */
 export interface Short {

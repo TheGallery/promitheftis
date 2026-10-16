@@ -97,7 +97,7 @@ function choose<T>(entries: readonly T[], roll: number): T {
 /**
  * What a day's overnight messages tell the player about the next day: whether the town has something on (a match day,
  * a regatta) that makes the clients it touches ask for more, and which clients are closed. Clients that always ask for a
- * time (the hospital and the schools) are never closed. It takes all its chances from `random`, always the same number,
+ * time (the hospital and the schools) are never closed, and a client still on a break tomorrow is never named. It takes all its chances from `random`, always the same number,
  * so that none of it moves anything else that chance decides. Nothing is announced on the first day.
  */
 export function tomorrowFor(
@@ -138,7 +138,9 @@ export function tomorrowFor(
     const event = kinds.length > 0 ? choose(kinds, eventPick) : null;
     if (event) {
       const area = event.places ?? [choose(here, placePick)];
-      const named = run.clients.filter((c) => area.includes(c.place) && !closing.some((t) => t.client.name === c.name)).slice(0, MOST_NAMED);
+      const named = run.clients
+        .filter((c) => area.includes(c.place) && (run.standing[c.name]?.away ?? 0) <= 1 && !closing.some((t) => t.client.name === c.name))
+        .slice(0, MOST_NAMED);
       if (named.length > 0) {
         for (const c of named) out.ahead.push({ client: c.name, event: event.id });
         out.notes.push({ kind: 'staff', from: lead, text: event.news(place(area[0] as PlaceId).name, when), at: eventAt });

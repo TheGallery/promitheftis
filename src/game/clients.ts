@@ -75,6 +75,21 @@ export function usualWith(usual: Readonly<Record<string, number>>, clients: read
   return out;
 }
 
+/**
+ * The usual amounts once `leaving`, one of `clients`, has gone for good: each falls by the share that client takes of the whole,
+ * so the orders that are left are as big as before and the business is worth less by that client's orders.
+ */
+export function usualWithout(usual: Readonly<Record<string, number>>, clients: readonly Shaped[], leaving: Shaped): Record<string, number> {
+  const out = { ...usual };
+  const total = clientWeight(clients);
+  if (total <= 0) return out;
+  for (const [item, n] of Object.entries(usual)) {
+    const kept = KEPT_OF.get(item);
+    if (kept) out[item] = Math.max(0, n - Math.round((n * itemWeight(leaving, kept)) / total));
+  }
+  return out;
+}
+
 /** Squares from the depot to a place, one way. */
 export function distanceFromDepot(id: PlaceId): number {
   return travelSquares(DEPOT, id);
